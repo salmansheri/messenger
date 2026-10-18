@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, type FormEvent } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { ApiProblem, call, sdk } from "@/lib/api";
+import { call, sdk, toProblem } from "@/lib/api";
 import { rememberPendingEmail } from "./pending-email";
-import { signUpSchema, type SignUpValues } from "./schemas";
+import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 
 const FIELDS = ["email", "displayName", "password"] as const;
@@ -19,6 +20,17 @@ export function SignUpForm() {
   const router = useRouter();
   const formElement = useRef<HTMLFormElement>(null);
   const problems = useServerProblems(FIELDS);
+
+  const signUp = useMutation({
+    mutationFn: (data: SignUpData) => call(sdk.signUp({ body: data })),
+    onMutate: () => problems.clearAll(),
+    onSuccess: (_, data) => {
+      rememberPendingEmail(data.email);
+      router.push("/verify");
+    },
+    onError: (error) => problems.show(toProblem(error)),
+  });
+
   const form = useForm({
     defaultValues,
     // Check a field when it loses focus; once a submit was attempted, check on every keystroke.
@@ -27,18 +39,8 @@ export function SignUpForm() {
       // Take a keyboard or screen-reader user to the first field that needs attention.
       requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     },
-    onSubmit: async ({ value }) => {
-      problems.clearAll();
-      const data = signUpSchema.parse(value); // the same checks, plus trimming and lower-casing the address
-      try {
-        await call(sdk.signUp({ body: data }));
-        rememberPendingEmail(data.email);
-        router.push("/verify");
-      } catch (error) {
-        if (!(error instanceof ApiProblem)) throw error;
-        problems.show(error);
-      }
-    },
+    // The same checks again, plus trimming and lower-casing the address; the mutation reports its own failures.
+    onSubmit: ({ value }) => signUp.mutateAsync(signUpSchema.parse(value)).catch(() => undefined),
   });
 
   function submit(event: FormEvent) {
@@ -103,13 +105,9 @@ export function SignUpForm() {
       </form.Field>
       {problems.formError && <Notice tone="problem">{problems.formError}</Notice>}
       <div className="flex items-center justify-between gap-4">
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <Button type="submit" busy={isSubmitting}>
-              {isSubmitting ? "Creating account…" : "Create account"}
-            </Button>
-          )}
-        </form.Subscribe>
+        <Button type="submit" busy={signUp.isPending}>
+          {signUp.isPending ? "Creating account…" : "Create account"}
+        </Button>
         <Link href="/verify" className="text-sm underline underline-offset-4 decoration-rule hover:decoration-ink">
           I already have a code
         </Link>

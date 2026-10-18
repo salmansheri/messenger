@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { ApiProblem, call, sdk } from "@/lib/api";
+import { call, sdk, toProblem } from "@/lib/api";
 import { AuthCard } from "./auth-card";
 import { forgetPendingEmail, pendingEmail } from "./pending-email";
-import { codeSchema, emailSchema, verifySchema, type VerifyValues } from "./schemas";
+import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { VerifiedView } from "./verified-view";
 import { codeMessageFor } from "./wording";
@@ -24,8 +25,49 @@ export function VerifyForm() {
   const problems = useServerProblems(FIELDS);
   const [verified, setVerified] = useState(false);
   const [wrongTries, setWrongTries] = useState(NO_WRONG_TRIES);
-  const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const verify = useMutation({
+    mutationFn: (data: VerifyData) => call(sdk.verifyEmail({ body: data })),
+    onMutate: () => {
+      setNotice(null);
+      problems.clearAll();
+    },
+    onSuccess: () => {
+      forgetPendingEmail();
+      setVerified(true);
+    },
+    onError: (error, data) => {
+      const problem = toProblem(error);
+      if (problem.status !== 400) {
+        problems.show(problem);
+        return;
+      }
+      const tries = afterWrongCode(wrongTries, data.email);
+      setWrongTries(tries);
+      problems.showForm(
+        wrongTriesExhausted(tries)
+          ? `That did not work again. A code stops working after ${WRONG_CODE_LIMIT} wrong tries, so ask for a new one.`
+          : codeMessageFor(problem),
+      );
+    },
+  });
+
+  const resend = useMutation({
+    mutationFn: (email: string) => call(sdk.resendVerification({ body: { email } })),
+    onMutate: () => {
+      setNotice(null);
+      problems.clearAll();
+    },
+    onSuccess: (_, email) => {
+      setWrongTries(NO_WRONG_TRIES);
+      form.resetField("code");
+      setNotice(`A new code is on its way to ${email}. The old one no longer works.`);
+    },
+    onError: (error) => problems.show(toProblem(error)),
+  });
+
+  const busy = verify.isPending || resend.isPending;
 
   const form = useForm({
     defaultValues,
@@ -33,29 +75,7 @@ export function VerifyForm() {
     onSubmitInvalid: () => {
       requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     },
-    onSubmit: async ({ value }) => {
-      setNotice(null);
-      problems.clearAll();
-      const data = verifySchema.parse(value);
-      try {
-        await call(sdk.verifyEmail({ body: data }));
-        forgetPendingEmail();
-        setVerified(true);
-      } catch (error) {
-        if (!(error instanceof ApiProblem)) throw error;
-        if (error.status !== 400) {
-          problems.show(error);
-          return;
-        }
-        const tries = afterWrongCode(wrongTries, data.email);
-        setWrongTries(tries);
-        problems.showForm(
-          wrongTriesExhausted(tries)
-            ? `That did not work again. A code stops working after ${WRONG_CODE_LIMIT} wrong tries, so ask for a new one.`
-            : codeMessageFor(error),
-        );
-      }
-    },
+    onSubmit: ({ value }) => verify.mutateAsync(verifySchema.parse(value)).catch(() => undefined),
   });
 
   // Coming from sign-up, the address is already known and only the code is missing.
@@ -73,26 +93,15 @@ export function VerifyForm() {
     void form.handleSubmit();
   }
 
-  async function sendNewCode() {
-    setNotice(null);
-    problems.clearAll();
+  function sendNewCode() {
     const address = emailSchema.safeParse(form.state.values.email);
     if (!address.success) {
+      setNotice(null);
+      problems.clearAll();
       problems.showField("email", address.error.issues[0].message);
       return;
     }
-    setSending(true);
-    try {
-      await call(sdk.resendVerification({ body: { email: address.data } }));
-      setWrongTries(NO_WRONG_TRIES);
-      form.resetField("code");
-      setNotice(`A new code is on its way to ${address.data}. The old one no longer works.`);
-    } catch (error) {
-      if (!(error instanceof ApiProblem)) throw error;
-      problems.show(error);
-    } finally {
-      setSending(false);
-    }
+    resend.mutate(address.data);
   }
 
   if (verified) return <VerifiedView />;
@@ -146,18 +155,14 @@ export function VerifyForm() {
         </form.Field>
         {problems.formError && <Notice tone="problem">{problems.formError}</Notice>}
         {notice && <Notice tone="info">{notice}</Notice>}
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <div className="flex items-center justify-between gap-4">
-              <Button type="submit" busy={isSubmitting || sending}>
-                {isSubmitting ? "Checking…" : "Verify"}
-              </Button>
-              <Button variant="quiet" onClick={sendNewCode} busy={isSubmitting || sending}>
-                {sending ? "Sending…" : "Send a new code"}
-              </Button>
-            </div>
-          )}
-        </form.Subscribe>
+        <div className="flex items-center justify-between gap-4">
+          <Button type="submit" busy={busy}>
+            {verify.isPending ? "Checking…" : "Verify"}
+          </Button>
+          <Button variant="quiet" onClick={sendNewCode} busy={busy}>
+            {resend.isPending ? "Sending…" : "Send a new code"}
+          </Button>
+        </div>
       </form>
     </AuthCard>
   );

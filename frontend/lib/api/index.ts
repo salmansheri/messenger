@@ -1,5 +1,5 @@
 import { client } from "./generated/client.gen";
-import { NETWORK_FAILURE, problemFrom } from "./problem";
+import { ApiProblem, NETWORK_FAILURE, problemFrom } from "./problem";
 
 export * as sdk from "./generated/sdk.gen";
 export * from "./generated/types.gen";
@@ -16,6 +16,11 @@ export function setAccessTokenProvider(provider: () => string | undefined) {
 }
 
 client.setConfig({ baseUrl: API_URL, credentials: "include", auth: () => accessToken() });
+
+/** Any error as an {@link ApiProblem}; `call` only throws those, so anything else is a bug and reads as a server error. */
+export function toProblem(error: unknown): ApiProblem {
+  return error instanceof ApiProblem ? error : problemFrom(undefined, 500, new Headers());
+}
 
 type Result<T> = { data?: T; error?: unknown; response?: Response };
 
