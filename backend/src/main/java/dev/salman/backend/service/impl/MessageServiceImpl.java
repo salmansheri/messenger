@@ -69,10 +69,10 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	@Transactional(readOnly = true)
 	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit) {
+		requireParticipant(callerId, conversationId); // first, so a non-participant never learns more than a 404
 		if (beforeSeq != null && afterSeq != null) {
 			throw new BadRequestException("Use either beforeSeq or afterSeq, not both.");
 		}
-		requireParticipant(callerId, conversationId);
 		// One extra row tells whether more exist beyond this page.
 		var fetch = Limit.of(limit + 1);
 		List<Message> found;

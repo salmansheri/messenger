@@ -1,6 +1,10 @@
 spring:
   application:
     name: backend
+  datasource:
+    hikari:
+      # Never wait forever for a row lock (a stalled sender must not block a whole conversation).
+      connection-init-sql: SET lock_timeout = '5s'
   jpa:
     open-in-view: false
     hibernate:
