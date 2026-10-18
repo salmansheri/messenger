@@ -17,6 +17,11 @@ spring:
 
 app:
   mail-from: no-reply@messenger.local
+  refresh-cookie:
+    secure: true
+  cors:
+    allowed-origins:
+      - http://localhost:3000
   jwt:
     issuer: messenger-backend
     access-token-ttl: 15m

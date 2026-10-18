@@ -1,6 +1,6 @@
 package dev.salman.backend.service;
 
-import dev.salman.backend.dto.TokenResponse;
+import dev.salman.backend.dto.IssuedTokens;
 
 public interface AuthService {
 
@@ -24,6 +24,6 @@ public interface AuthService {
 	 * @throws dev.salman.backend.exception.EmailNotVerifiedException when the password is right but the email is
 	 *         not yet verified
 	 */
-	TokenResponse login(String email, String password);
+	IssuedTokens login(String email, String password);
 
 }

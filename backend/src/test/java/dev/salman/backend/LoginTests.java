@@ -25,7 +25,7 @@ class LoginTests extends IntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.tokenType").value("Bearer"))
 				.andExpect(jsonPath("$.accessToken").isNotEmpty())
-				.andExpect(jsonPath("$.refreshToken").isNotEmpty())
+				.andExpect(jsonPath("$.refreshToken").doesNotExist())
 				.andExpect(jsonPath("$.expiresIn").value(900));
 	}
 

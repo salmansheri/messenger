@@ -14,6 +14,12 @@ public class ApiException extends ErrorResponseException {
 		super(status, ProblemDetail.forStatusAndDetail(status, message), null);
 	}
 
+	/** Adds a response header that is sent along with the problem. */
+	public ApiException header(String name, String value) {
+		headers.add(name, value);
+		return this;
+	}
+
 	protected final HttpHeaders mutableHeaders() {
 		return headers;
 	}

@@ -19,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class AuthClient {
 
 	public static final String PASSWORD = "correct-horse-battery";
+	public static final String REFRESH_COOKIE = "refresh_token";
 
 	private static final Pattern CODE = Pattern.compile("\\b(\\d{6})\\b");
 	private static final AtomicInteger NEXT_IP = new AtomicInteger(1);
@@ -62,11 +63,51 @@ public class AuthClient {
 	}
 
 	public ResultActions refresh(String refreshToken) throws Exception {
-		return postJson("/api/v1/auth/refresh", Map.of("refreshToken", refreshToken));
+		return postWithCookie("/api/v1/auth/refresh", refreshToken, null);
+	}
+
+	public ResultActions refreshFromOrigin(String refreshToken, String origin) throws Exception {
+		return postWithCookie("/api/v1/auth/refresh", refreshToken, origin);
+	}
+
+	public ResultActions refreshWithoutCookie() throws Exception {
+		return postWithCookie("/api/v1/auth/refresh", null, null);
 	}
 
 	public ResultActions logout(String refreshToken) throws Exception {
-		return postJson("/api/v1/auth/logout", Map.of("refreshToken", refreshToken));
+		return postWithCookie("/api/v1/auth/logout", refreshToken, null);
+	}
+
+	public ResultActions logoutWithoutCookie() throws Exception {
+		return postWithCookie("/api/v1/auth/logout", null, null);
+	}
+
+	private ResultActions postWithCookie(String path, String refreshToken, String origin) throws Exception {
+		var request = MockMvcRequestBuilders.post(path).with(req -> {
+			req.setRemoteAddr(ip);
+			return req;
+		});
+		if (refreshToken != null) {
+			request.cookie(new jakarta.servlet.http.Cookie(REFRESH_COOKIE, refreshToken));
+		}
+		if (origin != null) {
+			request.header("Origin", origin);
+		}
+		return mvc.perform(request);
+	}
+
+	/** The raw Set-Cookie header for the refresh cookie, or null when the response did not set it. */
+	public static String refreshSetCookie(ResultActions result) {
+		return result.andReturn().getResponse().getHeaders("Set-Cookie").stream()
+				.filter(h -> h.startsWith(REFRESH_COOKIE + "=")).findFirst().orElse(null);
+	}
+
+	public static String refreshCookieValue(ResultActions result) {
+		var header = refreshSetCookie(result);
+		if (header == null) {
+			throw new AssertionError("No " + REFRESH_COOKIE + " cookie was set");
+		}
+		return header.substring((REFRESH_COOKIE + "=").length()).split(";", 2)[0];
 	}
 
 	public ResultActions me(String accessToken) throws Exception {
@@ -99,7 +140,7 @@ public class AuthClient {
 
 	public Tokens tokensFrom(ResultActions result) throws Exception {
 		var node = json.readTree(result.andReturn().getResponse().getContentAsString());
-		return new Tokens(node.get("accessToken").asString(), node.get("refreshToken").asString());
+		return new Tokens(node.get("accessToken").asString(), refreshCookieValue(result));
 	}
 
 	public ResultActions postJson(String path, Object body) throws Exception {

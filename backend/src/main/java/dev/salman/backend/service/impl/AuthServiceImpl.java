@@ -5,7 +5,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import dev.salman.backend.config.AppProperties;
-import dev.salman.backend.dto.TokenResponse;
+import dev.salman.backend.dto.IssuedTokens;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.EmailNotVerifiedException;
@@ -89,7 +89,7 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
-	public TokenResponse login(String rawEmail, String password) {
+	public IssuedTokens login(String rawEmail, String password) {
 		var user = users.findByEmail(Emails.normalize(rawEmail));
 		var matches = passwordEncoder.matches(password,
 				user.map(User::getPasswordHash).orElse(unknownUserPasswordHash));

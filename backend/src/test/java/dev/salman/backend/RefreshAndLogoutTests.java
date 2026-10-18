@@ -145,15 +145,11 @@ class RefreshAndLogoutTests extends IntegrationTest {
 	}
 
 	@Test
-	void aMissingRefreshTokenIsAValidationError() throws Exception {
+	void aMissingRefreshCookieIsRefusedOnRefreshAndIgnoredOnLogout() throws Exception {
 		var client = auth();
 
-		client.postJson("/api/v1/auth/refresh", java.util.Map.of())
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.errors.refreshToken").isNotEmpty());
-		client.postJson("/api/v1/auth/logout", java.util.Map.of("refreshToken", ""))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.errors.refreshToken").isNotEmpty());
+		client.refreshWithoutCookie().andExpect(status().isUnauthorized());
+		client.logoutWithoutCookie().andExpect(status().isNoContent());
 	}
 
 }

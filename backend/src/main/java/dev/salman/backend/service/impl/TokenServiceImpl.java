@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.config.AppProperties;
-import dev.salman.backend.dto.TokenResponse;
+import dev.salman.backend.dto.IssuedTokens;
 import dev.salman.backend.entity.RefreshToken;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.ApiException;
@@ -35,14 +35,14 @@ public class TokenServiceImpl implements TokenService {
 	private final Clock clock;
 
 	@Override
-	public TokenResponse startSession(User user) {
+	public IssuedTokens startSession(User user) {
 		return issueTokenPair(user.getId(), UUID.randomUUID());
 	}
 
 	/** Reuse revokes the session, so failures here must not roll back that revocation. */
 	@Override
 	@Transactional(noRollbackFor = ApiException.class)
-	public TokenResponse refresh(String refreshToken) {
+	public IssuedTokens refresh(String refreshToken) {
 		var now = clock.instant();
 		var token = refreshTokens.findByTokenHash(Hashing.sha256Hex(refreshToken))
 				.orElseThrow(TokenServiceImpl::invalidRefreshToken);
@@ -65,7 +65,7 @@ public class TokenServiceImpl implements TokenService {
 		return new UnauthorizedException("The refresh token is invalid or has expired.");
 	}
 
-	private TokenResponse issueTokenPair(UUID userId, UUID familyId) {
+	private IssuedTokens issueTokenPair(UUID userId, UUID familyId) {
 		var now = clock.instant();
 		var accessTtl = props.jwt().accessTokenTtl();
 		var claims = JwtClaimsSet.builder()
@@ -87,7 +87,7 @@ public class TokenServiceImpl implements TokenService {
 		refresh.setExpiresAt(now.plus(props.jwt().refreshTokenTtl()));
 		refreshTokens.save(refresh);
 
-		return TokenResponse.bearer(accessToken, refreshValue, accessTtl.toSeconds());
+		return new IssuedTokens(accessToken, refreshValue, accessTtl.toSeconds());
 	}
 
 }
