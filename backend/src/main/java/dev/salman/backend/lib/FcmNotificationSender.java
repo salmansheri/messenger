@@ -47,7 +47,8 @@ public class FcmNotificationSender implements NotificationSender {
 		}
 		catch (FirebaseMessagingException e) {
 			var code = e.getMessagingErrorCode();
-			if (code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT) {
+			if (code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT
+					|| code == MessagingErrorCode.SENDER_ID_MISMATCH) {
 				return PushResult.TOKEN_REJECTED;
 			}
 			throw new PushUnavailableException("FCM could not take the notification: " + code, e);

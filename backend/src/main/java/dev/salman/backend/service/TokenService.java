@@ -18,8 +18,11 @@ public interface TokenService {
 	 */
 	IssuedTokens refresh(String refreshToken);
 
-	/** Ends the session the refresh token belongs to; unknown tokens are ignored. */
-	void revoke(String refreshToken);
+	/**
+	 * Ends the session the refresh token belongs to; unknown tokens are ignored. When {@code deviceId} is given, that
+	 * device of the session's User also stops receiving push notifications (only the session owner's own device).
+	 */
+	void revoke(String refreshToken, UUID deviceId);
 
 	/** Ends every session of the User, on every device. */
 	void revokeAllFor(UUID userId);

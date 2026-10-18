@@ -32,6 +32,12 @@ public class TestHarnessConfiguration {
 
 	@Bean
 	@Primary
+	FaultyPushPublisher faultyPushPublisher(dev.salman.backend.lib.AmqpPushPublisher real) {
+		return new FaultyPushPublisher(real);
+	}
+
+	@Bean
+	@Primary
 	RecordingNotificationSender recordingNotificationSender() {
 		return new RecordingNotificationSender();
 	}

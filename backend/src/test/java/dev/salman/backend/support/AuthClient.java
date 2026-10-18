@@ -89,6 +89,14 @@ public class AuthClient {
 		return postWithCookie("/api/v1/auth/logout", refreshToken, null);
 	}
 
+	public ResultActions logoutDevice(String refreshToken, Object deviceId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/auth/logout").with(req -> {
+			req.setRemoteAddr(ip);
+			return req;
+		}).cookie(new jakarta.servlet.http.Cookie(REFRESH_COOKIE, refreshToken)).contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("deviceId", deviceId))));
+	}
+
 	public ResultActions logoutWithoutCookie() throws Exception {
 		return postWithCookie("/api/v1/auth/logout", null, null);
 	}

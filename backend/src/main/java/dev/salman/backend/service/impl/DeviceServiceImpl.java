@@ -43,6 +43,11 @@ public class DeviceServiceImpl implements DeviceService {
 	}
 
 	@Override
+	public void unregisterAll(UUID userId) {
+		devices.deleteByUserId(userId);
+	}
+
+	@Override
 	public void unregister(UUID userId, UUID deviceId) {
 		devices.deleteByIdAndUserId(deviceId, userId);
 	}

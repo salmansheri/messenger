@@ -9,8 +9,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.RealtimeEvent;
@@ -18,6 +16,7 @@ import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
+import dev.salman.backend.lib.AfterCommit;
 import dev.salman.backend.lib.RealtimeListener;
 import dev.salman.backend.lib.RealtimePublisher;
 import dev.salman.backend.repository.ParticipantRepository;
@@ -109,17 +108,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 			return;
 		}
 		var event = new RealtimeEvent(recipients, payload);
-		if (TransactionSynchronizationManager.isSynchronizationActive()) {
-			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-				@Override
-				public void afterCommit() {
-					publisher.publish(event);
-				}
-			});
-		}
-		else {
-			publisher.publish(event);
-		}
+		AfterCommit.run(() -> publisher.publish(event));
 	}
 
 }

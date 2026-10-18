@@ -38,6 +38,9 @@ public abstract class IntegrationTest {
 	protected RecordingNotificationSender pushes;
 
 	@Autowired
+	protected FaultyPushPublisher pushQueue;
+
+	@Autowired
 	protected JsonMapper json;
 
 	@Autowired
@@ -48,6 +51,7 @@ public abstract class IntegrationTest {
 		clock.reset();
 		emails.clearFailures();
 		pushes.clear();
+		pushQueue.reset();
 	}
 
 	protected AuthClient auth() {

@@ -13,6 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
+import dev.salman.backend.config.PushAmqpConfig;
+import dev.salman.backend.dto.PushDelivery;
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
@@ -23,6 +28,9 @@ class PushTests extends RealtimeIntegrationTest {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@Autowired
+	AmqpAdmin amqpAdmin;
+
 	private AuthClient client;
 	private Account ada;
 	private Account grace;
@@ -31,6 +39,7 @@ class PushTests extends RealtimeIntegrationTest {
 
 	@BeforeEach
 	void adaAndGraceTalk() throws Exception {
+		amqpAdmin.purgeQueue(PushAmqpConfig.DEAD, true);
 		client = auth();
 		ada = client.account("Ada Lovelace");
 		grace = client.account("Grace Hopper");
@@ -254,6 +263,148 @@ class PushTests extends RealtimeIntegrationTest {
 		await().atMost(Duration.ofSeconds(10)).until(() -> pushes.all().size() == 2);
 		assertThat(pushes.attempts() - before).as("only the live device was tried").isEqualTo(1);
 		assertThat(devicesWithToken("grace-live")).isEqualTo(1);
+	}
+
+	// ---- lost work, retries and dead letters
+
+	private org.springframework.amqp.core.Message buried() {
+		var holder = new org.springframework.amqp.core.Message[1];
+		await().atMost(Duration.ofSeconds(10)).until(() -> {
+			holder[0] = rabbit.receive(PushAmqpConfig.DEAD, 200);
+			return holder[0] != null;
+		});
+		return holder[0];
+	}
+
+	@Test
+	void aFailureWhileQueueingRetriesTheJobWithoutPushingAnyDeviceTwice() throws Exception {
+		register(grace, "grace-phone");
+		register(grace, "grace-laptop");
+		pushQueue.failDeliverCalls(2); // the first device is queued, then the broker hiccups
+
+		client.sendNew(ada.accessToken(), conversation, "both devices, once each");
+
+		await().atMost(Duration.ofSeconds(10)).until(() -> pushes.all().size() >= 2);
+		Thread.sleep(1_500);
+		assertThat(pushes.all()).extracting(Push::deviceToken).containsExactlyInAnyOrder("grace-phone", "grace-laptop");
+	}
+
+	@Test
+	void aJobThatKeepsFailingEndsOnTheDeadLetterQueue() throws Exception {
+		register(grace, "grace-phone");
+		pushQueue.failAllDeliveries();
+
+		client.sendNew(ada.accessToken(), conversation, "never queued");
+
+		var dead = buried();
+		assertThat(dead.getMessageProperties().<String>getHeader("kind")).isEqualTo("job");
+		assertThat(pushes.all()).isEmpty();
+	}
+
+	@Test
+	void aDeliveryThatRunsOutOfAttemptsEndsOnTheDeadLetterQueue() throws Exception {
+		register(grace, "grace-phone");
+		pushes.failNext(1_000);
+
+		client.sendNew(ada.accessToken(), conversation, "provider is down");
+
+		assertThat(buried().getMessageProperties().<String>getHeader("kind")).isEqualTo("delivery");
+		assertThat(pushes.attempts()).isEqualTo(3);
+	}
+
+	@Test
+	void aDeliveryThatCannotBeQueuedForRetryIsBuriedNotLost() throws Exception {
+		register(grace, "grace-phone");
+		pushes.failNext(1_000);
+		pushQueue.failRetries();
+
+		client.sendNew(ada.accessToken(), conversation, "provider and broker both struggling");
+
+		assertThat(buried().getMessageProperties().<String>getHeader("kind")).isEqualTo("delivery");
+		assertThat(pushes.attempts()).isEqualTo(1);
+	}
+
+	@Test
+	void anUnexpectedErrorIsNotRetried() throws Exception {
+		register(grace, "grace-phone");
+		pushes.breakNext(new IllegalStateException("a bug"));
+
+		client.sendNew(ada.accessToken(), conversation, "one try only");
+
+		await().atMost(Duration.ofSeconds(10)).until(() -> pushes.attempts() >= 1);
+		Thread.sleep(1_500);
+		assertThat(pushes.attempts()).isEqualTo(1);
+		assertThat(pushes.all()).isEmpty();
+		assertThat(devicesWithToken("grace-phone")).isEqualTo(1);
+	}
+
+	@Autowired
+	RabbitTemplate rabbit;
+
+	@Test
+	void aRejectionOnlyRemovesTheRegistrationThatWasQueued() throws Exception {
+		register(linus, "moved-phone");
+		pushes.reject("moved-phone");
+
+		// queued while the phone belonged to Grace, delivered after it moved to Linus
+		var stale = new PushDelivery(UUID.randomUUID(), UUID.fromString(grace.id()), "moved-phone", "t", "b", 1);
+		rabbit.convertAndSend(PushAmqpConfig.DELIVERIES, json.writeValueAsString(stale));
+		await().atMost(Duration.ofSeconds(10)).until(() -> pushes.attempts() >= 1);
+		Thread.sleep(500);
+		assertThat(devicesWithToken("moved-phone")).as("linus keeps his registration").isEqualTo(1);
+
+		var current = new PushDelivery(UUID.randomUUID(), UUID.fromString(linus.id()), "moved-phone", "t", "b", 1);
+		rabbit.convertAndSend(PushAmqpConfig.DELIVERIES, json.writeValueAsString(current));
+		await().atMost(Duration.ofSeconds(10)).until(() -> devicesWithToken("moved-phone") == 0);
+	}
+
+	// ---- when a User goes away
+
+	@Test
+	void resettingThePasswordDropsEveryDeviceOfThatUser() throws Exception {
+		register(grace, "grace-phone");
+		register(grace, "grace-laptop");
+		register(ada, "ada-phone");
+		var email = grace.email();
+
+		client.forgotPassword(email).andExpect(status().isNoContent());
+		client.resetPassword(email, client.latestCode(email), "a-brand-new-password").andExpect(status().isNoContent());
+
+		assertThat(devicesWithToken("grace-phone") + devicesWithToken("grace-laptop")).isZero();
+		assertThat(devicesWithToken("ada-phone")).isEqualTo(1);
+	}
+
+	@Test
+	void loggingOutWithADeviceIdStopsPushesToThatDeviceOnly() throws Exception {
+		var phone = register(grace, "grace-phone");
+		register(grace, "grace-laptop");
+		var refresh = AuthClient.refreshCookieValue(client.login(grace.email(), AuthClient.PASSWORD)
+				.andExpect(status().isOk()));
+
+		client.logoutDevice(refresh, phone).andExpect(status().isNoContent());
+
+		assertThat(devicesWithToken("grace-phone")).isZero();
+		assertThat(devicesWithToken("grace-laptop")).isEqualTo(1);
+	}
+
+	@Test
+	void loggingOutCannotRemoveSomeoneElsesDevice() throws Exception {
+		var adas = register(ada, "ada-phone");
+		var refresh = AuthClient.refreshCookieValue(client.login(grace.email(), AuthClient.PASSWORD)
+				.andExpect(status().isOk()));
+
+		client.logoutDevice(refresh, adas).andExpect(status().isNoContent());
+
+		assertThat(devicesWithToken("ada-phone")).isEqualTo(1);
+	}
+
+	@Test
+	void aDeviceIdWithoutAValidSessionRemovesNothing() throws Exception {
+		var phone = register(grace, "grace-phone");
+
+		client.logoutDevice("not-a-real-refresh-token", phone).andExpect(status().isNoContent());
+
+		assertThat(devicesWithToken("grace-phone")).isEqualTo(1);
 	}
 
 }

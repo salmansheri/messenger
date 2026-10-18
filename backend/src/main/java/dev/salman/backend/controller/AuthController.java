@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import dev.salman.backend.dto.EmailRequest;
 import dev.salman.backend.dto.IssuedTokens;
 import dev.salman.backend.dto.LoginRequest;
+import dev.salman.backend.dto.LogoutRequest;
 import dev.salman.backend.dto.ResetPasswordRequest;
 import dev.salman.backend.dto.SignUpRequest;
 import dev.salman.backend.dto.SignUpResponse;
@@ -88,9 +89,10 @@ public class AuthController {
 	}
 
 	@PostMapping("/logout")
-	ResponseEntity<Void> logout(@CookieValue(name = RefreshCookies.NAME, required = false) String refreshToken) {
+	ResponseEntity<Void> logout(@CookieValue(name = RefreshCookies.NAME, required = false) String refreshToken,
+			@RequestBody(required = false) LogoutRequest request) {
 		if (StringUtils.hasText(refreshToken)) {
-			tokens.revoke(refreshToken);
+			tokens.revoke(refreshToken, request == null ? null : request.deviceId());
 		}
 		return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, refreshCookies.clear().toString()).build();
 	}

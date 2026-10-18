@@ -20,6 +20,7 @@ import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.lib.Hashing;
 import dev.salman.backend.repository.RefreshTokenRepository;
 import dev.salman.backend.repository.UserRepository;
+import dev.salman.backend.service.DeviceService;
 import dev.salman.backend.service.RealtimeEvents;
 import dev.salman.backend.service.TokenService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class TokenServiceImpl implements TokenService {
 	private final RefreshTokenRepository refreshTokens;
 	private final UserRepository users;
 	private final RealtimeEvents events;
+	private final DeviceService devices;
 	private final AppProperties props;
 	private final Clock clock;
 
@@ -60,9 +62,13 @@ public class TokenServiceImpl implements TokenService {
 
 	@Override
 	@Transactional
-	public void revoke(String refreshToken) {
-		refreshTokens.findByTokenHash(Hashing.sha256Hex(refreshToken))
-				.ifPresent(token -> refreshTokens.deleteFamily(token.getFamilyId()));
+	public void revoke(String refreshToken, UUID deviceId) {
+		refreshTokens.findByTokenHash(Hashing.sha256Hex(refreshToken)).ifPresent(token -> {
+			refreshTokens.deleteFamily(token.getFamilyId());
+			if (deviceId != null) {
+				devices.unregister(token.getUserId(), deviceId);
+			}
+		});
 	}
 
 	@Override

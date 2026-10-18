@@ -24,9 +24,14 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 	@Modifying
 	void deleteByIdAndUserId(UUID id, UUID userId);
 
+	/** Only the registration that was queued: if the token has since moved to another User, theirs is left alone. */
 	@Transactional
 	@Modifying
-	void deleteByToken(String token);
+	void deleteByTokenAndUserId(String token, UUID userId);
+
+	@Transactional
+	@Modifying
+	void deleteByUserId(UUID userId);
 
 	/** Makes concurrent registrations of the same token run one after the other (released at commit). */
 	@Query(value = "select count(*) from (select pg_advisory_xact_lock(hashtextextended(:token, 1))) locked",

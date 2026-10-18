@@ -20,6 +20,7 @@ import dev.salman.backend.lib.EmailSender;
 import dev.salman.backend.lib.Emails;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.AuthService;
+import dev.salman.backend.service.DeviceService;
 import dev.salman.backend.service.TokenService;
 import dev.salman.backend.service.VerificationCodeService.Purpose;
 import dev.salman.backend.service.VerificationCodeService;
@@ -47,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
 	private final EmailSender emailSender;
 	private final AppProperties props;
 	private final TokenService tokens;
+	private final DeviceService devices;
 
 	@Qualifier(MailExecutorConfig.MAIL_EXECUTOR)
 	private final Executor mailExecutor;
@@ -146,6 +148,7 @@ public class AuthServiceImpl implements AuthService {
 		}
 		user.setPasswordHash(newHash);
 		tokens.revokeAllFor(user.getId());
+		devices.unregisterAll(user.getId()); // they no longer vouch for any phone
 	}
 
 	/** Holds the User row lock while checking the password and creating the session (see {@link #resetPassword}). */

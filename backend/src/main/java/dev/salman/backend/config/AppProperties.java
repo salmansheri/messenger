@@ -32,17 +32,17 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	}
 
 	/**
-	 * {@code ttl}: how long a connection stays online without a heartbeat (instances refresh theirs every 10 seconds).
-	 * {@code offlineGrace}: how long after the last connection ends before the User is declared offline, so a page
-	 * refresh does not flicker. {@code sweepInterval}: how often each instance looks for Users who have gone quiet.
-	 */
-	/**
 	 * {@code maxDevicesPerUser}: registered devices one User may have. {@code retryDelay}: how long a delivery waits
 	 * after a temporary provider failure. {@code maxAttempts}: deliveries are given up on after this many tries.
 	 */
 	public record Push(int maxDevicesPerUser, Duration retryDelay, int maxAttempts) {
 	}
 
+	/**
+	 * {@code ttl}: how long a connection stays online without a heartbeat (instances refresh theirs every 10 seconds).
+	 * {@code offlineGrace}: how long after the last connection ends before the User is declared offline, so a page
+	 * refresh does not flicker. {@code sweepInterval}: how often each instance looks for Users who have gone quiet.
+	 */
 	public record Presence(Duration ttl, Duration offlineGrace, Duration sweepInterval) {
 	}
 
