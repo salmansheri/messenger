@@ -1,0 +1,43 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Env files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Logs
+*.log
+
+# Backend (Spring Boot / Maven)
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/HELP.md
+backend/.apt_generated
+backend/.classpath
+backend/.factorypath
+backend/.project
+backend/.settings/
+backend/.springBeans
+backend/.sts4-cache/
+
+# Frontend (Next.js / Bun)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/coverage/
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts

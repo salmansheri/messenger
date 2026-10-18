@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: backend
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  threads:
+    virtual:
+      enabled: true
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail-from: no-reply@messenger.local
+  jwt:
+    issuer: messenger-backend
+    access-token-ttl: 15m
+    refresh-token-ttl: 30d
+    # PEM (PKCS8 private / X.509 public) EC P-256 keys. When unset an ephemeral
+    # key pair is generated at startup, so tokens do not survive a restart.
+    private-key:
+    public-key:
+  otp:
+    secret: dev-only-change-me
+    ttl: 10m
+    max-attempts: 5
+    max-sends-per-hour: 5
+    max-sends-per-ip-per-hour: 20
