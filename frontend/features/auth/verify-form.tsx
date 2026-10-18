@@ -13,7 +13,7 @@ import { forgetPendingEmail, pendingEmail } from "./pending-email";
 import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { VerifiedView } from "./verified-view";
-import { codeMessageFor } from "./wording";
+import { codeMessageFor, codesMessageFor } from "./wording";
 import { afterWrongCode, NO_WRONG_TRIES, WRONG_CODE_LIMIT, wrongTriesExhausted } from "./wrong-tries";
 
 const FIELDS = ["email", "code"] as const;
@@ -64,14 +64,14 @@ export function VerifyForm() {
       form.resetField("code");
       setNotice(`A new code is on its way to ${email}. The old one no longer works.`);
     },
-    onError: (error) => problems.show(toProblem(error)),
+    onError: (error) => problems.show(toProblem(error), codesMessageFor),
   });
 
   const busy = verify.isPending || resend.isPending;
 
   const form = useForm({
     defaultValues,
-    validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
+    validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: () => {
       requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     },

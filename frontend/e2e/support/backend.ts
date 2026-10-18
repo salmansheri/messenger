@@ -45,3 +45,27 @@ export async function signIn(email: string, password = PASSWORD): Promise<string
   if (login.status !== 200) throw new Error(`Sign in failed: ${login.status}`);
   return ((await login.json()) as { accessToken: string }).accessToken;
 }
+
+/** Starts a Direct conversation through the backend (as the owner of the token) and returns its id. */
+export async function startDirectVia(token: string, userId: string): Promise<string> {
+  const response = await post("/api/v1/conversations/direct", { userId }, token);
+  if (response.status !== 200 && response.status !== 201) throw new Error(`Start direct failed: ${response.status}`);
+  return ((await response.json()) as { id: string }).id;
+}
+
+/** Creates a Group through the backend and returns its id. */
+export async function createGroupVia(token: string, name: string, userIds: string[]): Promise<string> {
+  const response = await post("/api/v1/conversations/groups", { name, userIds }, token);
+  if (response.status !== 201) throw new Error(`Create group failed: ${response.status}`);
+  return ((await response.json()) as { id: string }).id;
+}
+
+/** Sends a Message through the backend. */
+export async function sendMessageVia(token: string, conversationId: string, body: string) {
+  const response = await post(
+    `/api/v1/conversations/${conversationId}/messages`,
+    { clientMessageId: crypto.randomUUID(), body },
+    token,
+  );
+  if (response.status !== 201) throw new Error(`Send failed: ${response.status}`);
+}

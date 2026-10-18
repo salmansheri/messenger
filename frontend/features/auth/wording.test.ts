@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api";
-import { codeMessageFor, describeWait, messageFor, signInMessageFor } from "./wording";
+import { codeMessageFor, codesMessageFor, describeWait, messageFor, signInMessageFor } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number, title = "x") =>
   new ApiProblem(status, title, undefined, {}, retryAfterSeconds);
@@ -19,9 +19,9 @@ describe("describeWait", () => {
 });
 
 describe("messageFor", () => {
-  it("tells a rate-limited visitor when to try again", () => {
-    expect(messageFor(problem(429, 1800))).toBe("Too many codes were requested. Try again in 30 minutes.");
-    expect(messageFor(problem(429))).toBe("Too many codes were requested. Try again later.");
+  it("tells someone who is going too fast when to try again", () => {
+    expect(messageFor(problem(429, 1800))).toBe("You are doing that too often. Try again in 30 minutes.");
+    expect(messageFor(problem(429))).toBe("You are doing that too often. Try again later.");
   });
 
   it("explains a taken address", () => {
@@ -37,6 +37,18 @@ describe("messageFor", () => {
   it("passes the backend's own words through for a bad request", () => {
     const refused = new ApiProblem(400, "Bad Request", "Invalid request content.", {}, undefined);
     expect(messageFor(refused)).toBe("Invalid request content.");
+  });
+});
+
+describe("codesMessageFor", () => {
+  it("says it was codes that were asked for too often", () => {
+    expect(codesMessageFor(problem(429, 1800))).toBe("Too many codes were requested. Try again in 30 minutes.");
+    expect(codesMessageFor(problem(429))).toBe("Too many codes were requested. Try again later.");
+  });
+
+  it("leaves every other failure to the general wording", () => {
+    expect(codesMessageFor(problem(409))).toBe(messageFor(problem(409)));
+    expect(codesMessageFor(problem(0))).toBe(messageFor(problem(0)));
   });
 });
 

@@ -52,7 +52,7 @@ export function SignInForm() {
 
   const form = useForm({
     defaultValues,
-    validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
+    validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: () => {
       requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     },

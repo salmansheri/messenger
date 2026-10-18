@@ -12,6 +12,7 @@ import { call, sdk, toProblem } from "@/lib/api";
 import { rememberPendingEmail } from "./pending-email";
 import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
+import { codesMessageFor } from "./wording";
 
 const FIELDS = ["email", "displayName", "password"] as const;
 const defaultValues: SignUpValues = { email: "", displayName: "", password: "" };
@@ -28,13 +29,14 @@ export function SignUpForm() {
       rememberPendingEmail(data.email);
       router.push("/verify");
     },
-    onError: (error) => problems.show(toProblem(error)),
+    onError: (error) => problems.show(toProblem(error), codesMessageFor),
   });
 
   const form = useForm({
     defaultValues,
-    // Check a field when it loses focus; once a submit was attempted, check on every keystroke.
-    validationLogic: revalidateLogic({ mode: "blur", modeAfterSubmission: "change" }),
+    // Check on submit; from then on, on every keystroke. (Not on blur: an error line appearing or vanishing as the pointer
+    // goes down on the button moves it away and the press is lost.)
+    validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: () => {
       // Take a keyboard or screen-reader user to the first field that needs attention.
       requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());

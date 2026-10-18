@@ -8,12 +8,12 @@ export const metadata: Metadata = { title: `Conversations · ${APP_NAME}` };
 // as "dropped from rendering".
 export const instant = false;
 
-/** The Conversation list arrives with the next tickets; this is where signing in lands. */
-export default function AppHome() {
+/** Beside the index on a desktop, when no Conversation is open. (On a phone the index is the whole screen.) */
+export default function NothingOpen() {
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">Conversations</h1>
-      <p className="mt-2 text-ink-muted">You have no Conversations yet.</p>
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+      <h2 className="font-serif text-2xl font-semibold tracking-tight">Pick a Conversation</h2>
+      <p className="mt-2 max-w-sm text-ink-muted">Choose one from the list, or start a new one with someone you know.</p>
     </div>
   );
 }
