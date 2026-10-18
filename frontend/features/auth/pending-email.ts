@@ -1,38 +1,43 @@
 /**
- * The address just signed up with, kept for the next screen so it stays out of the URL (history, server logs and
- * Referer headers). It lives in this tab's sessionStorage only until the address is verified.
+ * An address carried from one screen to the next so it stays out of the URL (history, server logs and Referer
+ * headers). It lives in this tab's sessionStorage only until the step it was kept for is done.
  */
-const KEY = "pending-verification-email";
-
-/** Storage can be unavailable (private windows, blocked site data), and nothing here may break the page. */
-function storage() {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
+function pendingEmailStore(key: string) {
+  // Storage can be unavailable (private windows, blocked site data), and nothing here may break the page.
+  const storage = () => {
+    try {
+      return window.sessionStorage;
+    } catch {
+      return null;
+    }
+  };
+  return {
+    remember(email: string) {
+      try {
+        storage()?.setItem(key, email);
+      } catch {
+        // the next screen simply asks for the address
+      }
+    },
+    read(): string {
+      try {
+        return storage()?.getItem(key) ?? "";
+      } catch {
+        return "";
+      }
+    },
+    forget() {
+      try {
+        storage()?.removeItem(key);
+      } catch {
+        // nothing to forget
+      }
+    },
+  };
 }
 
-export function rememberPendingEmail(email: string) {
-  try {
-    storage()?.setItem(KEY, email);
-  } catch {
-    // the verification screen simply asks for the address
-  }
-}
+/** The address just signed up with (or tried to sign in with before verifying), for the verification screen. */
+export const verificationEmail = pendingEmailStore("pending-verification-email");
 
-export function pendingEmail(): string {
-  try {
-    return storage()?.getItem(KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-export function forgetPendingEmail() {
-  try {
-    storage()?.removeItem(KEY);
-  } catch {
-    // nothing to forget
-  }
-}
+/** The address a password reset code was just requested for, for the reset screen. */
+export const resetEmail = pendingEmailStore("pending-reset-email");

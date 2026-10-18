@@ -69,3 +69,14 @@ export async function sendMessageVia(token: string, conversationId: string, body
   );
   if (response.status !== 201) throw new Error(`Send failed: ${response.status}`);
 }
+
+/** Asks the backend for a password reset code (the answer is the same whether or not the address has an account). */
+export async function forgotPasswordVia(email: string): Promise<number> {
+  return (await post("/api/v1/auth/forgot-password", { email })).status;
+}
+
+/** Resets a password through the backend. */
+export async function resetPasswordVia(email: string, code: string, newPassword: string) {
+  const response = await post("/api/v1/auth/reset-password", { email, code, newPassword });
+  if (response.status !== 204) throw new Error(`Reset failed: ${response.status}`);
+}

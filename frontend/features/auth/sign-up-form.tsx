@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
-import { rememberPendingEmail } from "./pending-email";
+import { verificationEmail } from "./pending-email";
 import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { codesMessageFor } from "./wording";
@@ -26,7 +26,7 @@ export function SignUpForm() {
     mutationFn: (data: SignUpData) => call(sdk.signUp({ body: data })),
     onMutate: () => problems.clearAll(),
     onSuccess: (_, data) => {
-      rememberPendingEmail(data.email);
+      verificationEmail.remember(data.email);
       router.push("/verify");
     },
     onError: (error) => problems.show(toProblem(error), codesMessageFor),

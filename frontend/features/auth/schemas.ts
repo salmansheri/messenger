@@ -47,6 +47,14 @@ export const signUpSchema = z.object({
 export type SignUpValues = z.input<typeof signUpSchema>;
 export type SignUpData = z.output<typeof signUpSchema>;
 
+export const forgotPasswordSchema = z.object({ email: emailSchema });
+export type ForgotPasswordValues = z.input<typeof forgotPasswordSchema>;
+export type ForgotPasswordData = z.output<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({ email: emailSchema, code: codeSchema, newPassword: passwordSchema });
+export type ResetPasswordValues = z.input<typeof resetPasswordSchema>;
+export type ResetPasswordData = z.output<typeof resetPasswordSchema>;
+
 export const verifySchema = z.object({ email: emailSchema, code: codeSchema });
 export type VerifyValues = z.input<typeof verifySchema>;
 export type VerifyData = z.output<typeof verifySchema>;

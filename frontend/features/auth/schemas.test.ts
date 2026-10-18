@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeSchema, emailSchema, displayNameSchema, passwordSchema, signInSchema, signUpSchema, verifySchema } from "./schemas";
+import { codeSchema, emailSchema, displayNameSchema, forgotPasswordSchema, passwordSchema, resetPasswordSchema, signInSchema, signUpSchema, verifySchema } from "./schemas";
 
 const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
@@ -91,5 +91,38 @@ describe("sign-in", () => {
     });
     expect(signInSchema.safeParse({ email: "ada@example.com", password: "" }).success).toBe(false);
     expect(signInSchema.safeParse({ email: "nope", password: "x" }).success).toBe(false);
+  });
+});
+
+describe("forgot password", () => {
+  it("needs only an address, trimmed and lower-cased", () => {
+    expect(forgotPasswordSchema.parse({ email: "  Ada@Example.COM " })).toEqual({ email: "ada@example.com" });
+    expect(forgotPasswordSchema.safeParse({ email: "nope" }).success).toBe(false);
+  });
+});
+
+describe("reset password", () => {
+  const valid = { email: "ada@example.com", code: "123456", newPassword: "a-brand-new-password" };
+
+  it("needs the address, the 6-digit code and a new password that follows the password rules", () => {
+    expect(resetPasswordSchema.safeParse(valid).success).toBe(true);
+    expect(resetPasswordSchema.safeParse({ ...valid, code: "12" }).success).toBe(false);
+    expect(resetPasswordSchema.safeParse({ ...valid, newPassword: "short" }).success).toBe(false);
+    expect(resetPasswordSchema.safeParse({ ...valid, newPassword: "é".repeat(37) }).success).toBe(false);
+  });
+
+  it("trims the code and the address but not the password", () => {
+    expect(resetPasswordSchema.parse({ email: " Ada@Example.com ", code: " 123456 ", newPassword: "  secret pass  " })).toEqual({
+      email: "ada@example.com",
+      code: "123456",
+      newPassword: "  secret pass  ",
+    });
+  });
+
+  it("reports every broken field at once", () => {
+    const result = resetPasswordSchema.safeParse({ email: "", code: "x", newPassword: "" });
+    expect(result.success).toBe(false);
+    const fields = result.error!.issues.map((issue) => issue.path[0]);
+    expect(fields).toEqual(expect.arrayContaining(["email", "code", "newPassword"]));
   });
 });

@@ -11,7 +11,7 @@ import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { session } from "@/lib/auth/app-session";
 import { useSession } from "@/features/session/session-provider";
-import { rememberPendingEmail } from "./pending-email";
+import { verificationEmail } from "./pending-email";
 import { signInSchema, type SignInData, type SignInValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { signInMessageFor } from "./wording";
@@ -42,7 +42,7 @@ export function SignInForm() {
       const problem = toProblem(error);
       if (problem.status === 403) {
         // The password was right but the address was never verified: carry on at the verification screen.
-        rememberPendingEmail(data.email);
+        verificationEmail.remember(data.email);
         router.push("/verify");
         return;
       }
@@ -90,6 +90,12 @@ export function SignInForm() {
           />
         )}
       </form.Field>
+      <Link
+        href="/forgot-password"
+        className="-mt-2 self-start text-sm underline underline-offset-4 decoration-rule hover:decoration-ink"
+      >
+        Forgot your password?
+      </Link>
       {problems.formError && <Notice tone="problem">{problems.formError}</Notice>}
       <div className="flex items-center justify-between gap-4">
         <Button type="submit" busy={signIn.isPending || state.status === "signedIn"}>

@@ -10,7 +10,7 @@ import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
-import { forgetPendingEmail, pendingEmail } from "./pending-email";
+import { verificationEmail } from "./pending-email";
 import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { VerifiedView } from "./verified-view";
@@ -35,7 +35,7 @@ export function VerifyForm() {
       problems.clearAll();
     },
     onSuccess: () => {
-      forgetPendingEmail();
+      verificationEmail.forget();
       setVerified(true);
     },
     onError: (error, data) => {
@@ -79,7 +79,7 @@ export function VerifyForm() {
 
   // Coming from sign-up, the address is already known and only the code is missing.
   useEffect(() => {
-    const email = pendingEmail();
+    const email = verificationEmail.read();
     if (email) {
       form.setFieldValue("email", email);
       codeInput.current?.focus();
