@@ -47,6 +47,7 @@ test.describe("sign up and verify", () => {
     await expect(page.getByText("Enter the name others will see.")).toBeVisible();
     await expect(page.getByText("Use at least 8 characters.")).toBeVisible();
     const email = page.getByLabel("Email address");
+    await expect(email, "focus goes to the first field that needs attention").toBeFocused();
     await expect(email).toHaveAttribute("aria-invalid", "true");
     await expect(email).toHaveAccessibleDescription("Enter your email address.");
 
@@ -58,6 +59,25 @@ test.describe("sign up and verify", () => {
     await expect(page.getByText("Use at most 100 characters.")).toBeVisible();
     await expect(page.getByText(/Use at most 72 bytes/)).toBeVisible();
     expect(sent, "no request reached the backend").toEqual([]);
+  });
+
+  test("a problem the backend finds in a field is shown on that field and goes away when it is edited", async ({
+    page,
+  }) => {
+    await page.goto("/sign-up");
+    const account = newAccount();
+
+    // The browser's quick check lets this through; the backend's stricter one refuses it.
+    await fillSignUp(page, { ...account, email: "a..b@example.com" });
+
+    await expect(page.getByText("must be a well-formed email address")).toBeVisible();
+    await expect(problem(page)).toHaveText("Check the fields marked below.");
+    await expect(page.getByLabel("Email address")).toHaveAttribute("aria-invalid", "true");
+
+    await page.getByLabel("Email address").fill(account.email);
+    await expect(page.getByText("must be a well-formed email address")).toBeHidden();
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   });
 
   test("an address that already has an account is told so", async ({ page }) => {
