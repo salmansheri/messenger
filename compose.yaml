@@ -1,0 +1,5 @@
+# Lets the backend start its dev services (Postgres, Redis, RabbitMQ, Mailpit, Grafana) when it is launched from the
+# repository root, for example from an IDE. Spring Boot only looks for a compose file in its working directory.
+# backend/compose.yaml stays the single source of truth and is what `./mvnw spring-boot:run` uses from backend/.
+include:
+  - backend/compose.yaml
