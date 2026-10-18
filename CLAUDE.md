@@ -22,7 +22,7 @@ A WhatsApp-style messenger app, as a monorepo with one git repo at the root. Dom
 - A stale Postgres volume from an earlier run can cause `password authentication failed for user "myuser"`; `docker compose down -v` in `backend/` fixes it.
 - Tests sit at one seam: the running app's public interface. Extend `support.IntegrationTest` (MockMvc, real Postgres/Redis/RabbitMQ via `TestcontainersConfiguration`). Only email and push are faked: use the `emails` and `pushes` recording senders it exposes (e.g. read a Verification code from `emails.latestTo(...)`). Run the app against test containers via the `TestBackendApplication` main class.
 - Schema is managed by Flyway (`spring-boot-starter-flyway`); put migrations in `src/main/resources/db/migration`. Note that JPA is also present, so don't rely on Hibernate DDL auto-generation.
-- `application.yaml` is currently minimal (only the app name).
+- `application.yaml` holds JPA validation, virtual threads, problem details, mail host/port, and the `app.*` settings bound by `AppProperties` (JWT and OTP values are placeholders until tickets #3-#4).
 
 ## Frontend commands (run from `frontend/`)
 
@@ -43,7 +43,7 @@ Backend design (partly implemented; see issue #1 for the full spec):
 - REST via `spring-boot-starter-webmvc` plus OpenAPI/Swagger UI (`springdoc-openapi`).
 - Realtime messaging via `spring-boot-starter-websocket`; RabbitMQ (`amqp`) and Redis are intended for cross-instance fan-out, presence, and async work.
 - Security: stateless Spring Security. Public paths are `/api/v1/auth/**`, health/info, and OpenAPI/Swagger; everything else needs a bearer JWT. Security failures are written as problem+json by `ProblemSecurityHandlers`. JWT issuing/validation (self-issued ES256) arrives with ticket #4; there is no OAuth2 client.
-- Errors: all errors are RFC 9457 problem details. Spring MVC exceptions go through `GlobalExceptionHandler`; add domain exception handlers there.
+- Errors: all errors are RFC 9457 problem details with `title`, `status`, `detail`, `instance` (no `type` while it is the default). Validation failures add an `errors` map of field to message; unexpected exceptions become a generic 500. All of this lives in `GlobalExceptionHandler`; add domain exception handlers there. Security failures use the same shape via `ProblemSecurityHandlers`. Test-only `ErrorProbeController` (test classpath) exercises these paths.
 - Outbound ports `EmailSender` and `NotificationSender` live in `lib`; real implementations are SMTP and (later) FCM.
 - PostgreSQL is the primary store (JPA + Flyway); Lombok and MapStruct are wired via a single `annotationProcessorPaths` list in the `maven-compiler-plugin` configuration in `pom.xml` (with `lombok-mapstruct-binding`). Add any new annotation processors there. Packages are by technical layer under `dev.salman.backend`.
 - Observability: OpenTelemetry starter exporting to the LGTM container.

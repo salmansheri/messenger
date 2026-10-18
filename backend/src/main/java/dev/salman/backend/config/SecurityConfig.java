@@ -14,7 +14,7 @@ import dev.salman.backend.lib.ProblemSecurityHandlers;
 @Configuration
 public class SecurityConfig {
 
-	private static final String[] PUBLIC = { "/api/v1/auth/**", "/actuator/health/**", "/actuator/info",
+	private static final String[] PUBLIC_PATHS = { "/api/v1/auth/**", "/actuator/health/**", "/actuator/info",
 			"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html" };
 
 	@Bean
@@ -28,7 +28,7 @@ public class SecurityConfig {
 				.logout(AbstractHttpConfigurer::disable)
 				.authorizeHttpRequests(a -> a
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						.requestMatchers(PUBLIC).permitAll()
+						.requestMatchers(PUBLIC_PATHS).permitAll()
 						.anyRequest().authenticated())
 				.exceptionHandling(e -> e
 						.authenticationEntryPoint(problems)

@@ -1,5 +1,6 @@
 package dev.salman.backend;
 
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,7 +18,7 @@ class OpenApiTests extends IntegrationTest {
 		mvc.perform(get("/v3/api-docs"))
 				.andExpect(status().isOk())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-				.andExpect(jsonPath("$.openapi").value(org.hamcrest.Matchers.startsWith("3.")))
+				.andExpect(jsonPath("$.openapi").value(startsWith("3.")))
 				.andExpect(jsonPath("$.info.title").value("Messenger API"));
 	}
 
