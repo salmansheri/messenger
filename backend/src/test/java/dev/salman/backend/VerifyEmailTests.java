@@ -1,6 +1,7 @@
 package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -101,9 +102,8 @@ class VerifyEmailTests extends IntegrationTest {
 		var second = client.latestCode(email);
 
 		assertThat(client.emailsSentTo(email)).isEqualTo(2);
-		if (!first.equals(second)) {
-			client.verifyEmail(email, first).andExpect(status().isBadRequest());
-		}
+		assumeThat(second).as("two random codes happened to be equal").isNotEqualTo(first);
+		client.verifyEmail(email, first).andExpect(status().isBadRequest());
 		client.verifyEmail(email, second).andExpect(status().isNoContent());
 	}
 
@@ -135,9 +135,8 @@ class VerifyEmailTests extends IntegrationTest {
 		var second = client.latestCode(email);
 
 		assertThat(client.emailsSentTo(email)).isEqualTo(2);
-		if (!first.equals(second)) {
-			client.verifyEmail(email, first).andExpect(status().isBadRequest());
-		}
+		assumeThat(second).as("two random codes happened to be equal").isNotEqualTo(first);
+		client.verifyEmail(email, first).andExpect(status().isBadRequest());
 		client.verifyEmail(email, second).andExpect(status().isNoContent());
 	}
 

@@ -40,6 +40,7 @@ public abstract class IntegrationTest {
 	@BeforeEach
 	void resetClock() {
 		clock.reset();
+		emails.clearFailures();
 	}
 
 	protected AuthClient auth() {

@@ -46,8 +46,10 @@ public class TokenServiceImpl implements TokenService {
 		var now = clock.instant();
 		var token = refreshTokens.findByTokenHash(Hashing.sha256Hex(refreshToken))
 				.orElseThrow(TokenServiceImpl::invalidRefreshToken);
+		// Same lock as sign-in and password reset: a refresh cannot slip a new token in after a reset.
+		var user = users.findByIdForUpdate(token.getUserId());
 		var reused = token.getUsedAt() != null || refreshTokens.markUsed(token.getId(), now) == 0;
-		if (reused || token.getExpiresAt().isBefore(now) || !users.existsById(token.getUserId())) {
+		if (reused || token.getExpiresAt().isBefore(now) || user.isEmpty()) {
 			refreshTokens.deleteFamily(token.getFamilyId());
 			throw invalidRefreshToken();
 		}

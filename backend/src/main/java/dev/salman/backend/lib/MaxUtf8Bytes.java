@@ -15,7 +15,7 @@ import jakarta.validation.Payload;
 /** The string must encode to at most {@code value} bytes in UTF-8 (BCrypt only reads the first 72 bytes). */
 @Documented
 @Constraint(validatedBy = MaxUtf8Bytes.Validator.class)
-@Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
+@Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT, ElementType.ANNOTATION_TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MaxUtf8Bytes {
 

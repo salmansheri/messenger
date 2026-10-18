@@ -1,5 +1,8 @@
 package dev.salman.backend.support;
 
+import java.util.concurrent.Executor;
+
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -11,6 +14,14 @@ public class TestHarnessConfiguration {
 	@Primary
 	RecordingEmailSender recordingEmailSender() {
 		return new RecordingEmailSender();
+	}
+
+	/** Sends mail on the calling thread so tests can read the email as soon as the request returns. */
+	@Bean
+	@Primary
+	@Qualifier("mailExecutor")
+	Executor directMailExecutor() {
+		return Runnable::run;
 	}
 
 	@Bean
