@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
@@ -45,7 +46,11 @@ public class StompSessions {
 
 	/** Registers the decorator that remembers each socket from the moment it opens until it closes. */
 	public void register(WebSocketTransportRegistration registry) {
-		registry.addDecoratorFactory(handler -> new WebSocketHandlerDecorator(handler) {
+		registry.addDecoratorFactory(this::remembering);
+	}
+
+	private WebSocketHandler remembering(WebSocketHandler handler) {
+		return new WebSocketHandlerDecorator(handler) {
 			@Override
 			public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 				sockets.put(session.getId(), session);
@@ -58,7 +63,7 @@ public class StompSessions {
 				authenticated.remove(session.getId());
 				super.afterConnectionClosed(session, closeStatus);
 			}
-		});
+		};
 	}
 
 	/** Records who the socket belongs to and how long its token is good for. */
