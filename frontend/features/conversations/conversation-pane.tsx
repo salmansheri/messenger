@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
-import { messageFor } from "@/features/auth/wording";
-import { useMe } from "@/features/session/use-me";
+import { messageFor } from "@/lib/api/messages";
 import { PaneHeader } from "./pane-header";
 import { conversationTitle } from "./present";
-import { useConversations } from "./queries";
+import { useConversationList } from "./queries";
 
 /**
  * One Conversation, found in the list that is already loaded (so opening it asks the server for nothing more). Its
@@ -17,22 +16,20 @@ import { useConversations } from "./queries";
  */
 export function ConversationPane() {
   const { id } = useParams<{ id: string }>();
-  const conversations = useConversations();
-  const me = useMe();
-  const conversation = conversations.data?.find((candidate) => candidate.id === id);
+  const list = useConversationList();
 
-  if (conversations.isError) {
+  if (list.status === "error") {
     return (
       <>
         <PaneHeader>Conversation</PaneHeader>
         <div className="px-4 py-6 sm:px-8">
-          <Notice tone="problem">{messageFor(toProblem(conversations.error))}</Notice>
+          <Notice tone="problem">{messageFor(toProblem(list.error))}</Notice>
         </div>
       </>
     );
   }
 
-  if (!conversations.data || !me.data) {
+  if (list.status === "pending") {
     return (
       <>
         <PaneHeader>Conversation</PaneHeader>
@@ -43,6 +40,7 @@ export function ConversationPane() {
     );
   }
 
+  const conversation = list.items.find((candidate) => candidate.id === id);
   if (!conversation) {
     return (
       <>
@@ -61,7 +59,7 @@ export function ConversationPane() {
 
   return (
     <>
-      <PaneHeader>{conversationTitle(conversation, me.data.id)}</PaneHeader>
+      <PaneHeader>{conversationTitle(conversation, list.myId)}</PaneHeader>
       <div className="px-4 py-6 text-ink-muted sm:px-8">
         <p>Reading and sending Messages is coming next.</p>
       </div>

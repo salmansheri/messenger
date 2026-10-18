@@ -10,7 +10,7 @@ export function conversationTitle(conversation: ConversationResponse, myId: stri
 /** The latest Message as one short line: who said it where that matters, and nothing if none was sent yet. */
 export function lastLine(conversation: ConversationResponse, myId: string | undefined): string {
   const message = conversation.lastMessage;
-  if (!message?.body) return "No messages yet";
+  if (!message?.body) return "No Messages yet";
   const text = message.body.replace(/\s+/g, " ").trim();
   if (message.senderId === myId) return `You: ${text}`;
   if (conversation.type === "GROUP") {
@@ -46,4 +46,11 @@ export function formatWhen(iso: string | undefined, now: Date, timeZone?: string
 export function unreadLabel(count: number | undefined): string | undefined {
   if (!count || count < 1) return undefined;
   return count > 99 ? "99+" : String(count);
+}
+
+/** The unread count in words, for a screen reader (the badge itself is just the number). */
+export function unreadSpeech(count: number | undefined): string | undefined {
+  if (!count || count < 1) return undefined;
+  if (count > 99) return "More than 99 unread Messages";
+  return `${count} unread Message${count === 1 ? "" : "s"}`;
 }

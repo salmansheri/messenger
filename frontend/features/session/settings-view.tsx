@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
-import { messageFor } from "@/features/auth/wording";
+import { messageFor } from "@/lib/api/messages";
 import { useMe } from "./use-me";
 
 export function SettingsView() {

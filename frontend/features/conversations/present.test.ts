@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse } from "@/lib/api";
-import { conversationTitle, formatWhen, lastLine, unreadLabel } from "./present";
+import { conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
 
 const ME = "me-id";
 
@@ -39,7 +39,7 @@ describe("conversationTitle", () => {
 
 describe("lastLine", () => {
   it("says so when nothing has been sent yet", () => {
-    expect(lastLine(direct(), ME)).toBe("No messages yet");
+    expect(lastLine(direct(), ME)).toBe("No Messages yet");
   });
 
   it("shows the latest Message on one line", () => {
@@ -107,5 +107,16 @@ describe("unreadLabel", () => {
     expect(unreadLabel(7)).toBe("7");
     expect(unreadLabel(99)).toBe("99");
     expect(unreadLabel(100)).toBe("99+");
+  });
+});
+
+describe("unreadSpeech", () => {
+  it("says it in words for a screen reader, in the singular for one", () => {
+    expect(unreadSpeech(0)).toBeUndefined();
+    expect(unreadSpeech(undefined)).toBeUndefined();
+    expect(unreadSpeech(1)).toBe("1 unread Message");
+    expect(unreadSpeech(2)).toBe("2 unread Messages");
+    expect(unreadSpeech(99)).toBe("99 unread Messages");
+    expect(unreadSpeech(100)).toBe("More than 99 unread Messages");
   });
 });

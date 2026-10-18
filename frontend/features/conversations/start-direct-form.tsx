@@ -1,19 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, type FormEvent } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk } from "@/lib/api";
+import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { emailSchema } from "@/features/auth/schemas";
 import { shownError, useServerProblems } from "@/features/auth/server-problems";
 import { useMe } from "@/features/session/use-me";
 import { PaneHeader } from "./pane-header";
 import { conversationsKey } from "./queries";
-import { blamesTheAddress, SelfConversationError, startDirectMessageFor } from "./wording";
+import { SelfConversationError, startDirectOutcome } from "./wording";
 
 const FIELDS = ["email"] as const;
 
@@ -22,7 +22,7 @@ export function StartDirectForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const me = useMe();
-  const formElement = useRef<HTMLFormElement>(null);
+  const { ref: formElement, focusFirstInvalid } = useFormElement();
   const problems = useServerProblems(FIELDS);
 
   const start = useMutation({
@@ -38,8 +38,8 @@ export function StartDirectForm() {
       router.push(`/app/c/${conversation.id}`);
     },
     onError: (error) => {
-      const message = startDirectMessageFor(error);
-      if (blamesTheAddress(error)) problems.showField("email", message);
+      const { message, about } = startDirectOutcome(error);
+      if (about === "address") problems.showField("email", message);
       else problems.showForm(message);
     },
   });
@@ -47,17 +47,9 @@ export function StartDirectForm() {
   const form = useForm({
     defaultValues: { email: "" },
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
-    onSubmitInvalid: () => {
-      requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-    },
+    onSubmitInvalid: focusFirstInvalid,
     onSubmit: ({ value }) => start.mutateAsync(emailSchema.parse(value.email)).catch(() => undefined),
   });
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    void form.handleSubmit();
-  }
 
   return (
     <>
@@ -66,7 +58,7 @@ export function StartDirectForm() {
         <p className="text-ink-muted">
           Type the email address of someone who has an account. Only an exact address finds a person.
         </p>
-        <form ref={formElement} onSubmit={submit} noValidate className="mt-6 flex flex-col gap-5">
+        <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="mt-6 flex flex-col gap-5">
           <form.Field name="email" validators={{ onDynamic: emailSchema }}>
             {(field) => (
               <Field

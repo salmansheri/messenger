@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ApiProblem } from "@/lib/api";
-import { messageFor } from "./wording";
+import { messageFor } from "@/lib/api/messages";
 
 /** The first readable message from a field's validation errors (schema issues or plain strings). */
 export function firstMessage(errors: readonly unknown[]): string | undefined {

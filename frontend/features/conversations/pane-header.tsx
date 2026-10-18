@@ -8,7 +8,7 @@ export function PaneHeader({ children }: { children: ReactNode }) {
       <Link href="/app" className="text-sm underline underline-offset-4 decoration-rule hover:decoration-ink md:hidden">
         <span aria-hidden>←</span> Conversations
       </Link>
-      <h2 className="min-w-0 truncate font-serif text-xl font-semibold tracking-tight">{children}</h2>
+      <h1 className="min-w-0 truncate font-serif text-xl font-semibold tracking-tight">{children}</h1>
     </header>
   );
 }

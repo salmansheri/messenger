@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, type FormEvent } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
+import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { rememberPendingEmail } from "./pending-email";
 import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
@@ -19,7 +19,7 @@ const defaultValues: SignUpValues = { email: "", displayName: "", password: "" }
 
 export function SignUpForm() {
   const router = useRouter();
-  const formElement = useRef<HTMLFormElement>(null);
+  const { ref: formElement, focusFirstInvalid } = useFormElement();
   const problems = useServerProblems(FIELDS);
 
   const signUp = useMutation({
@@ -37,22 +37,13 @@ export function SignUpForm() {
     // Check on submit; from then on, on every keystroke. (Not on blur: an error line appearing or vanishing as the pointer
     // goes down on the button moves it away and the press is lost.)
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
-    onSubmitInvalid: () => {
-      // Take a keyboard or screen-reader user to the first field that needs attention.
-      requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-    },
+    onSubmitInvalid: focusFirstInvalid,
     // The same checks again, plus trimming and lower-casing the address; the mutation reports its own failures.
     onSubmit: ({ value }) => signUp.mutateAsync(signUpSchema.parse(value)).catch(() => undefined),
   });
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    void form.handleSubmit();
-  }
-
   return (
-    <form ref={formElement} onSubmit={submit} noValidate className="flex flex-col gap-5">
+    <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="flex flex-col gap-5">
       <form.Field name="email" validators={{ onDynamic: signUpSchema.shape.email }}>
         {(field) => (
           <Field

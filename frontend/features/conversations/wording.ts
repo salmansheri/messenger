@@ -1,5 +1,5 @@
 import { toProblem } from "@/lib/api";
-import { messageFor } from "@/features/auth/wording";
+import { messageFor } from "@/lib/api/messages";
 
 /** The address typed is the signed-in person's own: noticed here, before asking the server to start anything. */
 export class SelfConversationError extends Error {
@@ -8,19 +8,17 @@ export class SelfConversationError extends Error {
   }
 }
 
+/** What to tell the person, and where: under the address when it is the address that is the trouble. */
+export type StartDirectOutcome = { message: string; about: "address" | "form" };
+
 const YOURSELF = "You cannot start a Conversation with yourself.";
 const NOBODY = "No verified user has that email address. Check the spelling, or ask them to sign up and verify it.";
 
-/** Plain words for why a Direct conversation could not be started. */
-export function startDirectMessageFor(error: unknown): string {
-  if (error instanceof SelfConversationError) return YOURSELF;
+/** Why a Direct conversation could not be started. */
+export function startDirectOutcome(error: unknown): StartDirectOutcome {
+  if (error instanceof SelfConversationError) return { message: YOURSELF, about: "address" };
   const problem = toProblem(error);
-  if (problem.status === 400) return YOURSELF;
-  if (problem.status === 404) return NOBODY;
-  return messageFor(problem);
-}
-
-/** Whether the problem is about the address that was typed (so it belongs under that field, not on the whole form). */
-export function blamesTheAddress(error: unknown): boolean {
-  return error instanceof SelfConversationError || [400, 404].includes(toProblem(error).status);
+  if (problem.status === 400) return { message: YOURSELF, about: "address" };
+  if (problem.status === 404) return { message: NOBODY, about: "address" };
+  return { message: messageFor(problem), about: "form" };
 }

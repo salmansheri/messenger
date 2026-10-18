@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, type FormEvent } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
+import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { session } from "@/lib/auth/app-session";
 import { useSession } from "@/features/session/session-provider";
 import { rememberPendingEmail } from "./pending-email";
@@ -24,7 +24,7 @@ export function SignInForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const state = useSession();
-  const formElement = useRef<HTMLFormElement>(null);
+  const { ref: formElement, focusFirstInvalid } = useFormElement();
   const problems = useServerProblems(FIELDS);
 
   const signIn = useMutation({
@@ -53,20 +53,12 @@ export function SignInForm() {
   const form = useForm({
     defaultValues,
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
-    onSubmitInvalid: () => {
-      requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-    },
+    onSubmitInvalid: focusFirstInvalid,
     onSubmit: ({ value }) => signIn.mutateAsync(signInSchema.parse(value)).catch(() => undefined),
   });
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    void form.handleSubmit();
-  }
-
   return (
-    <form ref={formElement} onSubmit={submit} noValidate className="flex flex-col gap-5">
+    <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="flex flex-col gap-5">
       {state.status === "signedOut" && state.ended && (
         <Notice tone="info">Your session ended, so you have been signed out. Sign in again to carry on.</Notice>
       )}

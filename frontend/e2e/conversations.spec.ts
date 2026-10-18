@@ -47,13 +47,13 @@ test.describe("the Conversation index", () => {
     await expect(items).toHaveCount(3);
     await expect(items.nth(0)).toContainText("Grace Hopper");
     await expect(items.nth(0)).toContainText("Are you free at nine?");
-    await expect(items.nth(0)).toContainText("2 unread messages");
+    await expect(items.nth(0)).toContainText("2 unread Messages");
     await expect(items.nth(1)).toContainText("Analytical Engine");
     await expect(items.nth(1)).toContainText("Linus Torvalds: Notes attached");
-    await expect(items.nth(1)).toContainText("1 unread messages");
+    await expect(items.nth(1)).toContainText("1 unread Message");
     await expect(items.nth(2)).toContainText("Linus Torvalds");
     await expect(items.nth(2)).toContainText("Lunch tomorrow?");
-    await expect(items.nth(2)).toContainText("1 unread messages");
+    await expect(items.nth(2)).toContainText("1 unread Message");
     await expect(items.nth(0).locator("time")).toHaveText(/^\d\d:\d\d$/);
   });
 
@@ -105,7 +105,7 @@ test.describe("starting a Direct conversation", () => {
     await page.getByRole("button", { name: "Start Conversation" }).click();
 
     await expect(page).toHaveURL(/\/app\/c\/[0-9a-f-]{36}$/);
-    await expect(page.getByRole("heading", { name: "Grace Hopper", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Grace Hopper", level: 1 })).toBeVisible();
     const opened = idFrom(page);
     if (testInfo.project.name !== "phone") {
       // (on a phone the list steps aside while a Conversation is open)
@@ -140,8 +140,9 @@ test.describe("starting a Direct conversation", () => {
     await expect(page.getByText(nobody)).toBeVisible();
 
     await page.getByLabel("Their email address").fill(unverified.email);
+    await expect(page.getByText(nobody), "editing the address clears the old message").toBeHidden();
     await page.getByRole("button", { name: "Start Conversation" }).click();
-    await expect(page.getByText(nobody)).toBeVisible();
+    await expect(page.getByText(nobody), "an address never verified gets exactly the same answer").toBeVisible();
     await expect(page).toHaveURL(/\/app\/new$/);
   });
 
@@ -214,17 +215,57 @@ test.describe("on a desktop and on a phone", () => {
 
     await index(page).getByRole("link", { name: /Grace Hopper/ }).click();
     await expect(page).toHaveURL(new RegExp(`/app/c/${conversation}$`));
-    await expect(page.getByRole("heading", { name: "Grace Hopper", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Grace Hopper", level: 1 })).toBeVisible();
 
     if (phone) {
       await expect(index(page), "the list steps aside").toBeHidden();
       await page.getByRole("link", { name: /Conversations/ }).click(); // the way back
       await expect(page).toHaveURL(/\/app$/);
       await expect(index(page).getByRole("link", { name: /Grace Hopper/ })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Grace Hopper", level: 2 })).toBeHidden();
+      await expect(page.getByRole("heading", { name: "Grace Hopper", level: 1 })).toBeHidden();
     } else {
       await expect(index(page).getByRole("link", { name: /Grace Hopper/ })).toBeVisible();
       await expect(page.getByRole("link", { name: /← Conversations/ })).toBeHidden();
     }
   });
 });
+
+test.describe("navigating", () => {
+  test("the browser's Back button returns from a Conversation to the list", async ({ page }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+    await startDirectVia(await signIn(grace.email), me.id);
+    await signInThroughTheForm(page, me);
+
+    await index(page).getByRole("link", { name: /Grace Hopper/ }).click();
+    await expect(page).toHaveURL(/\/app\/c\/[0-9a-f-]{36}$/);
+    await page.goBack();
+
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(index(page).getByRole("link", { name: /Grace Hopper/ })).toBeVisible();
+  });
+
+  test("every screen has exactly one top-level heading, and the list is labelled by its own heading", async ({
+    page,
+  }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+    const conversation = await startDirectVia(await signIn(grace.email), me.id);
+    await signInThroughTheForm(page, me);
+    const topLevel = page.getByRole("heading", { level: 1 });
+
+    await expect(index(page).getByRole("link", { name: /Grace Hopper/ })).toBeVisible();
+    await expect(topLevel).toHaveCount(1);
+    await expect(topLevel).toHaveText("Conversations");
+
+    for (const [path, title] of [
+      ["/app/new", "Start a Conversation"],
+      [`/app/c/${conversation}`, "Grace Hopper"],
+      ["/app/c/00000000-0000-0000-0000-000000000000", "Conversation"],
+      ["/app/settings", "Settings"],
+    ] as const) {
+      await page.goto(path);
+      await expect(topLevel, path).toHaveCount(1);
+      await expect(topLevel, path).toHaveText(title);
+    }
+  });
+});
+

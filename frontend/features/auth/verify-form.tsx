@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
+import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
 import { forgetPendingEmail, pendingEmail } from "./pending-email";
 import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
@@ -20,7 +21,7 @@ const FIELDS = ["email", "code"] as const;
 const defaultValues: VerifyValues = { email: "", code: "" };
 
 export function VerifyForm() {
-  const formElement = useRef<HTMLFormElement>(null);
+  const { ref: formElement, focusFirstInvalid } = useFormElement();
   const codeInput = useRef<HTMLInputElement>(null);
   const problems = useServerProblems(FIELDS);
   const [verified, setVerified] = useState(false);
@@ -72,9 +73,7 @@ export function VerifyForm() {
   const form = useForm({
     defaultValues,
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
-    onSubmitInvalid: () => {
-      requestAnimationFrame(() => formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-    },
+    onSubmitInvalid: focusFirstInvalid,
     onSubmit: ({ value }) => verify.mutateAsync(verifySchema.parse(value)).catch(() => undefined),
   });
 
@@ -86,12 +85,6 @@ export function VerifyForm() {
       codeInput.current?.focus();
     }
   }, [form]);
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    void form.handleSubmit();
-  }
 
   function sendNewCode() {
     const address = emailSchema.safeParse(form.state.values.email);
@@ -116,7 +109,7 @@ export function VerifyForm() {
         </>
       }
     >
-      <form ref={formElement} onSubmit={submit} noValidate className="flex flex-col gap-5">
+      <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="flex flex-col gap-5">
         <form.Field name="email" validators={{ onDynamic: emailSchema }}>
           {(field) => (
             <Field
