@@ -166,6 +166,38 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	public ResultActions send(String accessToken, String conversationId, Object clientMessageId, String body)
+			throws Exception {
+		return sendBody(accessToken, conversationId, Map.of("clientMessageId", clientMessageId, "body", body));
+	}
+
+	public ResultActions sendBody(String accessToken, String conversationId, Object requestBody) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/messages", conversationId)
+				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(requestBody))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	/** Sends a new message with a fresh client message id and returns the stored message. */
+	public tools.jackson.databind.JsonNode sendNew(String accessToken, String conversationId, String body)
+			throws Exception {
+		var result = send(accessToken, conversationId, UUID.randomUUID().toString(), body).andReturn().getResponse();
+		if (result.getStatus() != 201) {
+			throw new AssertionError("Expected 201 but was " + result.getStatus() + ": " + result.getContentAsString());
+		}
+		return json.readTree(result.getContentAsString());
+	}
+
+	/** {@code query} is the raw query string, e.g. {@code "beforeSeq=16&limit=10"}; empty for none. */
+	public ResultActions history(String accessToken, String conversationId, String query) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders
+				.get("/api/v1/conversations/{id}/messages" + (query.isEmpty() ? "" : "?" + query), conversationId)
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions historyWithoutToken(String conversationId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}/messages", conversationId));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}

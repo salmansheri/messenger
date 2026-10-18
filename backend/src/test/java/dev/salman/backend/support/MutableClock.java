@@ -3,6 +3,7 @@ package dev.salman.backend.support;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 
@@ -31,7 +32,7 @@ public class MutableClock extends Clock {
 
 	@Override
 	public Instant instant() {
-		return Instant.now().plus(offset);
+		return Instant.now().plus(offset).truncatedTo(ChronoUnit.MICROS);
 	}
 
 }

@@ -189,4 +189,58 @@ class DirectConversationTests extends IntegrationTest {
 				.content("{\"userId\":\"%s\"}".formatted(grace.id()))).andExpect(status().isUnauthorized());
 	}
 
+	@Test
+	void aConversationWithoutMessagesHasNoLatestMessage() throws Exception {
+		client.startDirect(ada.accessToken(), grace.id()).andExpect(status().isCreated())
+				.andExpect(jsonPath("$.lastMessage").doesNotExist());
+
+		client.conversations(ada.accessToken()).andExpect(jsonPath("$[0].lastMessage").doesNotExist());
+	}
+
+	@Test
+	void theListShowsTheLatestMessageToBothParticipants() throws Exception {
+		var id = idFrom(client.startDirect(ada.accessToken(), grace.id()));
+		client.sendNew(ada.accessToken(), id, "first");
+		client.sendNew(grace.accessToken(), id, "second");
+		client.sendNew(ada.accessToken(), id, "third and latest");
+
+		for (var viewer : List.of(ada, grace)) {
+			client.conversations(viewer.accessToken())
+					.andExpect(jsonPath("$[0].lastMessage.body").value("third and latest"))
+					.andExpect(jsonPath("$[0].lastMessage.seq").value(3))
+					.andExpect(jsonPath("$[0].lastMessage.senderId").value(ada.id()));
+		}
+	}
+
+	@Test
+	void sendingMovesAConversationToTheTopOfTheList() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var withGrace = idFrom(client.startDirect(ada.accessToken(), grace.id()));
+		clock.advance(Duration.ofMinutes(1));
+		var withLinus = idFrom(client.startDirect(ada.accessToken(), linus.id()));
+		assertThat(ids(client.conversations(ada.accessToken()))).containsExactly(withLinus, withGrace);
+
+		clock.advance(Duration.ofMinutes(1));
+		client.sendNew(grace.accessToken(), withGrace, "bump");
+
+		assertThat(ids(client.conversations(ada.accessToken()))).containsExactly(withGrace, withLinus);
+		clock.advance(Duration.ofMinutes(1));
+		client.sendNew(ada.accessToken(), withLinus, "bump the other");
+		assertThat(ids(client.conversations(ada.accessToken()))).containsExactly(withLinus, withGrace);
+	}
+
+	@Test
+	void theListNeverShowsAnotherConversationsMessages() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var withGrace = idFrom(client.startDirect(ada.accessToken(), grace.id()));
+		var withLinus = idFrom(client.startDirect(ada.accessToken(), linus.id()));
+		client.sendNew(ada.accessToken(), withGrace, "for grace only");
+		client.sendNew(ada.accessToken(), withLinus, "for linus only");
+
+		client.conversations(grace.accessToken()).andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].lastMessage.body").value("for grace only"));
+		client.conversations(linus.accessToken()).andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].lastMessage.body").value("for linus only"));
+	}
+
 }

@@ -12,16 +12,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.dto.ConversationResponse;
+import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.ParticipantSummary;
 import dev.salman.backend.dto.StartedConversation;
 import dev.salman.backend.entity.Conversation;
 import dev.salman.backend.entity.ConversationType;
+import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.repository.ConversationRepository;
+import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.ConversationService;
@@ -33,6 +36,7 @@ public class ConversationServiceImpl implements ConversationService {
 
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
+	private final MessageRepository messages;
 	private final UserRepository users;
 	private final Clock clock;
 
@@ -83,7 +87,7 @@ public class ConversationServiceImpl implements ConversationService {
 		return a.compareTo(b) < 0 ? a + ":" + b : b + ":" + a;
 	}
 
-	/** Builds responses for the given Conversations with three queries however many there are. */
+	/** Builds responses for the given Conversations with four queries however many there are. */
 	private List<ConversationResponse> toResponses(List<Conversation> found) {
 		if (found.isEmpty()) {
 			return List.of();
@@ -92,18 +96,24 @@ public class ConversationServiceImpl implements ConversationService {
 		var usersById = users.findAllById(members.stream().map(Participant::getUserId).distinct().toList()).stream()
 				.collect(Collectors.toMap(User::getId, u -> u));
 		var membersByConversation = members.stream().collect(Collectors.groupingBy(Participant::getConversationId));
-		return found.stream().map(c -> toResponse(c, membersByConversation.get(c.getId()), usersById)).toList();
+		var latestByConversation = messages.findLatestIn(found.stream().map(Conversation::getId).toList()).stream()
+				.collect(Collectors.toMap(Message::getConversationId, m -> m));
+		return found.stream()
+				.map(c -> toResponse(c, membersByConversation.get(c.getId()), usersById,
+						latestByConversation.get(c.getId())))
+				.toList();
 	}
 
 	private static ConversationResponse toResponse(Conversation conversation, Collection<Participant> members,
-			Map<UUID, User> usersById) {
+			Map<UUID, User> usersById, Message latest) {
 		var summaries = members.stream()
 				.sorted(Comparator.comparing(m -> m.getUserId().toString()))
 				.map(m -> new ParticipantSummary(m.getUserId(), usersById.get(m.getUserId()).getDisplayName(),
 						m.getRole()))
 				.toList();
 		return new ConversationResponse(conversation.getId(), conversation.getType(), conversation.getName(),
-				summaries, conversation.getCreatedAt(), conversation.getUpdatedAt());
+				summaries, latest == null ? null : MessageResponse.from(latest), conversation.getCreatedAt(),
+				conversation.getUpdatedAt());
 	}
 
 }

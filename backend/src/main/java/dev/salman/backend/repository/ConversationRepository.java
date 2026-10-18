@@ -5,13 +5,23 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import dev.salman.backend.entity.Conversation;
+import jakarta.persistence.LockModeType;
 
 public interface ConversationRepository extends JpaRepository<Conversation, UUID> {
 
 	Optional<Conversation> findByDirectKey(String directKey);
+
+	/**
+	 * Loads the Conversation and locks its row until the transaction ends. Sending takes this lock, so Messages are
+	 * stored one at a time per Conversation and the Sequence number is incremented without gaps or duplicates.
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select c from Conversation c where c.id = :id")
+	Optional<Conversation> findByIdForUpdate(UUID id);
 
 	/** The caller's Conversations, most recently active first. */
 	@Query("""

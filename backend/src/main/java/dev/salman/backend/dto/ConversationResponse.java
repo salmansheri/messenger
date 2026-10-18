@@ -6,7 +6,10 @@ import java.util.UUID;
 
 import dev.salman.backend.entity.ConversationType;
 
-/** A Conversation as its Participants see it. Latest-message and unread information arrive with Messages. */
+/**
+ * A Conversation as its Participants see it. {@code lastMessage} is null until something has been sent; the unread
+ * count arrives with receipts.
+ */
 public record ConversationResponse(UUID id, ConversationType type, String name, List<ParticipantSummary> participants,
-		Instant createdAt, Instant updatedAt) {
+		MessageResponse lastMessage, Instant createdAt, Instant updatedAt) {
 }
