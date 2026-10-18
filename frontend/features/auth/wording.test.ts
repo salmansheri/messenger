@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
-import { codeMessageFor, codesMessageFor, signInMessageFor } from "./wording";
+import { codeMessageFor, codesMessageFor, refusedCodeMessage, signInMessageFor } from "./wording";
+import { afterWrongCode, NO_WRONG_TRIES } from "./wrong-tries";
 
 const problem = (status: number, retryAfterSeconds?: number, title = "x") =>
   new ApiProblem(status, title, undefined, {}, retryAfterSeconds);
@@ -39,5 +40,20 @@ describe("signInMessageFor", () => {
   it("leaves every other failure to the general wording", () => {
     expect(signInMessageFor(problem(0))).toBe(messageFor(problem(0)));
     expect(signInMessageFor(problem(429, 600))).toBe(messageFor(problem(429, 600)));
+  });
+});
+
+describe("refusedCodeMessage", () => {
+  it("says the code is wrong or expired for the first few refusals", () => {
+    const tries = afterWrongCode(NO_WRONG_TRIES, "ada@example.com");
+    expect(refusedCodeMessage(tries, problem(400))).toBe(codeMessageFor(problem(400)));
+  });
+
+  it("says a new code is needed once the backend's limit of wrong tries has been reached", () => {
+    let tries = NO_WRONG_TRIES;
+    for (let n = 0; n < 5; n++) tries = afterWrongCode(tries, "ada@example.com");
+    expect(refusedCodeMessage(tries, problem(400))).toBe(
+      "That did not work again. A code stops working after 5 wrong tries, so ask for a new one.",
+    );
   });
 });

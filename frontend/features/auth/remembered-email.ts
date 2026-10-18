@@ -2,7 +2,7 @@
  * An address carried from one screen to the next so it stays out of the URL (history, server logs and Referer
  * headers). It lives in this tab's sessionStorage only until the step it was kept for is done.
  */
-function pendingEmailStore(key: string) {
+function rememberedEmailStore(key: string) {
   // Storage can be unavailable (private windows, blocked site data), and nothing here may break the page.
   const storage = () => {
     try {
@@ -37,7 +37,7 @@ function pendingEmailStore(key: string) {
 }
 
 /** The address just signed up with (or tried to sign in with before verifying), for the verification screen. */
-export const verificationEmail = pendingEmailStore("pending-verification-email");
+export const verificationEmail = rememberedEmailStore("pending-verification-email");
 
 /** The address a password reset code was just requested for, for the reset screen. */
-export const resetEmail = pendingEmailStore("pending-reset-email");
+export const resetEmail = rememberedEmailStore("pending-reset-email");

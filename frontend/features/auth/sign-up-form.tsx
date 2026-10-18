@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
-import { verificationEmail } from "./pending-email";
+import { verificationEmail } from "./remembered-email";
 import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { codesMessageFor } from "./wording";

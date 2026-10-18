@@ -10,12 +10,12 @@ import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
-import { verificationEmail } from "./pending-email";
+import { verificationEmail } from "./remembered-email";
 import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { VerifiedView } from "./verified-view";
-import { codeMessageFor, codesMessageFor } from "./wording";
-import { afterWrongCode, NO_WRONG_TRIES, WRONG_CODE_LIMIT, wrongTriesExhausted } from "./wrong-tries";
+import { useWrongTries } from "./use-wrong-tries";
+import { codesMessageFor } from "./wording";
 
 const FIELDS = ["email", "code"] as const;
 const defaultValues: VerifyValues = { email: "", code: "" };
@@ -25,7 +25,7 @@ export function VerifyForm() {
   const codeInput = useRef<HTMLInputElement>(null);
   const problems = useServerProblems(FIELDS);
   const [verified, setVerified] = useState(false);
-  const [wrongTries, setWrongTries] = useState(NO_WRONG_TRIES);
+  const wrongTries = useWrongTries();
   const [notice, setNotice] = useState<string | null>(null);
 
   const verify = useMutation({
@@ -44,13 +44,7 @@ export function VerifyForm() {
         problems.show(problem);
         return;
       }
-      const tries = afterWrongCode(wrongTries, data.email);
-      setWrongTries(tries);
-      problems.showForm(
-        wrongTriesExhausted(tries)
-          ? `That did not work again. A code stops working after ${WRONG_CODE_LIMIT} wrong tries, so ask for a new one.`
-          : codeMessageFor(problem),
-      );
+      problems.showForm(wrongTries.refused(data.email, problem));
     },
   });
 
@@ -61,7 +55,7 @@ export function VerifyForm() {
       problems.clearAll();
     },
     onSuccess: (_, email) => {
-      setWrongTries(NO_WRONG_TRIES);
+      wrongTries.reset();
       form.resetField("code");
       setNotice(`A new code is on its way to ${email}. The old one no longer works.`);
     },

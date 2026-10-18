@@ -2,14 +2,18 @@ import { MAILPIT_URL } from "../playwright-urls";
 
 type Summary = { ID: string; Created: string; To: { Address: string }[] };
 
-/** The newest email addressed to exactly this address (only one that arrived after `since`, if given). */
-async function latestEmailTo(email: string, since?: Date): Promise<{ Text: string } | null> {
+/** Every email Mailpit holds for exactly this address, newest first. */
+async function messagesTo(email: string): Promise<Summary[]> {
   const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
   const { messages } = (await search.json()) as { messages: Summary[] };
-  const newest = (messages ?? [])
+  return (messages ?? [])
     .filter((message) => message.To.some((to) => to.Address.toLowerCase() === email.toLowerCase()))
-    .filter((message) => !since || Date.parse(message.Created) >= since.getTime())
-    .sort((a, b) => b.Created.localeCompare(a.Created))[0];
+    .sort((a, b) => b.Created.localeCompare(a.Created));
+}
+
+/** The newest email addressed to exactly this address (only one that arrived after `since`, if given). */
+async function latestEmailTo(email: string, since?: Date): Promise<{ Text: string } | null> {
+  const newest = (await messagesTo(email)).find((message) => !since || Date.parse(message.Created) >= since.getTime());
   if (!newest) return null;
   const message = await fetch(`${MAILPIT_URL}/api/v1/message/${newest.ID}`);
   return (await message.json()) as { Text: string };
@@ -17,9 +21,7 @@ async function latestEmailTo(email: string, since?: Date): Promise<{ Text: strin
 
 /** How many emails Mailpit holds for exactly this address. */
 export async function emailCountTo(email: string): Promise<number> {
-  const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
-  const { messages } = (await search.json()) as { messages: Summary[] };
-  return (messages ?? []).filter((message) => message.To.some((to) => to.Address.toLowerCase() === email.toLowerCase())).length;
+  return (await messagesTo(email)).length;
 }
 
 /**

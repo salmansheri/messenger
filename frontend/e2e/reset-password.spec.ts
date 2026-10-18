@@ -1,12 +1,6 @@
 import { expect, test } from "./support/fixtures";
-import {
-  createVerifiedAccount,
-  forgotPasswordVia,
-  PASSWORD,
-  resetPasswordVia,
-  signIn,
-  uniqueEmail,
-} from "./support/backend";
+import { createVerifiedAccount, forgotPasswordVia, PASSWORD, signIn, uniqueEmail } from "./support/backend";
+import { BACKEND_URL } from "./playwright-urls";
 import { problem, info, signInThroughTheForm, submitSignIn, verifyEmailField } from "./support/auth-screens";
 import { emailCountTo, latestCodeFor } from "./support/mailpit";
 
@@ -44,6 +38,27 @@ test.describe("forgot and reset password", () => {
     await expect(page).toHaveURL(/\/app$/);
   });
 
+  test("resetting the password in a tab that is signed in ends that tab's session too", async ({ page }) => {
+    const account = await createVerifiedAccount();
+    await signInThroughTheForm(page, account);
+    await page.goto("/forgot-password");
+    const asked = new Date();
+    await page.getByRole("main").getByLabel("Email address").fill(account.email);
+    await page.getByRole("button", { name: "Send me a code" }).click();
+    await expect(page).toHaveURL(/\/reset-password$/);
+    await page.getByLabel("Code from the email").fill(await latestCodeFor(account.email, 15_000, asked));
+    await page.getByLabel("New password").fill(NEW_PASSWORD);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByRole("heading", { name: "Your password has been changed" })).toBeVisible();
+
+    // The backend ended every session, this one included, so "Sign in" must really be a sign-in page.
+    await page.getByRole("link", { name: "Continue to sign in" }).click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await submitSignIn(page, { email: account.email, password: NEW_PASSWORD });
+    await expect(page).toHaveURL(/\/app$/);
+  });
+
   test("gives the same answer for an address with an account and one without, and only emails the first", async ({
     page,
   }) => {
@@ -51,7 +66,8 @@ test.describe("forgot and reset password", () => {
     const stranger = uniqueEmail();
 
     const asked = new Date();
-    for (const email of [account.email, stranger]) {
+    // The stranger first: if an email were wrongly sent to them it would arrive before the known account's.
+    for (const email of [stranger, account.email]) {
       await page.goto("/forgot-password");
       await page.getByRole("main").getByLabel("Email address").fill(email);
       await page.getByRole("button", { name: "Send me a code" }).click();
@@ -60,8 +76,7 @@ test.describe("forgot and reset password", () => {
       await expect(problem(page)).toBeHidden();
     }
 
-    expect(await latestCodeFor(account.email, 15_000, asked)).toMatch(/^\d{6}$/);
-    await new Promise((resolve) => setTimeout(resolve, 1_500)); // give a wrongly-sent email time to arrive
+    expect(await latestCodeFor(account.email, 15_000, asked), "the known account got its code").toMatch(/^\d{6}$/);
     expect(await emailCountTo(stranger), "no email goes to an address without an account").toBe(0);
   });
 
@@ -73,6 +88,8 @@ test.describe("forgot and reset password", () => {
     const wrong = code === "000000" ? "111111" : "000000";
     await page.goto("/reset-password");
     await expect(verifyEmailField(page)).toHaveValue("");
+    await expect(page.getByText("Enter the 6-digit code from your email"), "no code was asked for here").toBeVisible();
+    await expect(page.getByText(NEUTRAL)).toBeHidden();
     await verifyEmailField(page).fill(account.email);
     await page.getByLabel("New password").fill(NEW_PASSWORD);
 
@@ -128,17 +145,30 @@ test.describe("forgot and reset password", () => {
     await expect(page).toHaveURL(/\/forgot-password$/);
   });
 
-  test("a session open somewhere else is ended: its next renewal fails and it lands on sign-in", async ({ page }) => {
+  test("a session open in another browser is ended: its next renewal fails and it lands on sign-in", async ({
+    page,
+    openSession,
+  }) => {
     const account = await createVerifiedAccount();
     await page.clock.install();
     await signInThroughTheForm(page, account);
     await page.goto("/app/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
-    // Someone (here: another browser, through the API) resets the password.
+    // Another browser (a second context with its own cookies) resets the password through the screens.
+    const elsewhere = await openSession();
+    await elsewhere.goto("/forgot-password");
     const asked = new Date();
-    await forgotPasswordVia(account.email);
-    await resetPasswordVia(account.email, await latestCodeFor(account.email, 15_000, asked), NEW_PASSWORD);
+    await elsewhere.getByRole("main").getByLabel("Email address").fill(account.email);
+    await elsewhere.getByRole("button", { name: "Send me a code" }).click();
+    await expect(elsewhere).toHaveURL(/\/reset-password$/);
+    await elsewhere.getByLabel("Code from the email").fill(await latestCodeFor(account.email, 15_000, asked));
+    await elsewhere.getByLabel("New password").fill(NEW_PASSWORD);
+    await elsewhere.getByRole("button", { name: "Change password" }).click();
+    await expect(elsewhere.getByRole("heading", { name: "Your password has been changed" })).toBeVisible();
+
+    // The reset is what ended the first browser's session: its refresh cookie is already refused by the backend.
+    expect((await page.context().request.post(`${BACKEND_URL}/api/v1/auth/refresh`)).status()).toBe(401);
     await expect(signIn(account.email, PASSWORD), "the old password no longer works").rejects.toThrow();
 
     await page.clock.fastForward(14 * MINUTE + 5_000);

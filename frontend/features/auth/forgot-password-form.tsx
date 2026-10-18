@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
-import { resetEmail } from "./pending-email";
+import { resetEmail } from "./remembered-email";
 import { forgotPasswordSchema, type ForgotPasswordData, type ForgotPasswordValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { codesMessageFor } from "./wording";

@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem } from "@/lib/api";
+import { session } from "@/lib/auth/app-session";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
-import { resetEmail } from "./pending-email";
+import { resetEmail } from "./remembered-email";
 import { PasswordChangedView } from "./password-changed-view";
 import {
   emailSchema,
@@ -19,19 +20,26 @@ import {
   type ResetPasswordValues,
 } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
-import { codeMessageFor, codesMessageFor } from "./wording";
-import { afterWrongCode, NO_WRONG_TRIES, WRONG_CODE_LIMIT, wrongTriesExhausted } from "./wrong-tries";
+import { useWrongTries } from "./use-wrong-tries";
+import { codesMessageFor } from "./wording";
 
 const FIELDS = ["email", "code", "newPassword"] as const;
 const defaultValues: ResetPasswordValues = { email: "", code: "", newPassword: "" };
 
 /** Chooses a new password with the emailed code. Works cold too: the address is typed if it was not carried over. */
 export function ResetPasswordForm() {
+  const queryClient = useQueryClient();
   const { ref: formElement, focusFirstInvalid } = useFormElement();
   const codeInput = useRef<HTMLInputElement>(null);
   const problems = useServerProblems(FIELDS);
   const [changed, setChanged] = useState(false);
-  const [wrongTries, setWrongTries] = useState(NO_WRONG_TRIES);
+  const wrongTries = useWrongTries();
+  // Whether a code was just asked for on the previous screen. Only the browser knows (sessionStorage), hence this hook.
+  const askedForCode = useSyncExternalStore(
+    () => () => {},
+    () => resetEmail.read() !== "",
+    () => false,
+  );
   const [notice, setNotice] = useState<string | null>(null);
 
   const reset = useMutation({
@@ -42,6 +50,10 @@ export function ResetPasswordForm() {
     },
     onSuccess: () => {
       resetEmail.forget();
+      // The backend ended every session of this person, this tab's included: make that true here too, now, instead of
+      // at the next renewal, so the link to sign-in below really leads to a sign-in page.
+      session.end();
+      queryClient.clear();
       setChanged(true);
     },
     onError: (error, data) => {
@@ -50,13 +62,7 @@ export function ResetPasswordForm() {
         problems.show(problem);
         return;
       }
-      const tries = afterWrongCode(wrongTries, data.email);
-      setWrongTries(tries);
-      problems.showForm(
-        wrongTriesExhausted(tries)
-          ? `That did not work again. A code stops working after ${WRONG_CODE_LIMIT} wrong tries, so ask for a new one.`
-          : codeMessageFor(problem),
-      );
+      problems.showForm(wrongTries.refused(data.email, problem));
     },
   });
 
@@ -67,7 +73,7 @@ export function ResetPasswordForm() {
       problems.clearAll();
     },
     onSuccess: () => {
-      setWrongTries(NO_WRONG_TRIES);
+      wrongTries.reset();
       form.resetField("code");
       // Same words whether or not the address has an account: the answer must not tell.
       setNotice("If that address has an account, a new code is on its way. The old one no longer works.");
@@ -109,7 +115,11 @@ export function ResetPasswordForm() {
   return (
     <AuthCard
       heading="Choose a new password"
-      intro="If that address has an account, we have emailed a 6-digit code. It stays valid for a few minutes."
+      intro={
+        askedForCode
+          ? "If that address has an account, we have emailed a 6-digit code. It stays valid for a few minutes."
+          : "Enter the 6-digit code from your email, with the address it was sent to, and choose a new password."
+      }
       footer={
         <>
           Remembered it? <Link href="/sign-in" className="underline underline-offset-4">Sign in</Link>

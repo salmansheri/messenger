@@ -11,7 +11,7 @@ import { call, sdk, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { session } from "@/lib/auth/app-session";
 import { useSession } from "@/features/session/session-provider";
-import { verificationEmail } from "./pending-email";
+import { verificationEmail } from "./remembered-email";
 import { signInSchema, type SignInData, type SignInValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { signInMessageFor } from "./wording";
