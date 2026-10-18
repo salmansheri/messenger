@@ -22,7 +22,7 @@ spring:
 app:
   mail-from: no-reply@messenger.local
   refresh-cookie:
-    secure: true
+    secure: ${REFRESH_COOKIE_SECURE:true}
   lookup:
     max-per-minute: 30
   groups:
@@ -40,6 +40,7 @@ app:
   cors:
     allowed-origins:
       - http://localhost:3000
+      - http://localhost:3001
   jwt:
     issuer: messenger-backend
     access-token-ttl: 15m
