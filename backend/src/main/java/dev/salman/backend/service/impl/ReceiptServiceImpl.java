@@ -43,7 +43,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 		var me = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(ReceiptServiceImpl::notFound);
 		return new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(),
-				Math.max(0, conversation.getLastSeq() - me.getLastReadSeq()));
+				me.unreadCount(conversation.getLastSeq()));
 	}
 
 	private static NotFoundException notFound() {

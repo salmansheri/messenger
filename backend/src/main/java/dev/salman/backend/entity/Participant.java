@@ -3,6 +3,7 @@ package dev.salman.backend.entity;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.id.uuid.UuidVersion7Strategy;
 
@@ -18,6 +19,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /** A User's membership in a Conversation. */
+/**
+ * {@code @DynamicUpdate}: only the columns that changed are written. The receipt positions are advanced by a separate
+ * atomic UPDATE (see {@code ParticipantRepository.advanceReceipts}), so changing, say, the role of a copy loaded
+ * earlier must never write its old positions back over newer ones.
+ */
+@DynamicUpdate
 @Entity
 @Table(name = "participant")
 @Getter
@@ -72,6 +79,11 @@ public class Participant {
 	/** Whether a Message with this Sequence number was sent after the Participant joined, so they may read it. */
 	public boolean canRead(long seq) {
 		return seq > joinedAfterSeq;
+	}
+
+	/** How many Messages up to {@code lastSeq} this Participant has not read yet (see the glossary). */
+	public long unreadCount(long lastSeq) {
+		return Math.max(0, lastSeq - lastReadSeq);
 	}
 
 	/** The cursor to read after: the caller's own cursor, but never before their join point. */

@@ -2,6 +2,7 @@ package dev.salman.backend.support;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import java.util.UUID;
@@ -246,7 +247,7 @@ public class AuthClient {
 	/** Reports receipt positions; pass null for a field to leave it out. */
 	public ResultActions receipts(String accessToken, String conversationId, Object deliveredSeq, Object readSeq)
 			throws Exception {
-		var body = new java.util.LinkedHashMap<String, Object>();
+		var body = new LinkedHashMap<String, Object>();
 		if (deliveredSeq != null) {
 			body.put("deliveredSeq", deliveredSeq);
 		}

@@ -61,7 +61,7 @@ The Sequence number of the latest Message a Participant has seen; never above th
 _Avoid_: Read cursor, last seen (which means presence)
 
 **Unread count**:
-How many Messages a Participant has not yet read: the latest Sequence number minus their Read position. Their own Messages never count.
+How many Messages a Participant has not yet read: the latest Sequence number minus their Read position. Sending a Message moves the sender's Read position to it, so their own Messages never count; it also means replying marks everything before the reply as read.
 _Avoid_: Badge, pending
 
 **Message status**:

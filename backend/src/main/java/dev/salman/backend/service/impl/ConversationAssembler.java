@@ -52,7 +52,7 @@ class ConversationAssembler {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
-		var unread = viewer.map(v -> Math.max(0, conversation.getLastSeq() - v.getLastReadSeq())).orElse(0L);
+		var unread = viewer.map(v -> v.unreadCount(conversation.getLastSeq())).orElse(0L);
 		var summaries = members.stream()
 				.sorted(Comparator.comparing((Participant m) -> m.getRole() != ParticipantRole.ADMIN)
 						.thenComparing(Participant::getJoinedAt).thenComparing(m -> m.getUserId().toString()))

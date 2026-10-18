@@ -68,7 +68,8 @@ public class MessageServiceImpl implements MessageService {
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
 		participants.advanceReceipts(conversationId, callerId, message.getSeq(), message.getSeq());
-		return new SentMessage(MessageResponse.from(message, statusFor(message, callerId)), true);
+		// Nobody can report a position that did not exist before this send, so a new Message is always still SENT.
+		return new SentMessage(MessageResponse.from(message, MessageStatus.SENT), true);
 	}
 
 	@Override
