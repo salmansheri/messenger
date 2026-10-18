@@ -11,6 +11,7 @@ import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.ReceiptService;
+import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -19,6 +20,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
+	private final RealtimeEvents events;
 
 	/**
 	 * Needs no conversation lock: the latest Sequence number only ever grows, so a position that is valid when
@@ -30,9 +32,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 		if (deliveredSeq == null && readSeq == null) {
 			throw new BadRequestException("Report deliveredSeq, readSeq or both.");
 		}
-		if (!participants.existsByConversationIdAndUserId(conversationId, callerId)) {
-			throw notFound();
-		}
+		var before = participants.findPositions(conversationId, callerId).orElseThrow(ReceiptServiceImpl::notFound);
 		var conversation = conversations.findById(conversationId).orElseThrow(ReceiptServiceImpl::notFound);
 		long read = readSeq == null ? 0 : readSeq;
 		long delivered = Math.max(deliveredSeq == null ? 0 : deliveredSeq, read); // reading implies receiving
@@ -42,8 +42,11 @@ public class ReceiptServiceImpl implements ReceiptService {
 		participants.advanceReceipts(conversationId, callerId, delivered, read);
 		var me = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(ReceiptServiceImpl::notFound);
-		return new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(),
-				me.unreadCount(conversation.getLastSeq()));
+		var unread = me.unreadCount(conversation.getLastSeq());
+		if (me.getLastDeliveredSeq() != before.getDeliveredSeq() || me.getLastReadSeq() != before.getReadSeq()) {
+			events.receiptsChanged(conversationId, callerId, me.getLastDeliveredSeq(), me.getLastReadSeq(), unread);
+		}
+		return new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(), unread);
 	}
 
 	private static NotFoundException notFound() {

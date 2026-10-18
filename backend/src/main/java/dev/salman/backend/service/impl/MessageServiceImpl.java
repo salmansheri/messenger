@@ -23,6 +23,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.MessageService;
+import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -32,6 +33,7 @@ public class MessageServiceImpl implements MessageService {
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
 	private final MessageRepository messages;
+	private final RealtimeEvents events;
 	private final Clock clock;
 
 	/**
@@ -68,6 +70,7 @@ public class MessageServiceImpl implements MessageService {
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
 		participants.advanceReceipts(conversationId, callerId, message.getSeq(), message.getSeq());
+		events.messageCreated(message);
 		// Nobody can report a position that did not exist before this send, so a new Message is always still SENT.
 		return new SentMessage(MessageResponse.from(message, MessageStatus.SENT), true);
 	}

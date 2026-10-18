@@ -23,6 +23,19 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
 
 	long countByConversationId(UUID conversationId);
 
+	/** A Participant's receipt positions without loading the entity, so nothing stale lingers in the session. */
+	interface Positions {
+
+		long getDeliveredSeq();
+
+		long getReadSeq();
+
+	}
+
+	@Query("select p.lastDeliveredSeq as deliveredSeq, p.lastReadSeq as readSeq from Participant p "
+			+ "where p.conversationId = :conversationId and p.userId = :userId")
+	Optional<Positions> findPositions(UUID conversationId, UUID userId);
+
 	/**
 	 * Moves the Participant's receipt positions forward to at least the given values, atomically: a lower value, or
 	 * one that arrives late or concurrently, changes nothing. {@code delivered} must not be below {@code read}.

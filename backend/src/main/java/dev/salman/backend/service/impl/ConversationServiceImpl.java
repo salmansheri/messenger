@@ -21,6 +21,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.ConversationService;
+import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -30,6 +31,7 @@ public class ConversationServiceImpl implements ConversationService {
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
 	private final ConversationAssembler assembler;
+	private final RealtimeEvents events;
 	private final UserRepository users;
 	private final Clock clock;
 
@@ -60,6 +62,7 @@ public class ConversationServiceImpl implements ConversationService {
 		for (var userId : List.of(callerId, otherUserId)) {
 			participants.save(Participant.joining(conversation.getId(), userId, ParticipantRole.MEMBER, now, 0));
 		}
+		events.conversationChanged(conversation.getId(), List.of());
 		return new StartedConversation(assembler.assemble(List.of(conversation), callerId).getFirst(), true);
 	}
 

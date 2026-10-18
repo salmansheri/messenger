@@ -28,6 +28,7 @@ import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.GroupService;
 import dev.salman.backend.service.RateLimiter;
+import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -40,6 +41,7 @@ public class GroupServiceImpl implements GroupService {
 	private final ParticipantRepository participants;
 	private final UserRepository users;
 	private final ConversationAssembler assembler;
+	private final RealtimeEvents events;
 	private final RateLimiter rateLimiter;
 	private final AppProperties props;
 	private final Clock clock;
@@ -81,6 +83,7 @@ public class GroupServiceImpl implements GroupService {
 		conversations.save(group);
 		addMember(group, callerId, ParticipantRole.ADMIN, 0);
 		others.forEach(userId -> addMember(group, userId, ParticipantRole.MEMBER, 0));
+		events.conversationChanged(group.getId(), List.of());
 		return assembler.assemble(List.of(group), callerId).getFirst();
 	}
 
@@ -90,6 +93,7 @@ public class GroupServiceImpl implements GroupService {
 		var locked = lockGroup(callerId, conversationId);
 		locked.requireAdmin();
 		locked.conversation().setName(name.strip());
+		events.conversationChanged(conversationId, List.of());
 		return assembler.assemble(List.of(locked.conversation()), callerId).getFirst();
 	}
 
@@ -107,6 +111,7 @@ public class GroupServiceImpl implements GroupService {
 		}
 		// The new member's join point is the latest Message now, so everything sent so far stays out of their reach.
 		addMember(locked.conversation(), userId, ParticipantRole.MEMBER, locked.conversation().getLastSeq());
+		events.conversationChanged(conversationId, List.of());
 		return assembler.assemble(List.of(locked.conversation()), callerId).getFirst();
 	}
 
@@ -121,6 +126,7 @@ public class GroupServiceImpl implements GroupService {
 		var target = participants.findByConversationIdAndUserId(conversationId, userId)
 				.orElseThrow(() -> new NotFoundException("No such participant."));
 		participants.delete(target);
+		events.conversationChanged(conversationId, List.of(userId)); // the removed User hears about it too
 	}
 
 	@Override
@@ -131,6 +137,7 @@ public class GroupServiceImpl implements GroupService {
 		var target = participants.findByConversationIdAndUserId(conversationId, userId)
 				.orElseThrow(() -> new NotFoundException("No such participant."));
 		target.setRole(ParticipantRole.ADMIN);
+		events.conversationChanged(conversationId, List.of());
 	}
 
 	@Override
@@ -141,6 +148,7 @@ public class GroupServiceImpl implements GroupService {
 				.filter(p -> !p.getUserId().equals(callerId)).toList();
 		if (remaining.isEmpty()) {
 			conversations.delete(locked.conversation()); // nobody is left to read it; the database cascades
+			events.conversationChanged(conversationId, List.of(callerId));
 			return;
 		}
 		participants.delete(locked.caller());
@@ -150,6 +158,7 @@ public class GroupServiceImpl implements GroupService {
 					.min(Comparator.comparing(Participant::getJoinedAt).thenComparing(p -> p.getUserId().toString()))
 					.orElseThrow().setRole(ParticipantRole.ADMIN);
 		}
+		events.conversationChanged(conversationId, List.of(callerId)); // the leaver hears about it too
 	}
 
 	/**
