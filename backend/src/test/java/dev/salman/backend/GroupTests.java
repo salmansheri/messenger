@@ -2,6 +2,7 @@ package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -490,5 +491,64 @@ class GroupTests extends IntegrationTest {
 
 	@Autowired
 	org.springframework.transaction.PlatformTransactionManager transactions;
+
+	// ---- review follow-ups
+
+	@Test
+	void aUserMayCreateTwentyGroupsAnHourAndTheNextIsRefusedWithRetryAfter() throws Exception {
+		for (int i = 1; i <= 20; i++) {
+			client.createGroup(ada.accessToken(), "Group " + i, grace.id()).andExpect(status().isCreated());
+		}
+
+		client.createGroup(ada.accessToken(), "One too many", grace.id())
+				.andExpect(status().isTooManyRequests())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(header().exists("Retry-After"));
+		client.createGroup(grace.accessToken(), "Grace may still create", ada.id()).andExpect(status().isCreated());
+	}
+
+	@Test
+	void failedCreationAttemptsCountTowardsTheLimitSoItCannotProbeForUsers() throws Exception {
+		for (int i = 1; i <= 20; i++) {
+			client.createGroup(ada.accessToken(), "Ghosts", UUID.randomUUID().toString()).andExpect(status().isNotFound());
+		}
+
+		client.createGroup(ada.accessToken(), "Real one", grace.id()).andExpect(status().isTooManyRequests());
+	}
+
+	@Test
+	void participantsAreListedWithAdminsFirstAndTheCreatorLeading() throws Exception {
+		for (int round = 0; round < 5; round++) {
+			var id = idOf(client.createGroup(ada.accessToken(), "Order " + round, grace.id(), linus.id(), outsider.id())
+					.andExpect(status().isCreated()));
+			client.conversation(linus.accessToken(), id)
+					.andExpect(jsonPath("$.participants[0].userId").value(ada.id()))
+					.andExpect(jsonPath("$.participants[0].role").value("ADMIN"));
+
+			client.promote(ada.accessToken(), id, outsider.id()).andExpect(status().isNoContent());
+			client.conversation(linus.accessToken(), id)
+					.andExpect(jsonPath("$.participants[0].role").value("ADMIN"))
+					.andExpect(jsonPath("$.participants[1].role").value("ADMIN"))
+					.andExpect(jsonPath("$.participants[2].role").value("MEMBER"))
+					.andExpect(jsonPath("$.participants[3].role").value("MEMBER"));
+		}
+	}
+
+	@Test
+	void aGroupNameWithANulCharacterIsAValidationErrorNotAServerError() throws Exception {
+		client.createGroup(ada.accessToken(), "bad\u0000name", grace.id())
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.name").isNotEmpty());
+		var id = trio();
+		client.rename(ada.accessToken(), id, "also\u0000bad")
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.name").isNotEmpty());
+	}
+
+	@Test
+	void aGroupNameLimitCountsCharactersNotUtf16Units() throws Exception {
+		client.createGroup(ada.accessToken(), "😀".repeat(100), grace.id()).andExpect(status().isCreated())
+				.andExpect(jsonPath("$.name").value("😀".repeat(100)));
+		client.createGroup(ada.accessToken(), "😀".repeat(101), grace.id()).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.name").isNotEmpty());
+	}
 
 }

@@ -15,6 +15,7 @@ import dev.salman.backend.dto.ParticipantSummary;
 import dev.salman.backend.entity.Conversation;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
+import dev.salman.backend.entity.ParticipantRole;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
@@ -52,13 +53,14 @@ class ConversationAssembler {
 			return null;
 		}
 		return members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst()
-				.filter(viewer -> latest.getSeq() > viewer.getJoinedAfterSeq()).map(viewer -> latest).orElse(null);
+				.filter(viewer -> viewer.canRead(latest.getSeq())).map(viewer -> latest).orElse(null);
 	}
 
 	private static ConversationResponse toResponse(Conversation conversation, Collection<Participant> members,
 			Map<UUID, User> usersById, Message latest) {
 		var summaries = members.stream()
-				.sorted(Comparator.comparing(m -> m.getUserId().toString()))
+				.sorted(Comparator.comparing((Participant m) -> m.getRole() != ParticipantRole.ADMIN)
+						.thenComparing(Participant::getJoinedAt).thenComparing(m -> m.getUserId().toString()))
 				.map(m -> new ParticipantSummary(m.getUserId(), usersById.get(m.getUserId()).getDisplayName(),
 						m.getRole()))
 				.toList();

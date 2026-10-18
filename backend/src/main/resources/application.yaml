@@ -25,6 +25,8 @@ app:
     secure: true
   lookup:
     max-per-minute: 30
+  groups:
+    max-created-per-hour: 20
   cors:
     allowed-origins:
       - http://localhost:3000

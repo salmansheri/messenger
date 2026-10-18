@@ -47,4 +47,25 @@ public class Participant {
 	@Column(name = "joined_after_seq", nullable = false)
 	private long joinedAfterSeq;
 
+	public static Participant joining(UUID conversationId, UUID userId, ParticipantRole role, Instant joinedAt,
+			long joinedAfterSeq) {
+		var participant = new Participant();
+		participant.setConversationId(conversationId);
+		participant.setUserId(userId);
+		participant.setRole(role);
+		participant.setJoinedAt(joinedAt);
+		participant.setJoinedAfterSeq(joinedAfterSeq);
+		return participant;
+	}
+
+	/** Whether a Message with this Sequence number was sent after the Participant joined, so they may read it. */
+	public boolean canRead(long seq) {
+		return seq > joinedAfterSeq;
+	}
+
+	/** The cursor to read after: the caller's own cursor, but never before their join point. */
+	public long readableAfter(long cursor) {
+		return Math.max(cursor, joinedAfterSeq);
+	}
+
 }

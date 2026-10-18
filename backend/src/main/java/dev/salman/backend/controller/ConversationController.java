@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import dev.salman.backend.dto.ConversationResponse;
 import dev.salman.backend.dto.StartDirectConversationRequest;
+import dev.salman.backend.lib.Principals;
 import dev.salman.backend.service.ConversationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,19 +32,19 @@ public class ConversationController {
 	@PostMapping("/direct")
 	ResponseEntity<ConversationResponse> startDirect(@AuthenticationPrincipal Jwt jwt,
 			@Valid @RequestBody StartDirectConversationRequest request) {
-		var started = conversations.startDirect(UUID.fromString(jwt.getSubject()), request.userId());
+		var started = conversations.startDirect(Principals.userId(jwt), request.userId());
 		return ResponseEntity.status(started.created() ? HttpStatus.CREATED : HttpStatus.OK)
 				.body(started.conversation());
 	}
 
 	@GetMapping
 	List<ConversationResponse> list(@AuthenticationPrincipal Jwt jwt) {
-		return conversations.listFor(UUID.fromString(jwt.getSubject()));
+		return conversations.listFor(Principals.userId(jwt));
 	}
 
 	@GetMapping("/{conversationId}")
 	ConversationResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId) {
-		return conversations.get(UUID.fromString(jwt.getSubject()), conversationId);
+		return conversations.get(Principals.userId(jwt), conversationId);
 	}
 
 }

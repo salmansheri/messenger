@@ -70,8 +70,8 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	@Transactional(readOnly = true)
 	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit) {
-		var joinedAfterSeq = participants.findByConversationIdAndUserId(conversationId, callerId)
-				.orElseThrow(MessageServiceImpl::notFound).getJoinedAfterSeq(); // first, so outsiders only see a 404
+		var reader = participants.findByConversationIdAndUserId(conversationId, callerId)
+				.orElseThrow(MessageServiceImpl::notFound); // first, so outsiders only see a 404
 		if (beforeSeq != null && afterSeq != null) {
 			throw new BadRequestException("Use either beforeSeq or afterSeq, not both.");
 		}
@@ -80,14 +80,14 @@ public class MessageServiceImpl implements MessageService {
 		List<Message> found;
 		if (afterSeq != null) {
 			found = messages.findByConversationIdAndSeqGreaterThanOrderBySeqAsc(conversationId,
-					Math.max(afterSeq, joinedAfterSeq), fetch);
+					reader.readableAfter(afterSeq), fetch);
 		}
 		else {
 			found = new ArrayList<>(beforeSeq != null
 					? messages.findByConversationIdAndSeqGreaterThanAndSeqLessThanOrderBySeqDesc(conversationId,
-							joinedAfterSeq, beforeSeq, fetch)
-					: messages.findByConversationIdAndSeqGreaterThanOrderBySeqDesc(conversationId, joinedAfterSeq,
-							fetch));
+							reader.readableAfter(0), beforeSeq, fetch)
+					: messages.findByConversationIdAndSeqGreaterThanOrderBySeqDesc(conversationId,
+							reader.readableAfter(0), fetch));
 		}
 		var hasMore = found.size() > limit;
 		var page = new ArrayList<>(hasMore ? found.subList(0, limit) : found);

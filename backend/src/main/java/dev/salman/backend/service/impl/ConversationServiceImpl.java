@@ -12,6 +12,7 @@ import dev.salman.backend.dto.StartedConversation;
 import dev.salman.backend.entity.Conversation;
 import dev.salman.backend.entity.ConversationType;
 import dev.salman.backend.entity.Participant;
+import dev.salman.backend.entity.ParticipantRole;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.NotFoundException;
@@ -57,11 +58,7 @@ public class ConversationServiceImpl implements ConversationService {
 		conversation.setUpdatedAt(now);
 		conversations.save(conversation);
 		for (var userId : List.of(callerId, otherUserId)) {
-			var participant = new Participant();
-			participant.setConversationId(conversation.getId());
-			participant.setUserId(userId);
-			participant.setJoinedAt(now);
-			participants.save(participant);
+			participants.save(Participant.joining(conversation.getId(), userId, ParticipantRole.MEMBER, now, 0));
 		}
 		return new StartedConversation(assembler.assemble(List.of(conversation), callerId).getFirst(), true);
 	}

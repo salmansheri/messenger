@@ -34,7 +34,7 @@ class JwtConfigTests {
 		return new AppProperties("no-reply@example.com",
 				new AppProperties.Jwt("test-issuer", Duration.ofMinutes(15), Duration.ofDays(30), privateKey, publicKey),
 				new AppProperties.Otp("secret", Duration.ofMinutes(10), 5, 5, 20),
-				new AppProperties.RefreshCookie(true), new AppProperties.Cors(java.util.List.of()), new AppProperties.Lookup(30));
+				new AppProperties.RefreshCookie(true), new AppProperties.Cors(java.util.List.of()), new AppProperties.Lookup(30), new AppProperties.Groups(20));
 	}
 
 	private static String tokenFor(JwtConfig config, AppProperties props, com.nimbusds.jose.jwk.ECKey key,

@@ -113,4 +113,20 @@ class AuthInputValidationTests extends IntegrationTest {
 				.andExpect(jsonPath("$.errors.email").isNotEmpty());
 	}
 
+	@Test
+	void aDisplayNameWithANulCharacterIsAValidationErrorNotAServerError() throws Exception {
+		auth().signUp(AuthClient.uniqueEmail(), "bad\u0000name", AuthClient.PASSWORD)
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.displayName").isNotEmpty());
+	}
+
+	@Test
+	void aDisplayNameLimitCountsCharactersNotUtf16Units() throws Exception {
+		var client = auth();
+
+		client.signUp(AuthClient.uniqueEmail(), "😀".repeat(100), AuthClient.PASSWORD).andExpect(status().isAccepted());
+		client.signUp(AuthClient.uniqueEmail(), "😀".repeat(101), AuthClient.PASSWORD)
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.displayName").isNotEmpty());
+	}
+
 }

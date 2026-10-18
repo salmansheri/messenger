@@ -1,6 +1,7 @@
 package dev.salman.backend.service.impl;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.dto.ConversationResponse;
 import dev.salman.backend.entity.Conversation;
 import dev.salman.backend.entity.ConversationType;
@@ -25,6 +27,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.GroupService;
+import dev.salman.backend.service.RateLimiter;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -37,10 +40,12 @@ public class GroupServiceImpl implements GroupService {
 	private final ParticipantRepository participants;
 	private final UserRepository users;
 	private final ConversationAssembler assembler;
+	private final RateLimiter rateLimiter;
+	private final AppProperties props;
 	private final Clock clock;
 
 	/** A Group whose row is locked for this transaction, and the caller's membership of it. */
-	private record Locked(Conversation conversation, Participant caller) {
+	private record LockedGroup(Conversation conversation, Participant caller) {
 
 		void requireAdmin() {
 			if (caller.getRole() != ParticipantRole.ADMIN) {
@@ -53,6 +58,8 @@ public class GroupServiceImpl implements GroupService {
 	@Override
 	@Transactional
 	public ConversationResponse create(UUID callerId, String name, Collection<UUID> userIds) {
+		// Before anything else, and counting failures too: creation must not become a way to probe for Users or spam.
+		rateLimiter.hit("rl:group-create:" + callerId, props.groups().maxCreatedPerHour(), Duration.ofHours(1));
 		var others = new LinkedHashSet<>(userIds);
 		others.remove(callerId);
 		if (others.isEmpty() || others.size() > MAX_PARTICIPANTS - 1) {
@@ -149,7 +156,7 @@ public class GroupServiceImpl implements GroupService {
 	 * Locks the Group and returns the caller's membership, read again under the lock so a removal that just
 	 * committed is seen. A cheap check first keeps outsiders from queueing for the lock.
 	 */
-	private Locked lockGroup(UUID callerId, UUID conversationId) {
+	private LockedGroup lockGroup(UUID callerId, UUID conversationId) {
 		if (!participants.existsByConversationIdAndUserId(conversationId, callerId)) {
 			throw notFound();
 		}
@@ -159,17 +166,11 @@ public class GroupServiceImpl implements GroupService {
 		if (conversation.getType() != ConversationType.GROUP) {
 			throw new BadRequestException("This only applies to groups.");
 		}
-		return new Locked(conversation, caller);
+		return new LockedGroup(conversation, caller);
 	}
 
 	private void addMember(Conversation group, UUID userId, ParticipantRole role, long joinedAfterSeq) {
-		var member = new Participant();
-		member.setConversationId(group.getId());
-		member.setUserId(userId);
-		member.setRole(role);
-		member.setJoinedAt(clock.instant());
-		member.setJoinedAfterSeq(joinedAfterSeq);
-		participants.save(member);
+		participants.save(Participant.joining(group.getId(), userId, role, clock.instant(), joinedAfterSeq));
 	}
 
 	private static NotFoundException notFound() {

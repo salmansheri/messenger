@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import dev.salman.backend.dto.MessagePage;
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.SendMessageRequest;
+import dev.salman.backend.lib.Principals;
 import dev.salman.backend.service.MessageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -34,7 +35,7 @@ public class MessageController {
 	@PostMapping
 	ResponseEntity<MessageResponse> send(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId,
 			@Valid @RequestBody SendMessageRequest request) {
-		var sent = messages.send(UUID.fromString(jwt.getSubject()), conversationId, request.clientMessageId(),
+		var sent = messages.send(Principals.userId(jwt), conversationId, request.clientMessageId(),
 				request.body());
 		return ResponseEntity.status(sent.created() ? HttpStatus.CREATED : HttpStatus.OK).body(sent.message());
 	}
@@ -45,7 +46,7 @@ public class MessageController {
 			@RequestParam(required = false) @Min(1) Long beforeSeq,
 			@RequestParam(required = false) @Min(0) Long afterSeq,
 			@RequestParam(defaultValue = "50") @Min(1) @Max(100) int limit) {
-		return messages.history(UUID.fromString(jwt.getSubject()), conversationId, beforeSeq, afterSeq, limit);
+		return messages.history(Principals.userId(jwt), conversationId, beforeSeq, afterSeq, limit);
 	}
 
 }

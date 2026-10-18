@@ -11,11 +11,7 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
 
-/**
- * The text of a Message: not blank, at most {@value #MAX_CHARACTERS} characters (counted as Unicode code points, the
- * same way the database check counts them, so an emoji is one character) and free of NUL, which PostgreSQL cannot
- * store in text.
- */
+/** The text of a Message (up to 4000 characters). See {@link TextRules}. */
 @Documented
 @Constraint(validatedBy = ValidMessageBody.Validator.class)
 @Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
@@ -24,7 +20,7 @@ public @interface ValidMessageBody {
 
 	int MAX_CHARACTERS = 4000;
 
-	String message() default "is not a valid message";
+	String message() default "is not valid";
 
 	Class<?>[] groups() default {};
 
@@ -34,22 +30,7 @@ public @interface ValidMessageBody {
 
 		@Override
 		public boolean isValid(String value, ConstraintValidatorContext context) {
-			if (value == null || value.isBlank()) {
-				return reject(context, "must not be blank");
-			}
-			if (value.indexOf('\u0000') >= 0) {
-				return reject(context, "must not contain NUL characters");
-			}
-			if (value.codePointCount(0, value.length()) > MAX_CHARACTERS) {
-				return reject(context, "must be at most " + MAX_CHARACTERS + " characters");
-			}
-			return true;
-		}
-
-		private static boolean reject(ConstraintValidatorContext context, String reason) {
-			context.disableDefaultConstraintViolation();
-			context.buildConstraintViolationWithTemplate(reason).addConstraintViolation();
-			return false;
+			return TextRules.check(value, MAX_CHARACTERS, context);
 		}
 
 	}

@@ -1,7 +1,6 @@
 package dev.salman.backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import dev.salman.backend.lib.ValidGroupName;
 
-public record RenameGroupRequest(@NotBlank @Size(max = 100) String name) {
+public record RenameGroupRequest(@ValidGroupName String name) {
 }
