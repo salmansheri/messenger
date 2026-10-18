@@ -42,7 +42,7 @@ public class StompSessions {
 
 	private final Clock clock;
 	private final ConcurrentMap<String, WebSocketSession> sockets = new ConcurrentHashMap<>();
-	private final ConcurrentMap<String, Authenticated> authenticated = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, Authenticated> identities = new ConcurrentHashMap<>();
 
 	/** Registers the decorator that remembers each socket from the moment it opens until it closes. */
 	public void register(WebSocketTransportRegistration registry) {
@@ -60,7 +60,7 @@ public class StompSessions {
 			@Override
 			public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
 				sockets.remove(session.getId());
-				authenticated.remove(session.getId());
+				identities.remove(session.getId());
 				super.afterConnectionClosed(session, closeStatus);
 			}
 		};
@@ -68,23 +68,23 @@ public class StompSessions {
 
 	/** Records who the socket belongs to and how long its token is good for. */
 	public void authenticated(String sessionId, String userId, Instant tokenExpiresAt) {
-		authenticated.put(sessionId, new Authenticated(userId, tokenExpiresAt));
+		identities.put(sessionId, new Authenticated(userId, tokenExpiresAt));
 	}
 
 	public boolean isAuthenticated(String sessionId) {
-		return authenticated.containsKey(sessionId);
+		return identities.containsKey(sessionId);
 	}
 
 	/** True while the socket has authenticated and its access token has not run out. */
 	public boolean isLive(String sessionId) {
-		var session = authenticated.get(sessionId);
+		var session = identities.get(sessionId);
 		return session != null && clock.instant().isBefore(session.expiresAt());
 	}
 
 	/** Every authenticated socket on this instance whose access token is still good, as socket id to User id. */
 	public Map<String, UUID> liveSessions() {
 		var live = new HashMap<String, UUID>();
-		authenticated.forEach((sessionId, session) -> {
+		identities.forEach((sessionId, session) -> {
 			if (clock.instant().isBefore(session.expiresAt())) {
 				live.put(sessionId, UUID.fromString(session.userId()));
 			}
@@ -100,7 +100,7 @@ public class StompSessions {
 
 	/** Closes every socket this instance holds for the User. Other instances do the same on the same event. */
 	public void closeAllFor(String userId) {
-		authenticated.forEach((sessionId, session) -> {
+		identities.forEach((sessionId, session) -> {
 			if (session.userId().equals(userId)) {
 				close(sessionId);
 			}
@@ -109,7 +109,7 @@ public class StompSessions {
 
 	@Scheduled(fixedDelayString = "PT10S")
 	public void closeExpired() {
-		authenticated.keySet().stream().filter(id -> !isLive(id)).forEach(this::close);
+		identities.keySet().stream().filter(id -> !isLive(id)).forEach(this::close);
 	}
 
 	private void close(String sessionId) {
