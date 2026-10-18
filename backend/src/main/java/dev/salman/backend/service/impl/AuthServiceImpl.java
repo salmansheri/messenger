@@ -1,0 +1,77 @@
+package dev.salman.backend.service.impl;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import dev.salman.backend.config.AppProperties;
+import dev.salman.backend.entity.User;
+import dev.salman.backend.exception.ConflictException;
+import dev.salman.backend.exception.InvalidVerificationCodeException;
+import dev.salman.backend.lib.EmailSender;
+import dev.salman.backend.lib.Emails;
+import dev.salman.backend.repository.UserRepository;
+import dev.salman.backend.service.AuthService;
+import dev.salman.backend.service.VerificationCodeService;
+import dev.salman.backend.service.VerificationCodeService.Purpose;
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+
+	private final UserRepository users;
+	private final PasswordEncoder passwordEncoder;
+	private final VerificationCodeService codes;
+	private final EmailSender emailSender;
+	private final AppProperties props;
+
+	@Override
+	public String signUp(String rawEmail, String displayName, String password, String clientIp) {
+		var email = Emails.normalize(rawEmail);
+		codes.acquireSendPermit(email, clientIp);
+		var existing = users.findByEmail(email);
+		if (existing.isPresent() && existing.get().isEmailVerified()) {
+			throw new ConflictException("An account with this email already exists.");
+		}
+		var user = existing.orElseGet(User::new);
+		user.setEmail(email);
+		user.setDisplayName(displayName.strip());
+		user.setPasswordHash(passwordEncoder.encode(password));
+		try {
+			users.saveAndFlush(user);
+		}
+		catch (DataIntegrityViolationException e) {
+			throw new ConflictException("An account with this email already exists.");
+		}
+		sendVerificationCode(email);
+		return email;
+	}
+
+	@Override
+	public void verifyEmail(String rawEmail, String code) {
+		var email = Emails.normalize(rawEmail);
+		var user = users.findByEmail(email).filter(u -> !u.isEmailVerified())
+				.orElseThrow(InvalidVerificationCodeException::new);
+		if (!codes.verify(Purpose.EMAIL_VERIFICATION, email, code)) {
+			throw new InvalidVerificationCodeException();
+		}
+		user.setEmailVerified(true);
+		users.save(user);
+	}
+
+	@Override
+	public void resendVerification(String rawEmail, String clientIp) {
+		var email = Emails.normalize(rawEmail);
+		codes.acquireSendPermit(email, clientIp);
+		users.findByEmail(email).filter(u -> !u.isEmailVerified()).ifPresent(u -> sendVerificationCode(email));
+	}
+
+	private void sendVerificationCode(String email) {
+		var code = codes.issue(Purpose.EMAIL_VERIFICATION, email);
+		emailSender.send(email, "Verify your email",
+				"Your verification code is %s. It expires in %d minutes.".formatted(code,
+						props.otp().ttl().toMinutes()));
+	}
+
+}

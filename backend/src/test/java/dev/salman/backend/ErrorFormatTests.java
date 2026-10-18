@@ -16,13 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import dev.salman.backend.support.IntegrationTest;
-import tools.jackson.databind.json.JsonMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class ErrorFormatTests extends IntegrationTest {
-
-	@Autowired
-	JsonMapper json;
 
 	@Test
 	void unknownPublicPathReturnsNotFoundAsProblem() throws Exception {
