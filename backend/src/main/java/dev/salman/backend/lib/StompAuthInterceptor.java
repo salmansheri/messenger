@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * The gatekeeper for everything a client sends over a socket. CONNECT must carry a valid access token for a User who
  * still exists. After that a client may only listen on its own event and error queues and only send receipt
- * reports; anything else, or anything after the token has expired, is refused and the socket is closed.
+ * reports and typing notices; anything else, or anything after the token has expired, is refused and the socket is closed.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
 	private static final String BEARER = "Bearer ";
 	private static final Set<String> LISTENABLE = Set.of("/user/queue/events", "/user/queue/errors");
-	private static final Pattern RECEIPTS = Pattern.compile("^/app/conversations/[0-9a-fA-F-]{36}/receipts$");
+	private static final Pattern RECEIPTS = Pattern.compile("^/app/conversations/[0-9a-fA-F-]{36}/(receipts|typing)$");
 
 	private final JwtDecoder jwtDecoder;
 	private final UserRepository users;
@@ -54,8 +54,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 		if (command == StompCommand.SUBSCRIBE && !LISTENABLE.contains(accessor.getDestination())) {
 			throw refuse(accessor, "You may only listen on your own event and error queues.");
 		}
-		if (command == StompCommand.SEND && !isReceiptReport(accessor.getDestination())) {
-			throw refuse(accessor, "You may only send receipt reports.");
+		if (command == StompCommand.SEND && !isAllowedSend(accessor.getDestination())) {
+			throw refuse(accessor, "You may only send receipt reports and typing notices.");
 		}
 		if (command != StompCommand.SUBSCRIBE && command != StompCommand.SEND) {
 			throw refuse(accessor, command + " is not supported.");
@@ -94,7 +94,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 		}
 	}
 
-	private static boolean isReceiptReport(String destination) {
+	private static boolean isAllowedSend(String destination) {
 		return destination != null && RECEIPTS.matcher(destination).matches();
 	}
 

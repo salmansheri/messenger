@@ -27,6 +27,9 @@ app:
     max-per-minute: 30
   groups:
     max-created-per-hour: 20
+  presence:
+    ttl: 30s
+    offline-grace: 5s
   cors:
     allowed-origins:
       - http://localhost:3000

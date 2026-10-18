@@ -1,11 +1,14 @@
 package dev.salman.backend.repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.entity.User;
 import jakarta.persistence.LockModeType;
@@ -25,5 +28,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select u from User u where u.id = :id")
 	Optional<User> findByIdForUpdate(UUID id);
+
+	/** Records when the User was last connected; touches that one column only. */
+	@Transactional
+	@Modifying
+	@Query("update User u set u.lastSeenAt = :at where u.id = :id")
+	void updateLastSeen(UUID id, Instant at);
 
 }

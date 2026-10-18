@@ -9,39 +9,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.FanoutExchange;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.ResultActions;
 
-import dev.salman.backend.lib.StompSessions;
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
-import dev.salman.backend.support.IntegrationTest;
+import dev.salman.backend.support.RealtimeIntegrationTest;
 import dev.salman.backend.support.RawStompSocket;
 import dev.salman.backend.support.StompTestClient;
 import tools.jackson.databind.JsonNode;
 
-class RealtimeTests extends IntegrationTest {
-
-	@Autowired
-	StompSessions sessions;
-
-	@Autowired
-	RabbitTemplate rabbit;
-
-	@Autowired
-	FanoutExchange realtimeExchange;
+class RealtimeTests extends RealtimeIntegrationTest {
 
 	private AuthClient client;
 	private Account ada;
 	private Account grace;
 	private Account linus;
-	private final List<StompTestClient> open = new ArrayList<>();
 
 	@BeforeEach
 	void accounts() throws Exception {
@@ -49,46 +32,6 @@ class RealtimeTests extends IntegrationTest {
 		ada = client.account("Ada Lovelace");
 		grace = client.account("Grace Hopper");
 		linus = client.account("Linus Torvalds");
-	}
-
-	@AfterEach
-	void closeSockets() {
-		open.forEach(StompTestClient::close);
-	}
-
-	/** A connected client already subscribed to its event and error queues. */
-	private StompTestClient listening(Account who) throws Exception {
-		var socket = StompTestClient.connect(port, who.accessToken(), json);
-		open.add(socket);
-		assertThat(socket.awaitConnected()).as("connected: " + socket.refusal()).isTrue();
-		socket.subscribe(StompTestClient.EVENTS);
-		socket.subscribe(StompTestClient.ERRORS);
-		awaitLive(socket, who);
-		return socket;
-	}
-
-	/**
-	 * Spring's in-memory broker registers a subscription asynchronously and sends no receipt, so keep publishing a
-	 * probe through RabbitMQ (the real path) until this socket gets one: from then on it is really listening.
-	 */
-	private void awaitLive(StompTestClient socket, Account who) throws Exception {
-		var probe = Map.of("recipients", List.of(who.id()), "payload", Map.of("type", "probe"));
-		for (int attempt = 0; attempt < 40; attempt++) {
-			rabbit.convertAndSend(realtimeExchange.getName(), "", json.writeValueAsString(probe));
-			if (!socket.receivesNothingMatching(e -> "probe".equals(e.path("type").asString()), 250)) {
-				return;
-			}
-		}
-		throw new AssertionError("The socket never became ready: " + socket.refusal());
-	}
-
-	private String idOf(ResultActions result) throws Exception {
-		return json.readTree(result.andReturn().getResponse().getContentAsString()).get("id").asString();
-	}
-
-	private static boolean isType(JsonNode event, String type, String conversationId) {
-		return type.equals(event.path("type").asString())
-				&& conversationId.equals(event.path("conversationId").asString());
 	}
 
 	// ---- connecting

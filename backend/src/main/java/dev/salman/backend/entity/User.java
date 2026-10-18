@@ -3,6 +3,7 @@ package dev.salman.backend.entity;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.id.uuid.UuidVersion7Strategy;
 
@@ -15,6 +16,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * {@code @DynamicUpdate}: only changed columns are written, so changing a loaded copy (say, the password hash) can never
+ * write an old {@code last_seen_at} back over a newer one recorded separately by {@code updateLastSeen}.
+ */
+@DynamicUpdate
 @Entity
 @Table(name = "users")
 @Getter

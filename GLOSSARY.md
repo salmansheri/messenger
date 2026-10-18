@@ -67,3 +67,17 @@ _Avoid_: Badge, pending
 **Message status**:
 How far a Message has got, shown only to its sender: sent, delivered once every other Participant's Delivered position has reached it, read once every other Participant's Read position has.
 _Avoid_: Receipt state, tick
+
+### Presence
+
+**Online**:
+A User is online while at least one of their connections is open. Closing one of several connections does not change it; it ends a short grace period after the last one closes.
+_Avoid_: Active, available, logged in
+
+**Last seen**:
+When an offline User's last connection ended. Shown only while they are offline.
+_Avoid_: Last online, last active
+
+**Typing indicator**:
+A live notice that a Participant is typing in a Conversation. It is passed on to the other Participants and never stored.
+_Avoid_: Typing status, composing

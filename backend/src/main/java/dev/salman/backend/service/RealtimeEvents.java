@@ -1,5 +1,6 @@
 package dev.salman.backend.service;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +21,11 @@ import dev.salman.backend.entity.Message;
  * worked out separately for each recipient and sent only to those for whom it moved;</li>
  * <li>{@code unread.updated}: the reporter's own {@code deliveredSeq}, {@code readSeq} and {@code unreadCount}, to
  * the reporter only;</li>
- * <li>{@code conversation.changed}: the Conversation or who is in it changed; clients should fetch it again.</li>
+ * <li>{@code conversation.changed}: the Conversation or who is in it changed; clients should fetch it again;</li>
+ * <li>{@code typing.changed}: a Participant started or stopped typing ({@code userId}, {@code typing}); never stored,
+ * so clients should treat a "started" as stale after a few seconds without a repeat;</li>
+ * <li>{@code presence.changed} (no {@code conversationId}): a User went online or offline ({@code userId},
+ * {@code online}, and {@code lastSeenAt} when offline), to everyone who shares a Conversation with them.</li>
  * </ul>
  *
  * <p>Delivery is best effort and not durable (an instance restarting misses events), and events can arrive in a
@@ -44,6 +49,12 @@ public interface RealtimeEvents {
 	default void conversationChanged(UUID conversationId) {
 		conversationChanged(conversationId, List.of());
 	}
+
+	/** A Participant started or stopped typing; heard by the other current Participants. */
+	void typingChanged(UUID conversationId, UUID typistId, boolean typing);
+
+	/** The User went online or offline; heard by everyone who shares a Conversation with them. */
+	void presenceChanged(UUID userId, boolean online, Instant lastSeenAt);
 
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);

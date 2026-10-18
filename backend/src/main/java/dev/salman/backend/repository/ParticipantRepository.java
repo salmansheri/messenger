@@ -15,6 +15,11 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
 
 	List<Participant> findByConversationIdIn(Collection<UUID> conversationIds);
 
+	/** Everyone who shares at least one Conversation with the User (not the User). */
+	@Query("select distinct other.userId from Participant mine, Participant other "
+			+ "where mine.userId = :userId and other.conversationId = mine.conversationId and other.userId <> :userId")
+	List<UUID> findCoParticipantIds(UUID userId);
+
 	boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
 
 	Optional<Participant> findByConversationIdAndUserId(UUID conversationId, UUID userId);

@@ -1,5 +1,6 @@
 package dev.salman.backend.service.impl;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -64,6 +65,23 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.addAll(alsoNotify);
 		publish(recipients, event("conversation.changed", conversationId, Map.of()));
+	}
+
+	@Override
+	public void typingChanged(UUID conversationId, UUID typistId, boolean typing) {
+		var recipients = userIds(participants.findByConversationId(conversationId));
+		recipients.remove(typistId);
+		publish(recipients, event("typing.changed", conversationId, Map.of("userId", typistId, "typing", typing)));
+	}
+
+	@Override
+	public void presenceChanged(UUID userId, boolean online, Instant lastSeenAt) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "presence.changed");
+		payload.put("userId", userId);
+		payload.put("online", online);
+		payload.put("lastSeenAt", online ? null : lastSeenAt);
+		publish(new LinkedHashSet<>(participants.findCoParticipantIds(userId)), payload);
 	}
 
 	@Override

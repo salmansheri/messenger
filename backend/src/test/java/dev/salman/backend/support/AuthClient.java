@@ -259,6 +259,11 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	public ResultActions presence(String accessToken, String conversationId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}/presence", conversationId)
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}
