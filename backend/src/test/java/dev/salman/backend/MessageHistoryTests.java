@@ -145,4 +145,13 @@ class MessageHistoryTests extends IntegrationTest {
 		assertThat(seqs("limit=100")).isEqualTo(range(1, 25));
 	}
 
+	@Test
+	void aNonParticipantAlwaysGetsTheSameNotFoundEvenWithInvalidPagingParameters() throws Exception {
+		var outsider = client.account("Outsider");
+
+		client.history(outsider.accessToken(), conversationId, "beforeSeq=5&afterSeq=2")
+				.andExpect(status().isNotFound());
+		client.history(outsider.accessToken(), conversationId, "").andExpect(status().isNotFound());
+	}
+
 }

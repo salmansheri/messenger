@@ -17,7 +17,8 @@ import dev.salman.backend.TestcontainersConfiguration;
  * Postgres, Redis and RabbitMQ. Only email and push delivery are replaced with recording fakes.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.otp.ttl=4s")
+@TestPropertySource(properties = { "app.otp.ttl=4s",
+		"spring.datasource.hikari.connection-init-sql=SET lock_timeout = '1500ms'" })
 @AutoConfigureMockMvc
 @Import({ TestcontainersConfiguration.class, TestHarnessConfiguration.class })
 public abstract class IntegrationTest {

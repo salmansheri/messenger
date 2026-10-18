@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Drives the public auth endpoints and reads Verification codes from the recorded emails. */
@@ -178,7 +179,7 @@ public class AuthClient {
 	}
 
 	/** Sends a new message with a fresh client message id and returns the stored message. */
-	public tools.jackson.databind.JsonNode sendNew(String accessToken, String conversationId, String body)
+	public JsonNode sendNew(String accessToken, String conversationId, String body)
 			throws Exception {
 		var result = send(accessToken, conversationId, UUID.randomUUID().toString(), body).andReturn().getResponse();
 		if (result.getStatus() != 201) {

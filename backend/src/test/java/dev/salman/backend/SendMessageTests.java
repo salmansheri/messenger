@@ -2,24 +2,36 @@ package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.IntegrationTest;
 
 class SendMessageTests extends IntegrationTest {
+
+	@Autowired
+	JdbcTemplate jdbc;
+
+	@Autowired
+	PlatformTransactionManager transactions;
 
 	private AuthClient client;
 	private Account ada;
@@ -221,6 +233,57 @@ class SendMessageTests extends IntegrationTest {
 		client.historyWithoutToken(conversationId).andExpect(status().isUnauthorized());
 		client.send("not-a-jwt", conversationId, UUID.randomUUID().toString(), "hi")
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void aNulCharacterInTheTextIsAValidationErrorNotAServerError() throws Exception {
+		client.send(ada.accessToken(), conversationId, UUID.randomUUID().toString(), "hello\u0000world")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.body").isNotEmpty());
+
+		client.history(ada.accessToken(), conversationId, "").andExpect(jsonPath("$.messages.length()").value(0));
+	}
+
+	@Test
+	void theTextLimitCountsCharactersNotUtf16Units() throws Exception {
+		var emoji = "😀".repeat(4000); // 4000 characters, 8000 UTF-16 units
+		client.sendNew(ada.accessToken(), conversationId, emoji);
+
+		client.history(grace.accessToken(), conversationId, "").andExpect(jsonPath("$.messages[0].body").value(emoji));
+		client.send(ada.accessToken(), conversationId, UUID.randomUUID().toString(), "😀".repeat(4001))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.body").isNotEmpty());
+	}
+
+	@Test
+	void aStalledLockHolderCannotBlockSendersForeverAndTheyAreToldToRetry() throws Exception {
+		var holding = new CountDownLatch(1);
+		var release = new CountDownLatch(1);
+		var holder = Thread.ofVirtual().start(() -> new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+			jdbc.queryForList("select id from conversation where id = ? for update", UUID.fromString(conversationId));
+			holding.countDown();
+			try {
+				release.await();
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		}));
+		try {
+			holding.await();
+
+			client.send(ada.accessToken(), conversationId, UUID.randomUUID().toString(), "blocked")
+					.andExpect(status().isServiceUnavailable())
+					.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+					.andExpect(header().exists("Retry-After"));
+		}
+		finally {
+			release.countDown();
+			holder.join();
+		}
+
+		client.send(ada.accessToken(), conversationId, UUID.randomUUID().toString(), "after")
+				.andExpect(status().isCreated()).andExpect(jsonPath("$.seq").value(1));
 	}
 
 }
