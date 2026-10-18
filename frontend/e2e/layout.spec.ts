@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/fixtures";
 
 test.describe("layout", () => {
   test("the index and the reading column sit side by side on a desktop and stack on a phone", async ({

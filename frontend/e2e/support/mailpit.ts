@@ -1,13 +1,16 @@
-import { MAILPIT_URL } from "../../playwright.config";
+import { MAILPIT_URL } from "../playwright-urls";
 
-type Summary = { ID: string };
+type Summary = { ID: string; Created: string; To: { Address: string }[] };
 
-/** The newest email sent to the address, once it has arrived in Mailpit. */
+/** The newest email addressed to exactly this address, once it has arrived in Mailpit. */
 async function latestEmailTo(email: string): Promise<{ Text: string } | null> {
-  const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
+  const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
   const { messages } = (await search.json()) as { messages: Summary[] };
-  if (!messages?.length) return null;
-  const message = await fetch(`${MAILPIT_URL}/api/v1/message/${messages[0].ID}`);
+  const newest = (messages ?? [])
+    .filter((message) => message.To.some((to) => to.Address.toLowerCase() === email.toLowerCase()))
+    .sort((a, b) => b.Created.localeCompare(a.Created))[0];
+  if (!newest) return null;
+  const message = await fetch(`${MAILPIT_URL}/api/v1/message/${newest.ID}`);
   return (await message.json()) as { Text: string };
 }
 

@@ -1,3 +1,6 @@
+/** The status given to a request that never got an answer. */
+export const NETWORK_FAILURE = 0;
+
 /** A failed API call, from the backend's RFC 9457 problem details (or from the network failing before an answer). */
 export class ApiProblem extends Error {
   constructor(
@@ -14,18 +17,19 @@ export class ApiProblem extends Error {
 
   /** The request never got an answer (offline, server down, blocked). */
   get isNetworkFailure() {
-    return this.status === 0;
+    return this.status === NETWORK_FAILURE;
   }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const text = (value: unknown) => (typeof value === "string" ? value : undefined);
+const stringOrUndefined = (value: unknown) => (typeof value === "string" ? value : undefined);
 
 function retryAfter(headers: Headers) {
-  const seconds = Number(headers.get("Retry-After"));
-  return Number.isInteger(seconds) && seconds >= 0 && headers.get("Retry-After") !== null ? seconds : undefined;
+  const header = headers.get("Retry-After");
+  if (header === null || !/^\d+$/.test(header.trim())) return undefined;
+  return Number(header);
 }
 
 /** Turns whatever the backend (or the network) gave back into an {@link ApiProblem}; it never throws. */
@@ -39,8 +43,8 @@ export function problemFrom(body: unknown, status: number, headers: Headers): Ap
   }
   return new ApiProblem(
     status,
-    text(problem.title) ?? "Something went wrong",
-    text(problem.detail),
+    stringOrUndefined(problem.title) ?? "Something went wrong",
+    stringOrUndefined(problem.detail),
     errors,
     retryAfter(headers),
   );

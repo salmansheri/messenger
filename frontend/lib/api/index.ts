@@ -1,5 +1,5 @@
 import { client } from "./generated/client.gen";
-import { problemFrom } from "./problem";
+import { NETWORK_FAILURE, problemFrom } from "./problem";
 
 export * as sdk from "./generated/sdk.gen";
 export * from "./generated/types.gen";
@@ -25,7 +25,7 @@ export async function call<T>(request: Promise<Result<T>>): Promise<T> {
   try {
     result = await request;
   } catch {
-    throw problemFrom(undefined, 0, new Headers());
+    throw problemFrom(undefined, NETWORK_FAILURE, new Headers());
   }
   if (result.error !== undefined || !result.response.ok) {
     throw problemFrom(result.error, result.response.status, result.response.headers);

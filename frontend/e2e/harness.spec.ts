@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { BACKEND_URL } from "../playwright.config";
+import { expect, test } from "./support/fixtures";
+import { BACKEND_URL } from "./playwright-urls";
 import { createVerifiedAccount, signIn } from "./support/backend";
 
 test.describe("test harness", () => {

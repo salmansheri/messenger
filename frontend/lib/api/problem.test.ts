@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiProblem, problemFrom } from "./problem";
+import { ApiProblem, NETWORK_FAILURE, problemFrom } from "./problem";
 
 const headers = (init: Record<string, string> = {}) => new Headers(init);
 
@@ -28,6 +28,9 @@ describe("problemFrom", () => {
   it("ignores a Retry-After that is not a number of seconds", () => {
     expect(problemFrom({}, 429, headers({ "Retry-After": "soon" })).retryAfterSeconds).toBeUndefined();
     expect(problemFrom({}, 429, headers({ "Retry-After": "-3" })).retryAfterSeconds).toBeUndefined();
+    expect(problemFrom({}, 429, headers({ "Retry-After": "1.5" })).retryAfterSeconds).toBeUndefined();
+    expect(problemFrom({}, 429, headers({ "Retry-After": "" })).retryAfterSeconds).toBeUndefined();
+    expect(problemFrom({}, 429, headers()).retryAfterSeconds).toBeUndefined();
   });
 
   it("falls back to the status when the body is not a problem at all", () => {
@@ -40,7 +43,7 @@ describe("problemFrom", () => {
   });
 
   it("reports a failed connection as status 0", () => {
-    const problem = problemFrom(undefined, 0, headers());
+    const problem = problemFrom(undefined, NETWORK_FAILURE, headers());
     expect(problem.status).toBe(0);
     expect(problem.isNetworkFailure).toBe(true);
     expect(problemFrom({}, 500, headers()).isNetworkFailure).toBe(false);

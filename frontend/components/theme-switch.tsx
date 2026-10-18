@@ -4,26 +4,26 @@ import { useLayoutEffect, useSyncExternalStore } from "react";
 import { applyTheme, saveTheme, themeFromCookieHeader, type Theme, THEMES } from "@/lib/theme";
 
 const LABELS: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
-const CHANGED = "theme-changed";
+const THEME_CHANGED_EVENT = "theme-changed";
 
 function subscribe(onChange: () => void) {
-  window.addEventListener(CHANGED, onChange);
-  return () => window.removeEventListener(CHANGED, onChange);
+  window.addEventListener(THEME_CHANGED_EVENT, onChange);
+  return () => window.removeEventListener(THEME_CHANGED_EVENT, onChange);
 }
 
-const current = () => themeFromCookieHeader(document.cookie);
-const onServer = (): Theme => "system";
+const savedTheme = () => themeFromCookieHeader(document.cookie);
+const themeOnServer = (): Theme => "system";
 
 /** System / light / dark, remembered in a cookie that the inline script in the layout applies before first paint. */
 export function ThemeSwitch() {
-  const theme = useSyncExternalStore(subscribe, current, onServer);
+  const theme = useSyncExternalStore(subscribe, savedTheme, themeOnServer);
 
   // React's development remount resets attributes on <html>; this puts the saved theme back (a no-op in production).
-  useLayoutEffect(() => applyTheme(current()), []);
+  useLayoutEffect(() => applyTheme(savedTheme()), []);
 
   function choose(next: Theme) {
     saveTheme(next);
-    window.dispatchEvent(new Event(CHANGED));
+    window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
   }
 
   return (

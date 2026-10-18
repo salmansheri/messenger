@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "../../playwright.config";
+import { BACKEND_URL } from "../playwright-urls";
 import { latestCodeFor } from "./mailpit";
 
 export const PASSWORD = "correct-horse-battery";

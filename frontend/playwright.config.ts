@@ -1,8 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-export const FRONTEND_URL = "http://localhost:3001";
-export const BACKEND_URL = "http://localhost:8080";
-export const MAILPIT_URL = "http://localhost:8025";
+import { BACKEND_URL, FRONTEND_URL } from "./e2e/playwright-urls";
 
 /**
  * End-to-end tests drive the real app in a real browser against the real backend stack (Postgres, Redis, RabbitMQ and
@@ -11,6 +9,7 @@ export const MAILPIT_URL = "http://localhost:8025";
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   workers: 2,
@@ -35,7 +34,7 @@ export default defineConfig({
       },
     },
     {
-      command: "bun dev -p 3001",
+      command: "bun dev",
       url: FRONTEND_URL,
       reuseExistingServer: true,
       timeout: 120_000,
