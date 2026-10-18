@@ -4,13 +4,13 @@ import { BACKEND_URL, FRONTEND_URL } from "./e2e/playwright-urls";
 
 /**
  * End-to-end tests drive the real app in a real browser against the real backend stack (Postgres, Redis, RabbitMQ and
- * Mailpit from the backend's compose file). Servers already running are reused. The backend's per-IP and lookup/group
+ * Mailpit from the backend's compose file). A running frontend dev server is reused; the backend is always started by
+ * Playwright (see below). Its per-IP and lookup/group
  * throttles are raised so a whole suite from one machine never trips them; the per-email code limit stays real (5 an
  * hour) because a test exercises it, and tests use unique emails, so data may pile up.
  */
 export default defineConfig({
   testDir: "./e2e",
-  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   workers: 2,
@@ -25,7 +25,10 @@ export default defineConfig({
       command: "./mvnw spring-boot:run",
       cwd: "../backend",
       url: `${BACKEND_URL}/actuator/health`,
-      reuseExistingServer: true,
+      // Never adopt a backend that is already running: Playwright could not know it has the raised throttles, and the
+      // tests would spend its real allowance (and leave data in it). Stop it and let Playwright start its own, or set
+      // E2E_REUSE_SERVERS=1 if you started it yourself with the environment variables below.
+      reuseExistingServer: process.env.E2E_REUSE_SERVERS === "1",
       timeout: 300_000,
       // A clean shutdown lets Spring stop the compose containers it started; a kill would leave them holding ports.
       gracefulShutdown: { signal: "SIGTERM", timeout: 60_000 },
