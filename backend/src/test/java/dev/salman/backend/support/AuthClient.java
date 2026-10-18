@@ -123,6 +123,15 @@ public class AuthClient {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken));
 	}
 
+	public ResultActions lookup(String accessToken, String email) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/lookup").param("email", email)
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions lookupWithoutToken(String email) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/lookup").param("email", email));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}
