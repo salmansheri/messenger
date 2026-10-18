@@ -25,6 +25,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.MessageService;
+import dev.salman.backend.service.PushService;
 import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +37,7 @@ public class MessageServiceImpl implements MessageService {
 	private final ParticipantRepository participants;
 	private final MessageRepository messages;
 	private final RealtimeEvents events;
+	private final PushService push;
 	private final Clock clock;
 
 	/**
@@ -74,6 +76,7 @@ public class MessageServiceImpl implements MessageService {
 		var before = participants.findPositions(conversationId, callerId).orElseThrow(MessageServiceImpl::notFound);
 		participants.advanceReceipts(conversationId, callerId, message.getSeq(), message.getSeq());
 		events.messageCreated(message);
+		push.messageStored(message);
 		if (before.getDeliveredSeq() != message.getSeq() || before.getReadSeq() != message.getSeq()) {
 			// Replying counts as having read everything up to it: tell whose messages that reached, and this
 			// sender's other devices that nothing is unread any more.

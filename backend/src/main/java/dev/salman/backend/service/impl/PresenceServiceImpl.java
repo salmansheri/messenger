@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -183,6 +185,19 @@ public class PresenceServiceImpl implements PresenceService {
 		users.updateLastSeen(userId, lastSeen);
 		events.presenceChanged(userId, false, lastSeen);
 		redis.execute(RELEASE, List.of(WATCH, CLAIMED), userId.toString(), String.valueOf(now + lease));
+	}
+
+	@Override
+	public Set<UUID> onlineAmong(Collection<UUID> userIds) {
+		var ids = List.copyOf(new HashSet<>(userIds));
+		var counts = liveSocketCounts(ids);
+		var online = new HashSet<UUID>();
+		for (int i = 0; i < ids.size(); i++) {
+			if (counts.get(i) > 0) {
+				online.add(ids.get(i));
+			}
+		}
+		return online;
 	}
 
 	@Override

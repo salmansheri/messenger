@@ -81,3 +81,13 @@ _Avoid_: Last online, last active
 **Typing indicator**:
 A live notice that a Participant is typing in a Conversation. It is passed on to the other Participants and never stored.
 _Avoid_: Typing status, composing
+
+### Push
+
+**Device**:
+A phone, tablet or browser a User registered to receive push notifications. Identified to the push provider by its token; a token belongs to one User at a time.
+_Avoid_: Client, endpoint, subscription
+
+**Push notification**:
+A short notice (who wrote, and the start of the Message) sent to a Device of a Participant who has no open connection when a Message arrives. Never sent to the sender or to someone already receiving the Message live.
+_Avoid_: Alert, notification (alone, which is ambiguous with live events)

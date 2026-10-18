@@ -264,6 +264,19 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	public ResultActions registerDevice(String accessToken, Object token, Object platform) throws Exception {
+		var body = new LinkedHashMap<String, Object>();
+		body.put("token", token);
+		body.put("platform", platform);
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/devices").contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions unregisterDevice(String accessToken, String deviceId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/devices/{id}", deviceId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}

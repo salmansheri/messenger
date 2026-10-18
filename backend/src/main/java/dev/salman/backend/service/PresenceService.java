@@ -2,6 +2,7 @@ package dev.salman.backend.service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import dev.salman.backend.dto.PresenceView;
@@ -26,6 +27,9 @@ public interface PresenceService {
 
 	/** Declares offline every User with no live socket for longer than the grace period, announcing it. */
 	void sweep();
+
+	/** Which of these Users have a live socket right now. */
+	Set<UUID> onlineAmong(Collection<UUID> userIds);
 
 	/**
 	 * Presence of everyone else in the Conversation.

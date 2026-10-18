@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Presence presence) {
+public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Presence presence, Push push) {
 
 	public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String privateKey,
 			String publicKey) {
@@ -36,6 +36,13 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	 * {@code offlineGrace}: how long after the last connection ends before the User is declared offline, so a page
 	 * refresh does not flicker. {@code sweepInterval}: how often each instance looks for Users who have gone quiet.
 	 */
+	/**
+	 * {@code maxDevicesPerUser}: registered devices one User may have. {@code retryDelay}: how long a delivery waits
+	 * after a temporary provider failure. {@code maxAttempts}: deliveries are given up on after this many tries.
+	 */
+	public record Push(int maxDevicesPerUser, Duration retryDelay, int maxAttempts) {
+	}
+
 	public record Presence(Duration ttl, Duration offlineGrace, Duration sweepInterval) {
 	}
 

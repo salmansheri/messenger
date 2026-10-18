@@ -19,7 +19,7 @@ import dev.salman.backend.TestcontainersConfiguration;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = { "app.otp.ttl=4s", "app.presence.offline-grace=1s",
-		"app.presence.sweep-interval=250ms",
+		"app.presence.sweep-interval=250ms", "app.push.retry-delay=500ms", "app.push.max-attempts=3",
 		"spring.datasource.hikari.connection-init-sql=SET lock_timeout = '1500ms'" })
 @AutoConfigureMockMvc
 @Import({ TestcontainersConfiguration.class, TestHarnessConfiguration.class })
@@ -47,6 +47,7 @@ public abstract class IntegrationTest {
 	void resetClock() {
 		clock.reset();
 		emails.clearFailures();
+		pushes.clear();
 	}
 
 	protected AuthClient auth() {
