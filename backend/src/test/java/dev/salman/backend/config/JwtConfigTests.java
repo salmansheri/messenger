@@ -3,6 +3,7 @@ package dev.salman.backend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.spec.ECGenParameterSpec;
 import java.time.Clock;
@@ -88,6 +89,79 @@ class JwtConfigTests {
 		var later = Clock.offset(NOW, Duration.ofMinutes(5));
 		var token = tokenFor(config, props, key, "test-issuer");
 		assertThatThrownBy(() -> config.jwtDecoder(key, props, later).decode(token))
+				.isInstanceOf(BadJwtException.class);
+	}
+
+	private static KeyPair keyPair(String curve) throws Exception {
+		var generator = KeyPairGenerator.getInstance("EC");
+		generator.initialize(new ECGenParameterSpec(curve));
+		return generator.generateKeyPair();
+	}
+
+	private static AppProperties configuredWith(KeyPair pair) {
+		return props(pem("PRIVATE KEY", pair.getPrivate().getEncoded()), pem("PUBLIC KEY", pair.getPublic().getEncoded()));
+	}
+
+	@Test
+	void theKeyIdIsDerivedFromThePublicKeySoItSurvivesRestartsAndMatchesOtherInstances() throws Exception {
+		var props = configuredWith(keyPair("secp256r1"));
+		var config = new JwtConfig();
+
+		var first = config.jwtSigningKey(props);
+		var second = config.jwtSigningKey(props);
+
+		assertThat(first.getKeyID()).isNotBlank().isEqualTo(second.getKeyID());
+		assertThat(first.getKeyID()).isEqualTo(first.computeThumbprint().toString());
+	}
+
+	@Test
+	void aTokenIssuedBeforeARestartStillValidatesAfterwards() throws Exception {
+		var props = configuredWith(keyPair("secp256r1"));
+		var config = new JwtConfig();
+		var beforeRestart = config.jwtSigningKey(props);
+		var token = tokenFor(config, props, beforeRestart, "test-issuer");
+
+		var afterRestart = config.jwtSigningKey(props);
+
+		assertThat(config.jwtDecoder(afterRestart, props, NOW).decode(token).getSubject()).isEqualTo("user-1");
+	}
+
+	@Test
+	void aPrivateKeyThatDoesNotBelongToThePublicKeyIsRejectedAtStartup() throws Exception {
+		var one = keyPair("secp256r1");
+		var other = keyPair("secp256r1");
+		var props = props(pem("PRIVATE KEY", one.getPrivate().getEncoded()),
+				pem("PUBLIC KEY", other.getPublic().getEncoded()));
+
+		assertThatThrownBy(() -> new JwtConfig().jwtSigningKey(props)).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("do not form a pair");
+	}
+
+	@Test
+	void aKeyOnAnyCurveOtherThanP256IsRejectedAtStartup() throws Exception {
+		var props = configuredWith(keyPair("secp384r1"));
+
+		assertThatThrownBy(() -> new JwtConfig().jwtSigningKey(props)).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("P-256");
+	}
+
+	@Test
+	void tokensWithoutAnExpiryOrWithoutASubjectAreRejected() throws Exception {
+		var props = props(null, null);
+		var config = new JwtConfig();
+		var key = config.jwtSigningKey(props);
+		var decoder = config.jwtDecoder(key, props, NOW);
+		var header = JwsHeader.with(SignatureAlgorithm.ES256).build();
+
+		var noExpiry = JwtClaimsSet.builder().issuer("test-issuer").subject("user-1").issuedAt(NOW.instant()).build();
+		var noSubject = JwtClaimsSet.builder().issuer("test-issuer").issuedAt(NOW.instant())
+				.expiresAt(NOW.instant().plusSeconds(60)).build();
+
+		assertThatThrownBy(() -> decoder
+				.decode(config.jwtEncoder(key).encode(JwtEncoderParameters.from(header, noExpiry)).getTokenValue()))
+				.isInstanceOf(BadJwtException.class);
+		assertThatThrownBy(() -> decoder
+				.decode(config.jwtEncoder(key).encode(JwtEncoderParameters.from(header, noSubject)).getTokenValue()))
 				.isInstanceOf(BadJwtException.class);
 	}
 

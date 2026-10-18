@@ -6,7 +6,7 @@ import dev.salman.backend.dto.UserProfile;
 
 public interface UserService {
 
-	/** The profile of the signed-in User; fails as unauthorized when the account no longer exists. */
+	/** The profile of the signed-in User; fails as unauthorized when the User no longer exists. */
 	UserProfile profile(UUID userId);
 
 }

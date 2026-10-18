@@ -4,7 +4,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import java.util.Map;
 
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -12,6 +11,7 @@ import java.util.regex.Pattern;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -94,9 +94,7 @@ public class AuthClient {
 
 	/** Logs in a verified account and returns the issued tokens. */
 	public Tokens loginForTokens(String email, String password) throws Exception {
-		var body = login(email, password).andReturn().getResponse().getContentAsString();
-		var node = json.readTree(body);
-		return new Tokens(node.get("accessToken").asString(), node.get("refreshToken").asString());
+		return tokensFrom(login(email, password));
 	}
 
 	public Tokens tokensFrom(ResultActions result) throws Exception {

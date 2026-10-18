@@ -19,8 +19,8 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public UserProfile profile(UUID userId) {
 		return users.findById(userId)
-				.map(u -> new UserProfile(u.getId(), u.getEmail(), u.getDisplayName(), u.isEmailVerified()))
-				.orElseThrow(() -> new UnauthorizedException("The account no longer exists."));
+				.map(UserProfile::from)
+				.orElseThrow(() -> new UnauthorizedException("The user no longer exists."));
 	}
 
 }

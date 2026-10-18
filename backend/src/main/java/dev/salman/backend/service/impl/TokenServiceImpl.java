@@ -36,7 +36,7 @@ public class TokenServiceImpl implements TokenService {
 
 	@Override
 	public TokenResponse startSession(User user) {
-		return issue(user.getId(), UUID.randomUUID());
+		return issueTokenPair(user.getId(), UUID.randomUUID());
 	}
 
 	/** Reuse revokes the session, so failures here must not roll back that revocation. */
@@ -46,15 +46,12 @@ public class TokenServiceImpl implements TokenService {
 		var now = clock.instant();
 		var token = refreshTokens.findByTokenHash(Hashing.sha256Hex(refreshToken))
 				.orElseThrow(TokenServiceImpl::invalidRefreshToken);
-		if (token.getUsedAt() != null || refreshTokens.markUsed(token.getId(), now) == 0) {
+		var reused = token.getUsedAt() != null || refreshTokens.markUsed(token.getId(), now) == 0;
+		if (reused || token.getExpiresAt().isBefore(now) || !users.existsById(token.getUserId())) {
 			refreshTokens.deleteFamily(token.getFamilyId());
 			throw invalidRefreshToken();
 		}
-		if (token.getExpiresAt().isBefore(now) || !users.existsById(token.getUserId())) {
-			refreshTokens.deleteFamily(token.getFamilyId());
-			throw invalidRefreshToken();
-		}
-		return issue(token.getUserId(), token.getFamilyId());
+		return issueTokenPair(token.getUserId(), token.getFamilyId());
 	}
 
 	@Override
@@ -68,7 +65,7 @@ public class TokenServiceImpl implements TokenService {
 		return new UnauthorizedException("The refresh token is invalid or has expired.");
 	}
 
-	private TokenResponse issue(UUID userId, UUID familyId) {
+	private TokenResponse issueTokenPair(UUID userId, UUID familyId) {
 		var now = clock.instant();
 		var accessTtl = props.jwt().accessTokenTtl();
 		var claims = JwtClaimsSet.builder()

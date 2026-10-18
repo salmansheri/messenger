@@ -5,8 +5,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import dev.salman.backend.config.AppProperties;
-import dev.salman.backend.entity.User;
 import dev.salman.backend.dto.TokenResponse;
+import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.EmailNotVerifiedException;
 import dev.salman.backend.exception.InvalidVerificationCodeException;
@@ -16,8 +16,8 @@ import dev.salman.backend.lib.Emails;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.AuthService;
 import dev.salman.backend.service.TokenService;
-import dev.salman.backend.service.VerificationCodeService;
 import dev.salman.backend.service.VerificationCodeService.Purpose;
+import dev.salman.backend.service.VerificationCodeService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 
@@ -36,7 +36,7 @@ public class AuthServiceImpl implements AuthService {
 	private String unknownUserPasswordHash;
 
 	@PostConstruct
-	void init() {
+	void precomputeUnknownUserHash() {
 		unknownUserPasswordHash = passwordEncoder.encode("unknown-user-placeholder");
 	}
 
@@ -87,7 +87,6 @@ public class AuthServiceImpl implements AuthService {
 				"Your verification code is %s. It expires in %d minutes.".formatted(code,
 						props.otp().ttl().toMinutes()));
 	}
-
 
 	@Override
 	public TokenResponse login(String rawEmail, String password) {
