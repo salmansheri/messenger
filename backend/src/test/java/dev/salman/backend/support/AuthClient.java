@@ -142,6 +142,30 @@ public class AuthClient {
 		return json.readTree(profile).get("id").asString();
 	}
 
+	/** A verified, signed-in account: its email, User id and access token. */
+	public record Account(String email, String id, String accessToken) {
+	}
+
+	public Account account(String displayName) throws Exception {
+		var email = uniqueEmail();
+		registerVerified(email, displayName, PASSWORD);
+		var token = loginForTokens(email, PASSWORD).accessToken();
+		var profile = me(token).andReturn().getResponse().getContentAsString();
+		return new Account(email, json.readTree(profile).get("id").asString(), token);
+	}
+
+	public ResultActions startDirect(String accessToken, Object userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/direct")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("userId", userId)))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions conversations(String accessToken) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations")
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}
