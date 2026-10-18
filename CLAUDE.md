@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A WhatsApp-style messenger app. The repo root is not a git repo itself; it holds two independent projects (`frontend/` has its own `.git`). Both are currently fresh scaffolds with no app code yet beyond the generated entry points.
+A WhatsApp-style messenger app, as a monorepo with one git repo at the root. Domain language lives in `GLOSSARY.md`; the backend plan is GitHub issue #1 with tickets #2-#13 (see Agent skills below). The frontend is still a fresh scaffold; the backend is being built ticket by ticket.
 
 - `backend/` — Spring Boot 4.1.x, Java 25, Maven (package `dev.salman.backend`)
 - `frontend/` — Next.js 16 (App Router), React 19, Tailwind 4, TypeScript, Bun
@@ -18,8 +18,9 @@ A WhatsApp-style messenger app. The repo root is not a git repo itself; it holds
 ./mvnw package                                          # build jar
 ```
 
-- `spring-boot-docker-compose` is on the classpath, so `spring-boot:run` auto-starts `compose.yaml` (Postgres, Redis, RabbitMQ, Grafana LGTM for OpenTelemetry). Compose ports are unpublished-host (`'5432'`, etc.), so Docker assigns random host ports and Spring wires the connections automatically. Don't hardcode datasource/Redis/Rabbit URLs in dev.
-- Tests use Testcontainers (`TestcontainersConfiguration`, `TestBackendApplication` in `src/test`). Run the app against test containers via the `TestBackendApplication` main class.
+- `spring-boot-docker-compose` is on the classpath, so `spring-boot:run` auto-starts `compose.yaml` (Postgres, Redis, RabbitMQ, Mailpit, Grafana LGTM for OpenTelemetry). Postgres/Redis/RabbitMQ use random host ports and Spring wires them automatically; don't hardcode their URLs in dev. Mailpit is fixed at SMTP `1025` (app default) and web UI `http://localhost:8025`. Grafana is on host `3000`.
+- A stale Postgres volume from an earlier run can cause `password authentication failed for user "myuser"`; `docker compose down -v` in `backend/` fixes it.
+- Tests sit at one seam: the running app's public interface. Extend `support.IntegrationTest` (MockMvc, real Postgres/Redis/RabbitMQ via `TestcontainersConfiguration`). Only email and push are faked: use the `emails` and `pushes` recording senders it exposes (e.g. read a Verification code from `emails.latestTo(...)`). Run the app against test containers via the `TestBackendApplication` main class.
 - Schema is managed by Flyway (`spring-boot-starter-flyway`); put migrations in `src/main/resources/db/migration`. Note that JPA is also present, so don't rely on Hibernate DDL auto-generation.
 - `application.yaml` is currently minimal (only the app name).
 
@@ -37,10 +38,26 @@ bun run lint # eslint; there is no test runner configured yet
 
 ## Architecture notes
 
-Backend dependencies indicate the intended design (not yet implemented):
+Backend design (partly implemented; see issue #1 for the full spec):
 
 - REST via `spring-boot-starter-webmvc` plus OpenAPI/Swagger UI (`springdoc-openapi`).
 - Realtime messaging via `spring-boot-starter-websocket`; RabbitMQ (`amqp`) and Redis are intended for cross-instance fan-out, presence, and async work.
-- Security: Spring Security with OAuth2 resource server (JWT) and OAuth2 client.
-- PostgreSQL is the primary store (JPA + Flyway); Lombok is enabled via annotation processor paths configured explicitly in the `maven-compiler-plugin` executions in `pom.xml`. Add any new annotation processors (e.g. MapStruct) to those `annotationProcessorPaths` lists.
+- Security: stateless Spring Security. Public paths are `/api/v1/auth/**`, health/info, and OpenAPI/Swagger; everything else needs a bearer JWT. Security failures are written as problem+json by `ProblemSecurityHandlers`. JWT issuing/validation (self-issued ES256) arrives with ticket #4; there is no OAuth2 client.
+- Errors: all errors are RFC 9457 problem details. Spring MVC exceptions go through `GlobalExceptionHandler`; add domain exception handlers there.
+- Outbound ports `EmailSender` and `NotificationSender` live in `lib`; real implementations are SMTP and (later) FCM.
+- PostgreSQL is the primary store (JPA + Flyway); Lombok and MapStruct are wired via a single `annotationProcessorPaths` list in the `maven-compiler-plugin` configuration in `pom.xml` (with `lombok-mapstruct-binding`). Add any new annotation processors there. Packages are by technical layer under `dev.salman.backend`.
 - Observability: OpenTelemetry starter exporting to the LGTM container.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`salmansheri/messenger`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
