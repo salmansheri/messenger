@@ -9,8 +9,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import dev.salman.backend.config.AppProperties;
-import dev.salman.backend.exception.RateLimitedException;
 import dev.salman.backend.lib.Hashing;
+import dev.salman.backend.service.RateLimiter;
 import dev.salman.backend.service.VerificationCodeService;
 import lombok.RequiredArgsConstructor;
 
@@ -51,30 +51,14 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
 			return 1
 			""", Long.class);
 
-	/** KEYS: counter. ARGV: window millis. Returns {hits, millis until the window ends}. */
-	private static final RedisScript<List> COUNT = script("""
-			local hits = redis.call('INCR', KEYS[1])
-			if redis.call('PTTL', KEYS[1]) < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
-			return {hits, redis.call('PTTL', KEYS[1])}
-			""", List.class);
-
 	private final StringRedisTemplate redis;
+	private final RateLimiter rateLimiter;
 	private final AppProperties props;
 
 	@Override
 	public void acquireSendPermit(String email, String clientIp) {
-		count("rl:otp-send:email:" + email, props.otp().maxSendsPerHour());
-		count("rl:otp-send:ip:" + clientIp, props.otp().maxSendsPerIpPerHour());
-	}
-
-	/** Fixed one-hour window: the first hit starts the window, later hits only increment. */
-	private void count(String key, int limit) {
-		List<?> result = redis.execute(COUNT, List.of(key), String.valueOf(SEND_WINDOW.toMillis()));
-		var hits = ((Number) result.get(0)).longValue();
-		if (hits > limit) {
-			var millisLeft = ((Number) result.get(1)).longValue();
-			throw new RateLimitedException(Duration.ofMillis(millisLeft > 0 ? millisLeft : SEND_WINDOW.toMillis()));
-		}
+		rateLimiter.hit("rl:otp-send:email:" + email, props.otp().maxSendsPerHour(), SEND_WINDOW);
+		rateLimiter.hit("rl:otp-send:ip:" + clientIp, props.otp().maxSendsPerIpPerHour(), SEND_WINDOW);
 	}
 
 	@Override

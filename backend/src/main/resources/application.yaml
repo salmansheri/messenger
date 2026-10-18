@@ -19,6 +19,8 @@ app:
   mail-from: no-reply@messenger.local
   refresh-cookie:
     secure: true
+  lookup:
+    max-per-minute: 30
   cors:
     allowed-origins:
       - http://localhost:3000

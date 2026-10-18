@@ -124,12 +124,22 @@ public class AuthClient {
 	}
 
 	public ResultActions lookup(String accessToken, String email) throws Exception {
-		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/lookup").param("email", email)
-				.header("Authorization", "Bearer " + accessToken));
+		return lookupBody(accessToken, Map.of("email", email));
+	}
+
+	public ResultActions lookupBody(String accessToken, Object body) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/users/lookup").contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
 	}
 
 	public ResultActions lookupWithoutToken(String email) throws Exception {
-		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/lookup").param("email", email));
+		return postJson("/api/v1/users/lookup", Map.of("email", email));
+	}
+
+	/** The id of a User, as that User sees it on their own profile. */
+	public String idOf(String email) throws Exception {
+		var profile = me(loginForTokens(email, PASSWORD).accessToken()).andReturn().getResponse().getContentAsString();
+		return json.readTree(profile).get("id").asString();
 	}
 
 	public ResultActions meWithoutToken() throws Exception {
