@@ -26,4 +26,18 @@ public interface AuthService {
 	 */
 	IssuedTokens login(String email, String password);
 
+	/**
+	 * Emails a password-reset Verification code to a verified User. Counts against the same send limits as
+	 * sign-up and does nothing visible for unknown or unverified emails.
+	 */
+	void requestPasswordReset(String email, String clientIp);
+
+	/**
+	 * Sets a new password using a reset code and ends every session of the User.
+	 *
+	 * @throws dev.salman.backend.exception.InvalidVerificationCodeException for a wrong, expired, used or
+	 *         over-attempted code, or an unknown email
+	 */
+	void resetPassword(String email, String code, String newPassword);
+
 }

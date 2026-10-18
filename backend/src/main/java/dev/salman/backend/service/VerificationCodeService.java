@@ -4,7 +4,8 @@ package dev.salman.backend.service;
 public interface VerificationCodeService {
 
 	enum Purpose {
-		EMAIL_VERIFICATION
+		EMAIL_VERIFICATION,
+		PASSWORD_RESET
 	}
 
 	/**

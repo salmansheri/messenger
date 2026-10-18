@@ -3,6 +3,7 @@ package dev.salman.backend.service.impl;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.dto.IssuedTokens;
@@ -82,10 +83,35 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	private void sendVerificationCode(String email) {
-		var code = codes.issue(Purpose.EMAIL_VERIFICATION, email);
-		emailSender.send(email, "Verify your email",
-				"Your verification code is %s. It expires in %d minutes.".formatted(code,
-						props.otp().ttl().toMinutes()));
+		sendCode(Purpose.EMAIL_VERIFICATION, email, "Verify your email", "Your verification code is %s.");
+	}
+
+	private void sendCode(Purpose purpose, String email, String subject, String sentenceWithCode) {
+		var code = codes.issue(purpose, email);
+		emailSender.send(email, subject, (sentenceWithCode + " It expires in %d minutes.").formatted(code,
+				props.otp().ttl().toMinutes()));
+	}
+
+	@Override
+	public void requestPasswordReset(String rawEmail, String clientIp) {
+		var email = Emails.normalize(rawEmail);
+		codes.acquireSendPermit(email, clientIp);
+		users.findByEmail(email).filter(User::isEmailVerified).ifPresent(u -> sendCode(Purpose.PASSWORD_RESET, email,
+				"Reset your password", "Your password reset code is %s."));
+	}
+
+	@Override
+	@Transactional
+	public void resetPassword(String rawEmail, String code, String newPassword) {
+		var email = Emails.normalize(rawEmail);
+		var user = users.findByEmail(email).filter(User::isEmailVerified)
+				.orElseThrow(InvalidVerificationCodeException::new);
+		if (!codes.verify(Purpose.PASSWORD_RESET, email, code)) {
+			throw new InvalidVerificationCodeException();
+		}
+		user.setPasswordHash(passwordEncoder.encode(newPassword));
+		users.save(user);
+		tokens.revokeAllFor(user.getId());
 	}
 
 	@Override

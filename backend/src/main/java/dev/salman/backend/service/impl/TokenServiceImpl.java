@@ -61,6 +61,12 @@ public class TokenServiceImpl implements TokenService {
 				.ifPresent(token -> refreshTokens.deleteFamily(token.getFamilyId()));
 	}
 
+	@Override
+	@Transactional
+	public void revokeAllFor(UUID userId) {
+		refreshTokens.deleteAllForUser(userId);
+	}
+
 	private static UnauthorizedException invalidRefreshToken() {
 		return new UnauthorizedException("The refresh token is invalid or has expired.");
 	}

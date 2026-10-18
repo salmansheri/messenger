@@ -58,6 +58,15 @@ public class AuthClient {
 		return postJson("/api/v1/auth/resend-verification", Map.of("email", email));
 	}
 
+	public ResultActions forgotPassword(String email) throws Exception {
+		return postJson("/api/v1/auth/forgot-password", Map.of("email", email));
+	}
+
+	public ResultActions resetPassword(String email, String code, String newPassword) throws Exception {
+		return postJson("/api/v1/auth/reset-password",
+				Map.of("email", email, "code", code, "newPassword", newPassword));
+	}
+
 	public ResultActions login(String email, String password) throws Exception {
 		return postJson("/api/v1/auth/login", Map.of("email", email, "password", password));
 	}

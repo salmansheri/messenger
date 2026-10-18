@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import dev.salman.backend.dto.ForgotPasswordRequest;
 import dev.salman.backend.dto.IssuedTokens;
 import dev.salman.backend.dto.LoginRequest;
 import dev.salman.backend.dto.ResendVerificationRequest;
+import dev.salman.backend.dto.ResetPasswordRequest;
 import dev.salman.backend.dto.SignUpRequest;
 import dev.salman.backend.dto.SignUpResponse;
 import dev.salman.backend.dto.TokenResponse;
@@ -52,6 +54,18 @@ public class AuthController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void resendVerification(@Valid @RequestBody ResendVerificationRequest request, HttpServletRequest http) {
 		auth.resendVerification(request.email(), http.getRemoteAddr());
+	}
+
+	@PostMapping("/forgot-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest http) {
+		auth.requestPasswordReset(request.email(), http.getRemoteAddr());
+	}
+
+	@PostMapping("/reset-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		auth.resetPassword(request.email(), request.code(), request.newPassword());
 	}
 
 	@PostMapping("/login")

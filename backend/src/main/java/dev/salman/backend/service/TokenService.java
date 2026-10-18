@@ -1,5 +1,7 @@
 package dev.salman.backend.service;
 
+import java.util.UUID;
+
 import dev.salman.backend.dto.IssuedTokens;
 import dev.salman.backend.entity.User;
 
@@ -18,5 +20,8 @@ public interface TokenService {
 
 	/** Ends the session the refresh token belongs to; unknown tokens are ignored. */
 	void revoke(String refreshToken);
+
+	/** Ends every session of the User, on every device. */
+	void revokeAllFor(UUID userId);
 
 }
