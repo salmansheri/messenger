@@ -33,7 +33,13 @@ export const codeFor = (account: NewAccount) => latestCodeFor(account.email);
 export const otherThan = (code: string) => (code === "000000" ? "111111" : "000000");
 
 /** The problem message on the screen (not the framework's own route announcer, which is also an alert). */
-export const problem = (page: Page) => page.locator("main").getByRole("alert");
+export const problem = (page: Page) => page.getByRole("main").getByRole("alert");
 
 /** The good-news message on the screen. */
-export const info = (page: Page) => page.locator("main").getByRole("status");
+export const info = (page: Page) => page.getByRole("main").getByRole("status");
+
+/**
+ * The email field on the verification screen. Next keeps the page you came from in the DOM (hidden) so Back restores
+ * it, which makes a label query ambiguous; a role query only sees what is actually on screen.
+ */
+export const verifyEmailField = (page: Page) => page.getByRole("textbox", { name: "Email address" });

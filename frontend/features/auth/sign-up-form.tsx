@@ -8,25 +8,26 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { ApiProblem, call, sdk } from "@/lib/api";
-import { signUpSchema, type SignUpValues } from "./schemas";
+import { rememberPendingEmail } from "./pending-email";
+import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
 import { messageFor } from "./wording";
 
-type Output = ReturnType<typeof signUpSchema.parse>;
 const FIELDS = ["email", "displayName", "password"] as const;
 
 export function SignUpForm() {
   const router = useRouter();
-  const form = useForm<SignUpValues, unknown, Output>({
+  const form = useForm<SignUpValues, unknown, SignUpData>({
     resolver: zodResolver(signUpSchema),
     defaultValues: { email: "", displayName: "", password: "" },
     mode: "onTouched",
   });
   const { errors, isSubmitting } = form.formState;
 
-  async function submit(values: Output) {
+  async function submit(values: SignUpData) {
     try {
       await call(sdk.signUp({ body: values }));
-      router.push(`/verify?email=${encodeURIComponent(values.email)}`);
+      rememberPendingEmail(values.email);
+      router.push("/verify");
     } catch (error) {
       if (!(error instanceof ApiProblem)) throw error;
       let shown = false;
@@ -66,7 +67,7 @@ export function SignUpForm() {
       />
       {errors.root?.message && <Notice tone="problem">{errors.root.message}</Notice>}
       <div className="flex items-center justify-between gap-4">
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" busy={isSubmitting}>
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
         <Link href="/verify" className="text-sm underline underline-offset-4 decoration-rule hover:decoration-ink">

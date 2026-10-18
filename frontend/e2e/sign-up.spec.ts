@@ -1,13 +1,26 @@
 import { expect, test } from "./support/fixtures";
 import { createVerifiedAccount, signIn } from "./support/backend";
-import { codeFor, enterCode, fillSignUp, info, newAccount, otherThan, problem, signUpThroughTheForm } from "./support/auth-screens";
+import {
+  codeFor,
+  enterCode,
+  fillSignUp,
+  info,
+  newAccount,
+  otherThan,
+  problem,
+  signUpThroughTheForm,
+  verifyEmailField,
+} from "./support/auth-screens";
 import { latestCodeFor } from "./support/mailpit";
 
 test.describe("sign up and verify", () => {
   test("a visitor signs up, enters the emailed code and ends up with a verified account", async ({ page }) => {
     const account = await signUpThroughTheForm(page);
-    await expect(page).toHaveURL(new RegExp(`/verify\\?email=${encodeURIComponent(account.email).replace(/\./g, "\\.")}`));
-    await expect(page.getByText(`We sent a 6-digit code to ${account.email}`)).toBeVisible();
+    await expect(page).toHaveURL(/\/verify$/);
+    expect(page.url(), "the address stays out of the URL").not.toContain("example.com");
+    await expect(verifyEmailField(page), "the address is carried over").toHaveValue(account.email);
+    await expect(page.getByLabel("Verification code"), "only the code is missing").toBeFocused();
+    await expect(page.getByRole("main")).not.toContainText(account.email);
 
     await enterCode(page, await codeFor(account));
 
@@ -16,6 +29,9 @@ test.describe("sign up and verify", () => {
     await expect(heading).toBeFocused();
     await expect(page.getByRole("link", { name: "Continue to sign in" })).toHaveAttribute("href", "/sign-in");
     expect(await signIn(account.email, account.password), "the backend now accepts this account").toBeTruthy();
+
+    await page.goto("/verify");
+    await expect(verifyEmailField(page), "the remembered address is forgotten once used").toHaveValue("");
   });
 
   test("an address that is not an address, a missing name and a short password are caught before anything is sent", async ({
@@ -86,10 +102,12 @@ test.describe("sign up and verify", () => {
     const code = await codeFor(account);
 
     for (let attempt = 0; attempt < 5; attempt++) await enterCode(page, otherThan(code));
-    await expect(problem(page)).toHaveText("Too many wrong tries. This code no longer works: ask for a new one.");
+    await expect(problem(page)).toHaveText(
+      "That did not work again. A code stops working after 5 wrong tries, so ask for a new one.",
+    );
 
     await enterCode(page, code); // even the right code is refused now
-    await expect(problem(page)).toContainText("no longer works");
+    await expect(problem(page)).toContainText("stops working after 5 wrong tries");
     await expect(page.getByRole("heading", { name: "Your address is verified" })).toBeHidden();
 
     await page.getByRole("button", { name: "Send a new code" }).click();
@@ -115,7 +133,7 @@ test.describe("sign up and verify", () => {
   });
 
   test("asking for too many codes shows when to try again", async ({ page }) => {
-    const account = await signUpThroughTheForm(page); // the first of the five codes an address may have per hour
+    await signUpThroughTheForm(page); // the first of the five codes an address may have per hour
     const resend = page.getByRole("button", { name: "Send a new code" });
 
     for (let request = 0; request < 4; request++) {
@@ -128,17 +146,16 @@ test.describe("sign up and verify", () => {
 
     expect((await refused).status()).toBe(429);
     await expect(problem(page)).toHaveText(/^Too many codes were requested\. Try again in (\d+ minutes?|\d+ hours?)\.$/);
-    expect(account.email).toBeTruthy();
   });
 
   test("the verification screen can be used cold, and an unknown address gets the same answer as a wrong code", async ({
     page,
   }) => {
     await page.goto("/verify");
-    await expect(page.getByText("Enter the address you signed up with")).toBeVisible();
-    await expect(page.getByLabel("Email address")).toHaveValue("");
+    await expect(page.getByText("Enter the 6-digit code we emailed you.")).toBeVisible();
+    await expect(verifyEmailField(page)).toHaveValue("");
 
-    await page.getByLabel("Email address").fill("nobody-here@example.com");
+    await verifyEmailField(page).fill("nobody-here@example.com");
     await enterCode(page, "123456");
 
     await expect(problem(page)).toHaveText("That code is wrong or has expired. Check it, or ask for a new one.");
@@ -155,5 +172,51 @@ test.describe("sign up and verify", () => {
     await page.unroute("**/api/v1/auth/signup");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  });
+
+  test("wrong tries are counted per address, not carried over to another one", async ({ page }) => {
+    const account = await signUpThroughTheForm(page);
+    const code = await codeFor(account);
+    for (let attempt = 0; attempt < 4; attempt++) await enterCode(page, otherThan(code));
+    await expect(problem(page)).toContainText("wrong or has expired");
+
+    await verifyEmailField(page).fill("somebody-else@example.com");
+    await enterCode(page, otherThan(code));
+
+    await expect(problem(page), "the fifth failure was for a different address").toHaveText(
+      "That code is wrong or has expired. Check it, or ask for a new one.",
+    );
+  });
+
+  test("pressing a button again while it is working sends nothing twice", async ({ page }) => {
+    const account = await signUpThroughTheForm(page);
+    const code = await codeFor(account);
+    const sent: string[] = [];
+    page.on("request", (request) => request.method() === "POST" && sent.push(new URL(request.url()).pathname));
+
+    await page.getByRole("button", { name: "Verify" }).dblclick(); // the code field is empty: nothing to send
+    await page.getByLabel("Verification code").fill(otherThan(code));
+    await page.getByRole("button", { name: "Verify" }).dblclick();
+    await expect(problem(page)).toContainText("wrong or has expired");
+    await page.getByRole("button", { name: "Send a new code" }).dblclick();
+    await expect(info(page)).toContainText(`A new code is on its way to ${account.email}`);
+
+    expect(sent.filter((path) => path.endsWith("/verify-email"))).toHaveLength(1);
+    expect(sent.filter((path) => path.endsWith("/resend-verification"))).toHaveLength(1);
+  });
+
+  test("the sign-up button does not send twice either", async ({ page }) => {
+    const sent: string[] = [];
+    page.on("request", (request) => request.method() === "POST" && sent.push(new URL(request.url()).pathname));
+    await page.goto("/sign-up");
+    const account = newAccount();
+    await page.getByLabel("Email address").fill(account.email);
+    await page.getByLabel("Your name").fill(account.name);
+    await page.getByLabel("Password").fill(account.password);
+
+    await page.getByRole("button", { name: "Create account" }).dblclick();
+
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    expect(sent.filter((path) => path.endsWith("/signup"))).toHaveLength(1);
   });
 });

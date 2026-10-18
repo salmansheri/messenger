@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 /** The frame of a signed-out screen: a serif heading, a line of explanation, the form, and a footer line. */
 export function AuthCard({
@@ -12,7 +12,7 @@ export function AuthCard({
   intro?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  headingRef?: React.Ref<HTMLHeadingElement>;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10 sm:py-16">

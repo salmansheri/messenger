@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api";
-import { describeWait, messageFor, WRONG_CODE_LIMIT } from "./wording";
+import { codeMessageFor, describeWait, messageFor } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number, title = "x") =>
   new ApiProblem(status, title, undefined, {}, retryAfterSeconds);
@@ -34,13 +34,21 @@ describe("messageFor", () => {
     expect(messageFor(problem(500))).toBe("Something went wrong on our side. Try again in a moment.");
   });
 
+  it("passes the backend's own words through for a bad request", () => {
+    const refused = new ApiProblem(400, "Bad Request", "Invalid request content.", {}, undefined);
+    expect(messageFor(refused)).toBe("Invalid request content.");
+  });
+});
+
+describe("codeMessageFor", () => {
   it("does not claim to know why a code was refused", () => {
-    expect(messageFor(problem(400, undefined, "Bad Request"), "code")).toBe(
+    expect(codeMessageFor(problem(400, undefined, "Bad Request"))).toBe(
       "That code is wrong or has expired. Check it, or ask for a new one.",
     );
   });
 
-  it("knows how many wrong tries a code allows", () => {
-    expect(WRONG_CODE_LIMIT).toBe(5);
+  it("leaves every other failure to the general wording", () => {
+    expect(codeMessageFor(problem(0))).toBe(messageFor(problem(0)));
+    expect(codeMessageFor(problem(503))).toBe(messageFor(problem(503)));
   });
 });

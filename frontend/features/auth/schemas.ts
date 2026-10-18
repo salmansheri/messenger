@@ -40,6 +40,8 @@ export const signUpSchema = z.object({
   password: passwordSchema,
 });
 export type SignUpValues = z.input<typeof signUpSchema>;
+export type SignUpData = z.output<typeof signUpSchema>;
 
 export const verifySchema = z.object({ email: emailSchema, code: codeSchema });
 export type VerifyValues = z.input<typeof verifySchema>;
+export type VerifyData = z.output<typeof verifySchema>;
