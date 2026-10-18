@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeSchema, emailSchema, displayNameSchema, passwordSchema, signUpSchema, verifySchema } from "./schemas";
+import { codeSchema, emailSchema, displayNameSchema, passwordSchema, signInSchema, signUpSchema, verifySchema } from "./schemas";
 
 const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
@@ -79,5 +79,17 @@ describe("forms", () => {
   it("verify needs an address and a code", () => {
     expect(verifySchema.safeParse({ email: "ada@example.com", code: "123456" }).success).toBe(true);
     expect(verifySchema.safeParse({ email: "ada@example.com", code: "12" }).success).toBe(false);
+  });
+});
+
+describe("sign-in", () => {
+  it("needs an address and something typed as the password, whatever its length", () => {
+    expect(signInSchema.safeParse({ email: " Ada@Example.com ", password: "x" }).success).toBe(true);
+    expect(signInSchema.parse({ email: " Ada@Example.com ", password: "  x  " })).toEqual({
+      email: "ada@example.com",
+      password: "  x  ",
+    });
+    expect(signInSchema.safeParse({ email: "ada@example.com", password: "" }).success).toBe(false);
+    expect(signInSchema.safeParse({ email: "nope", password: "x" }).success).toBe(false);
   });
 });

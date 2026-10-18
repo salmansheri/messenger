@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api";
-import { codeMessageFor, describeWait, messageFor } from "./wording";
+import { codeMessageFor, describeWait, messageFor, signInMessageFor } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number, title = "x") =>
   new ApiProblem(status, title, undefined, {}, retryAfterSeconds);
@@ -50,5 +50,16 @@ describe("codeMessageFor", () => {
   it("leaves every other failure to the general wording", () => {
     expect(codeMessageFor(problem(0))).toBe(messageFor(problem(0)));
     expect(codeMessageFor(problem(503))).toBe(messageFor(problem(503)));
+  });
+});
+
+describe("signInMessageFor", () => {
+  it("gives one answer whether the address is unknown or the password is wrong", () => {
+    expect(signInMessageFor(problem(401))).toBe("That email and password do not match. Check them and try again.");
+  });
+
+  it("leaves every other failure to the general wording", () => {
+    expect(signInMessageFor(problem(0))).toBe(messageFor(problem(0)));
+    expect(signInMessageFor(problem(429, 600))).toBe(messageFor(problem(429, 600)));
   });
 });

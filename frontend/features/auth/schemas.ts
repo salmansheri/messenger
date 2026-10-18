@@ -34,6 +34,11 @@ export const codeSchema = z
   .trim()
   .regex(/^\d{6}$/, "Enter the 6-digit code from the email.");
 
+/** Signing in only needs something typed: an old or odd password is the backend's to refuse, not ours. */
+export const signInSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password.") });
+export type SignInValues = z.input<typeof signInSchema>;
+export type SignInData = z.output<typeof signInSchema>;
+
 export const signUpSchema = z.object({
   email: emailSchema,
   displayName: displayNameSchema,

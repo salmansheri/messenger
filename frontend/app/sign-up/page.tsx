@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AuthCard } from "@/features/auth/auth-card";
 import { SignUpForm } from "@/features/auth/sign-up-form";
+import { RedirectIfSignedIn } from "@/features/session/redirect-if-signed-in";
 import { APP_NAME } from "@/lib/app-name";
 
 export const metadata: Metadata = { title: `Create your account · ${APP_NAME}` };
@@ -19,7 +20,9 @@ export default function SignUpPage() {
           </>
         }
       >
-        <SignUpForm />
+        <RedirectIfSignedIn to="/app">
+          <SignUpForm />
+        </RedirectIfSignedIn>
       </AuthCard>
     </AppShell>
   );

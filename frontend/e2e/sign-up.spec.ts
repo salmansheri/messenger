@@ -38,7 +38,7 @@ test.describe("sign up and verify", () => {
     page,
   }) => {
     const sent: string[] = [];
-    page.on("request", (request) => request.url().includes("/auth/") && sent.push(request.url()));
+    page.on("request", (request) => request.url().includes("/auth/signup") && sent.push(request.url()));
     await page.goto("/sign-up");
 
     await page.getByRole("button", { name: "Create account" }).click();
@@ -58,7 +58,7 @@ test.describe("sign up and verify", () => {
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByText("Use at most 100 characters.")).toBeVisible();
     await expect(page.getByText(/Use at most 72 bytes/)).toBeVisible();
-    expect(sent, "no request reached the backend").toEqual([]);
+    expect(sent, "no sign-up request reached the backend").toEqual([]);
   });
 
   test("a problem the backend finds in a field is shown on that field and goes away when it is edited", async ({

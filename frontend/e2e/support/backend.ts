@@ -31,6 +31,14 @@ export async function createVerifiedAccount(displayName = "Ada Lovelace"): Promi
   return { email, displayName, password: PASSWORD, id };
 }
 
+/** Signs up through the backend and stops there: the address is never verified. */
+export async function createUnverifiedAccount(displayName = "Grace Hopper") {
+  const email = uniqueEmail();
+  const signUp = await post("/api/v1/auth/signup", { email, displayName, password: PASSWORD });
+  if (signUp.status !== 202) throw new Error(`Sign up failed: ${signUp.status}`);
+  return { email, displayName, password: PASSWORD };
+}
+
 /** Signs in through the backend and returns an access token. */
 export async function signIn(email: string, password = PASSWORD): Promise<string> {
   const login = await post("/api/v1/auth/login", { email, password });

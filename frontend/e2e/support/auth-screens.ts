@@ -43,3 +43,19 @@ export const info = (page: Page) => page.getByRole("main").getByRole("status");
  * it, which makes a label query ambiguous; a role query only sees what is actually on screen.
  */
 export const verifyEmailField = (page: Page) => page.getByRole("textbox", { name: "Email address" });
+
+/** Signs in through the sign-in form and waits until the signed-in app is showing. */
+export async function signInThroughTheForm(page: Page, account: { email: string; password: string }) {
+  await page.goto("/sign-in");
+  await submitSignIn(page, account);
+  await expect(page).toHaveURL(/\/app$/);
+}
+
+/** Fills in and sends the sign-in form that is on screen. */
+export async function submitSignIn(page: Page, account: { email: string; password: string }) {
+  // Next keeps the page you came from in the DOM, hidden; the visible main region has exactly one of each field.
+  const main = page.getByRole("main");
+  await main.getByLabel("Email address").fill(account.email);
+  await main.getByLabel("Password").fill(account.password);
+  await main.getByRole("button", { name: "Sign in" }).click();
+}
