@@ -42,22 +42,17 @@ class ConversationAssembler {
 		var latestByConversation = messages.findLatestIn(found.stream().map(Conversation::getId).toList()).stream()
 				.collect(Collectors.toMap(Message::getConversationId, m -> m));
 		return found.stream()
-				.map(c -> toResponse(c, membersByConversation.get(c.getId()), usersById,
-						visibleTo(viewerId, membersByConversation.get(c.getId()), latestByConversation.get(c.getId()))))
+				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
+						latestByConversation.get(c.getId())))
 				.toList();
 	}
 
-	/** The latest Message, but only if the viewer joined before it was sent. */
-	private static Message visibleTo(UUID viewerId, Collection<Participant> members, Message latest) {
-		if (latest == null) {
-			return null;
-		}
-		return members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst()
-				.filter(viewer -> viewer.canRead(latest.getSeq())).map(viewer -> latest).orElse(null);
-	}
-
-	private static ConversationResponse toResponse(Conversation conversation, Collection<Participant> members,
-			Map<UUID, User> usersById, Message latest) {
+	private static ConversationResponse toResponse(Conversation conversation, UUID viewerId,
+			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage) {
+		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
+		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
+				.map(v -> latestMessage).orElse(null);
+		var unread = viewer.map(v -> Math.max(0, conversation.getLastSeq() - v.getLastReadSeq())).orElse(0L);
 		var summaries = members.stream()
 				.sorted(Comparator.comparing((Participant m) -> m.getRole() != ParticipantRole.ADMIN)
 						.thenComparing(Participant::getJoinedAt).thenComparing(m -> m.getUserId().toString()))
@@ -65,8 +60,9 @@ class ConversationAssembler {
 						m.getRole()))
 				.toList();
 		return new ConversationResponse(conversation.getId(), conversation.getType(), conversation.getName(),
-				summaries, latest == null ? null : MessageResponse.from(latest), conversation.getCreatedAt(),
-				conversation.getUpdatedAt());
+				summaries,
+				latest == null ? null : MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members)),
+				unread, conversation.getCreatedAt(), conversation.getUpdatedAt());
 	}
 
 }

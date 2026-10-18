@@ -243,6 +243,21 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Reports receipt positions; pass null for a field to leave it out. */
+	public ResultActions receipts(String accessToken, String conversationId, Object deliveredSeq, Object readSeq)
+			throws Exception {
+		var body = new java.util.LinkedHashMap<String, Object>();
+		if (deliveredSeq != null) {
+			body.put("deliveredSeq", deliveredSeq);
+		}
+		if (readSeq != null) {
+			body.put("readSeq", readSeq);
+		}
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/receipts", conversationId)
+				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}

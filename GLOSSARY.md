@@ -49,3 +49,21 @@ _Avoid_: Idempotency key, request ID
 **Sequence number**:
 The position of a Message within its Conversation, assigned by the server. It defines the canonical order of Messages and is how clients resume after being offline.
 _Avoid_: Timestamp order, message index
+
+### Receipts
+
+**Delivered position**:
+The Sequence number of the latest Message a Participant's client has confirmed receiving. Only ever moves forward.
+_Avoid_: Delivery cursor, ack
+
+**Read position**:
+The Sequence number of the latest Message a Participant has seen; never above their Delivered position. Only ever moves forward.
+_Avoid_: Read cursor, last seen (which means presence)
+
+**Unread count**:
+How many Messages a Participant has not yet read: the latest Sequence number minus their Read position. Their own Messages never count.
+_Avoid_: Badge, pending
+
+**Message status**:
+How far a Message has got, shown only to its sender: sent, delivered once every other Participant's Delivered position has reached it, read once every other Participant's Read position has.
+_Avoid_: Receipt state, tick

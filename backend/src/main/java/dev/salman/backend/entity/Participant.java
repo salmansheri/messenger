@@ -47,6 +47,14 @@ public class Participant {
 	@Column(name = "joined_after_seq", nullable = false)
 	private long joinedAfterSeq;
 
+	/** The latest Message this Participant's client has confirmed receiving. Only ever moves forward. */
+	@Column(name = "last_delivered_seq", nullable = false)
+	private long lastDeliveredSeq;
+
+	/** The latest Message this Participant has seen; never above the delivered position. Only moves forward. */
+	@Column(name = "last_read_seq", nullable = false)
+	private long lastReadSeq;
+
 	public static Participant joining(UUID conversationId, UUID userId, ParticipantRole role, Instant joinedAt,
 			long joinedAfterSeq) {
 		var participant = new Participant();
@@ -55,6 +63,9 @@ public class Participant {
 		participant.setRole(role);
 		participant.setJoinedAt(joinedAt);
 		participant.setJoinedAfterSeq(joinedAfterSeq);
+		// Nothing from before they joined is delivered to them or unread by them.
+		participant.setLastDeliveredSeq(joinedAfterSeq);
+		participant.setLastReadSeq(joinedAfterSeq);
 		return participant;
 	}
 

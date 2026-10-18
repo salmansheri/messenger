@@ -12,8 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.dto.MessagePage;
 import dev.salman.backend.dto.MessageResponse;
+import dev.salman.backend.dto.MessageStatus;
 import dev.salman.backend.dto.SentMessage;
 import dev.salman.backend.entity.Message;
+import dev.salman.backend.entity.Participant;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.NotFoundException;
@@ -50,7 +52,7 @@ public class MessageServiceImpl implements MessageService {
 			if (!existing.get().getBody().equals(body)) {
 				throw new ConflictException("This client message ID was already used for a different message.");
 			}
-			return new SentMessage(MessageResponse.from(existing.get()), false);
+			return new SentMessage(MessageResponse.from(existing.get(), statusFor(existing.get(), callerId)), false);
 		}
 
 		var now = clock.instant();
@@ -64,7 +66,9 @@ public class MessageServiceImpl implements MessageService {
 		message.setBody(body);
 		message.setCreatedAt(now);
 		messages.save(message);
-		return new SentMessage(MessageResponse.from(message), true);
+		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
+		participants.advanceReceipts(conversationId, callerId, message.getSeq(), message.getSeq());
+		return new SentMessage(MessageResponse.from(message, statusFor(message, callerId)), true);
 	}
 
 	@Override
@@ -94,7 +98,15 @@ public class MessageServiceImpl implements MessageService {
 		if (afterSeq == null) {
 			Collections.reverse(page); // fetched newest first, returned oldest first
 		}
-		return new MessagePage(page.stream().map(MessageResponse::from).toList(), hasMore);
+		var members = page.stream().anyMatch(m -> m.getSenderId().equals(callerId))
+				? participants.findByConversationId(conversationId) : List.<Participant>of();
+		return new MessagePage(
+				page.stream().map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members))).toList(),
+				hasMore);
+	}
+
+	private MessageStatus statusFor(Message message, UUID callerId) {
+		return MessageStatuses.of(message, callerId, participants.findByConversationId(message.getConversationId()));
 	}
 
 	/** A non-Participant gets the same answer as for a Conversation that does not exist. */
