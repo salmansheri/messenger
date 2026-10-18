@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import dev.salman.backend.dto.MessagePage;
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.MessageStatus;
+import dev.salman.backend.dto.ReceiptPositions;
+import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.dto.SentMessage;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
@@ -69,8 +71,16 @@ public class MessageServiceImpl implements MessageService {
 		message.setCreatedAt(now);
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
+		var before = participants.findPositions(conversationId, callerId).orElseThrow(MessageServiceImpl::notFound);
 		participants.advanceReceipts(conversationId, callerId, message.getSeq(), message.getSeq());
 		events.messageCreated(message);
+		if (before.getDeliveredSeq() != message.getSeq() || before.getReadSeq() != message.getSeq()) {
+			// Replying counts as having read everything up to it: tell whose messages that reached, and this
+			// sender's other devices that nothing is unread any more.
+			events.receiptsChanged(conversationId, callerId,
+					new ReceiptPositions(before.getDeliveredSeq(), before.getReadSeq()),
+					new ReceiptResponse(message.getSeq(), message.getSeq(), 0));
+		}
 		// Nobody can report a position that did not exist before this send, so a new Message is always still SENT.
 		return new SentMessage(MessageResponse.from(message, MessageStatus.SENT), true);
 	}

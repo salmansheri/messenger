@@ -20,6 +20,7 @@ import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.lib.Hashing;
 import dev.salman.backend.repository.RefreshTokenRepository;
 import dev.salman.backend.repository.UserRepository;
+import dev.salman.backend.service.RealtimeEvents;
 import dev.salman.backend.service.TokenService;
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +32,7 @@ public class TokenServiceImpl implements TokenService {
 	private final JwtEncoder jwtEncoder;
 	private final RefreshTokenRepository refreshTokens;
 	private final UserRepository users;
+	private final RealtimeEvents events;
 	private final AppProperties props;
 	private final Clock clock;
 
@@ -67,6 +69,7 @@ public class TokenServiceImpl implements TokenService {
 	@Transactional
 	public void revokeAllFor(UUID userId) {
 		refreshTokens.deleteAllForUser(userId);
+		events.credentialsRevoked(userId); // their open sockets must not outlive the revocation
 	}
 
 	private static UnauthorizedException invalidRefreshToken() {

@@ -5,13 +5,14 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
-import dev.salman.backend.service.ReceiptService;
 import dev.salman.backend.service.RealtimeEvents;
+import dev.salman.backend.service.ReceiptService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -42,11 +43,13 @@ public class ReceiptServiceImpl implements ReceiptService {
 		participants.advanceReceipts(conversationId, callerId, delivered, read);
 		var me = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(ReceiptServiceImpl::notFound);
-		var unread = me.unreadCount(conversation.getLastSeq());
+		var response = new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(),
+				me.unreadCount(conversation.getLastSeq()));
 		if (me.getLastDeliveredSeq() != before.getDeliveredSeq() || me.getLastReadSeq() != before.getReadSeq()) {
-			events.receiptsChanged(conversationId, callerId, me.getLastDeliveredSeq(), me.getLastReadSeq(), unread);
+			events.receiptsChanged(conversationId, callerId,
+					new ReceiptPositions(before.getDeliveredSeq(), before.getReadSeq()), response);
 		}
-		return new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(), unread);
+		return response;
 	}
 
 	private static NotFoundException notFound() {

@@ -64,6 +64,9 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 	}
 
 	private void authenticate(StompHeaderAccessor accessor) {
+		if (sessions.isAuthenticated(accessor.getSessionId())) {
+			throw refuse(accessor, "This connection is already authenticated.");
+		}
 		var header = accessor.getFirstNativeHeader("Authorization");
 		if (header == null || !header.startsWith(BEARER)) {
 			throw refuse(accessor, "An access token is required.");
@@ -71,13 +74,16 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 		try {
 			var jwt = jwtDecoder.decode(header.substring(BEARER.length()).strip());
 			var userId = UUID.fromString(jwt.getSubject());
-			if (!users.findById(userId).filter(User::isEmailVerified).isPresent()) {
+			if (jwt.getExpiresAt() == null || !users.findById(userId).filter(User::isEmailVerified).isPresent()) {
 				throw refuse(accessor, "The user no longer exists.");
 			}
+			sessions.authenticated(accessor.getSessionId(), userId.toString(), jwt.getExpiresAt());
 			accessor.setUser(new StompUser(userId.toString()));
-			sessions.authenticated(accessor.getSessionId(), jwt.getExpiresAt());
 		}
-		catch (JwtException | IllegalArgumentException e) {
+		catch (MessagingException e) {
+			throw e;
+		}
+		catch (RuntimeException e) { // a bad signature, expiry, a missing claim: whatever it is, not authenticated
 			throw refuse(accessor, "The access token is not valid.");
 		}
 	}

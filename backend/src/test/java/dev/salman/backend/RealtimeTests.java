@@ -22,6 +22,7 @@ import dev.salman.backend.lib.StompSessions;
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.IntegrationTest;
+import dev.salman.backend.support.RawStompSocket;
 import dev.salman.backend.support.StompTestClient;
 import tools.jackson.databind.JsonNode;
 
@@ -292,19 +293,51 @@ class RealtimeTests extends IntegrationTest {
 	}
 
 	@Test
-	void inAGroupTheFrontierIsHeldBackByTheLaggingMember() throws Exception {
+	void inAGroupTheFrontierIsHeldBackByTheLaggingMemberAndOnlyMovesWhenTheLaggardDoes() throws Exception {
 		var group = idOf(client.createGroup(ada.accessToken(), "Trio", grace.id(), linus.id()));
 		client.sendNew(ada.accessToken(), group, "one");
 		client.sendNew(ada.accessToken(), group, "two");
 		var forAda = listening(ada);
 
 		client.receipts(grace.accessToken(), group, 2, 2).andExpect(status().isOk());
-		var first = forAda.await(e -> isType(e, "receipts.updated", group));
-		assertThat(first.get("readUpTo").asInt()).as("linus has read nothing").isZero();
+		assertThat(forAda.receivesNothingMatching(e -> isType(e, "receipts.updated", group), 800))
+				.as("linus has read nothing, so nothing changed for ada").isTrue();
 
 		client.receipts(linus.accessToken(), group, 2, 1).andExpect(status().isOk());
-		var second = forAda.await(e -> isType(e, "receipts.updated", group) && e.get("readUpTo").asInt() == 1);
-		assertThat(second.get("deliveredUpTo").asInt()).isEqualTo(2);
+		var moved = forAda.await(e -> isType(e, "receipts.updated", group));
+		assertThat(moved.get("readUpTo").asInt()).isEqualTo(1);
+		assertThat(moved.get("deliveredUpTo").asInt()).isEqualTo(2);
+	}
+
+	@Test
+	void onlyThoseWhoseFrontierMovedHearAboutAReport() throws Exception {
+		var group = idOf(client.createGroup(ada.accessToken(), "Trio", grace.id(), linus.id()));
+		client.sendNew(ada.accessToken(), group, "one");
+		client.sendNew(ada.accessToken(), group, "two");
+		var forAda = listening(ada);
+		var forLinus = listening(linus);
+
+		client.receipts(grace.accessToken(), group, 2, 2).andExpect(status().isOk());
+
+		// Linus's frontier is made of Ada (2/2 from sending) and Grace, who just caught up: it moved.
+		assertThat(forLinus.await(e -> isType(e, "receipts.updated", group)).get("readUpTo").asInt()).isEqualTo(2);
+		// Ada's is held back by Linus, who has not moved.
+		assertThat(forAda.receivesNothingMatching(e -> isType(e, "receipts.updated", group), 500)).isTrue();
+	}
+
+	@Test
+	void replyingTellsEveryoneWhoseMessagesItMarkedReadAndTheRepliersOtherDevices() throws Exception {
+		var conversation = idOf(client.startDirect(ada.accessToken(), grace.id()));
+		client.sendNew(ada.accessToken(), conversation, "question");
+		var forAda = listening(ada);
+		var otherDeviceOfGrace = listening(grace);
+
+		client.sendNew(grace.accessToken(), conversation, "answer");
+
+		var frontier = forAda.await(e -> isType(e, "receipts.updated", conversation));
+		assertThat(frontier.get("readUpTo").asInt()).as("ada's question now counts as read").isEqualTo(2);
+		var own = otherDeviceOfGrace.await(e -> isType(e, "unread.updated", conversation));
+		assertThat(own.get("unreadCount").asInt()).isZero();
 	}
 
 	@Test
@@ -403,6 +436,65 @@ class RealtimeTests extends IntegrationTest {
 		assertThat(forGrace.await(e -> "another-instance".equals(e.path("origin").asString()))).isNotNull();
 		assertThat(forLinus.receivesNothingMatching(e -> "another-instance".equals(e.path("origin").asString()), 800))
 				.isTrue();
+	}
+
+	// ---- hardening
+
+	@Test
+	void aSecondConnectCannotSwapTheIdentityOfAnAuthenticatedSession() throws Exception {
+		try (var socket = RawStompSocket.open(port)) {
+			socket.connect(ada.accessToken());
+			assertThat(socket.awaitFrame("CONNECTED")).as("first CONNECT accepted").isNotNull();
+
+			socket.connect(grace.accessToken());
+
+			assertThat(socket.awaitFrame("ERROR")).as("second CONNECT refused").isNotNull();
+			assertThat(socket.awaitClosed()).isTrue();
+		}
+	}
+
+	@Test
+	void aSocketThatSendsOnlyHeartbeatsAndNeverAuthenticatesIsClosed() throws Exception {
+		try (var socket = RawStompSocket.open(port)) {
+			socket.send("\n");
+
+			assertThat(socket.awaitClosed()).isTrue();
+		}
+	}
+
+	@Test
+	void aSweepLeavesAnAuthenticatedSocketWithAValidTokenAlone() throws Exception {
+		try (var socket = RawStompSocket.open(port)) {
+			socket.connect(ada.accessToken());
+			assertThat(socket.awaitFrame("CONNECTED")).isNotNull();
+			clock.advance(Duration.ofSeconds(30));
+
+			sessions.closeExpired();
+
+			assertThat(socket.isOpen()).isTrue();
+		}
+	}
+
+	@Test
+	void resettingAPasswordClosesEverySocketOfThatUserAndNobodyElses() throws Exception {
+		var email = client.registerVerified();
+		var token = client.loginForTokens(email, AuthClient.PASSWORD).accessToken();
+		var phone = StompTestClient.connect(port, token, json);
+		var laptop = StompTestClient.connect(port, token, json);
+		open.add(phone);
+		open.add(laptop);
+		assertThat(phone.awaitConnected()).isTrue();
+		assertThat(laptop.awaitConnected()).isTrue();
+		var bystander = listening(grace);
+
+		client.forgotPassword(email).andExpect(status().isNoContent());
+		client.resetPassword(email, client.latestCode(email), "a-brand-new-password").andExpect(status().isNoContent());
+
+		assertThat(phone.awaitRefused()).as("phone closed: " + phone.refusal()).isTrue();
+		assertThat(laptop.awaitRefused()).isTrue();
+		var conversation = idOf(client.startDirect(ada.accessToken(), grace.id()));
+		client.sendNew(ada.accessToken(), conversation, "still working for others");
+		assertThat(bystander.await(e -> isType(e, "message.created", conversation))).isNotNull();
 	}
 
 }

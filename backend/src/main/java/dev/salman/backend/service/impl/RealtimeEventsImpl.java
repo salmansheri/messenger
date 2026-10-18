@@ -13,8 +13,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.RealtimeEvent;
+import dev.salman.backend.dto.ReceiptPositions;
+import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
+import dev.salman.backend.lib.RealtimeListener;
 import dev.salman.backend.lib.RealtimePublisher;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.RealtimeEvents;
@@ -36,19 +39,24 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	}
 
 	@Override
-	public void receiptsChanged(UUID conversationId, UUID reporterId, long deliveredSeq, long readSeq,
-			long unreadCount) {
+	public void receiptsChanged(UUID conversationId, UUID reporterId, ReceiptPositions before,
+			ReceiptResponse after) {
 		var members = participants.findByConversationId(conversationId);
-		// Each Participant is told how far everyone ELSE has got; recipients with the same answer share one event.
-		Map<ReceiptFrontier, Set<UUID>> byFrontier = new LinkedHashMap<>();
+		// Each Participant is told how far everyone ELSE has got, but only if the report moved it for them;
+		// recipients with the same answer share one event.
+		Map<ReceiptFrontier, Set<UUID>> moved = new LinkedHashMap<>();
 		for (var member : members) {
-			byFrontier.computeIfAbsent(ReceiptFrontier.of(member.getUserId(), members), f -> new LinkedHashSet<>())
-					.add(member.getUserId());
+			var now = ReceiptFrontier.ofOthers(member.getUserId(), members);
+			var earlier = ReceiptFrontier.ofOthers(member.getUserId(), members, reporterId, before.deliveredSeq(),
+					before.readSeq());
+			if (!now.equals(earlier)) {
+				moved.computeIfAbsent(now, f -> new LinkedHashSet<>()).add(member.getUserId());
+			}
 		}
-		byFrontier.forEach((frontier, recipients) -> publish(recipients, event("receipts.updated", conversationId,
+		moved.forEach((frontier, recipients) -> publish(recipients, event("receipts.updated", conversationId,
 				Map.of("deliveredUpTo", frontier.deliveredUpTo(), "readUpTo", frontier.readUpTo()))));
-		publish(Set.of(reporterId), event("unread.updated", conversationId,
-				Map.of("deliveredSeq", deliveredSeq, "readSeq", readSeq, "unreadCount", unreadCount)));
+		publish(Set.of(reporterId), event("unread.updated", conversationId, Map.of("deliveredSeq",
+				after.deliveredSeq(), "readSeq", after.readSeq(), "unreadCount", after.unreadCount())));
 	}
 
 	@Override
@@ -56,6 +64,11 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.addAll(alsoNotify);
 		publish(recipients, event("conversation.changed", conversationId, Map.of()));
+	}
+
+	@Override
+	public void credentialsRevoked(UUID userId) {
+		publish(Set.of(userId), Map.of("type", RealtimeListener.AUTH_REVOKED));
 	}
 
 	private static Set<UUID> userIds(Collection<Participant> members) {

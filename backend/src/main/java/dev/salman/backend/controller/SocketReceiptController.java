@@ -17,6 +17,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.ErrorResponse;
 
 import dev.salman.backend.dto.ReceiptRequest;
+import dev.salman.backend.lib.Principals;
 import dev.salman.backend.service.ReceiptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class SocketReceiptController {
 	@MessageMapping("/conversations/{conversationId}/receipts")
 	public void report(Principal principal, @DestinationVariable UUID conversationId,
 			@Valid @Payload ReceiptRequest request) {
-		receipts.report(UUID.fromString(principal.getName()), conversationId, request.deliveredSeq(),
+		receipts.report(Principals.userId(principal), conversationId, request.deliveredSeq(),
 				request.readSeq());
 	}
 

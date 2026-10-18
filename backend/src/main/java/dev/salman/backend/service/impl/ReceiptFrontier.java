@@ -14,16 +14,24 @@ import dev.salman.backend.entity.Participant;
  */
 record ReceiptFrontier(long deliveredUpTo, long readUpTo) {
 
-	static ReceiptFrontier of(UUID viewerId, Collection<Participant> members) {
+	static ReceiptFrontier ofOthers(UUID viewerId, Collection<Participant> members) {
+		return ofOthers(viewerId, members, null, 0, 0);
+	}
+
+	/** The same, but with {@code reporterId} shown at the given earlier positions, to see what a report changed. */
+	static ReceiptFrontier ofOthers(UUID viewerId, Collection<Participant> members, UUID reporterId,
+			long reporterDelivered, long reporterRead) {
 		long delivered = Long.MAX_VALUE;
 		long read = Long.MAX_VALUE;
 		var others = false;
 		for (var member : members) {
-			if (!member.getUserId().equals(viewerId)) {
-				others = true;
-				delivered = Math.min(delivered, member.getLastDeliveredSeq());
-				read = Math.min(read, member.getLastReadSeq());
+			if (member.getUserId().equals(viewerId)) {
+				continue;
 			}
+			var reporter = member.getUserId().equals(reporterId);
+			others = true;
+			delivered = Math.min(delivered, reporter ? reporterDelivered : member.getLastDeliveredSeq());
+			read = Math.min(read, reporter ? reporterRead : member.getLastReadSeq());
 		}
 		return others ? new ReceiptFrontier(delivered, read) : new ReceiptFrontier(0, 0);
 	}

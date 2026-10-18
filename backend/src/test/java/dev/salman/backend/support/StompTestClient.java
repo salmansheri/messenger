@@ -199,6 +199,9 @@ public class StompTestClient implements AutoCloseable {
 				session.disconnect();
 			}
 		}
+		catch (RuntimeException alreadyClosedByTheServer) {
+			// the server may have closed the socket first (that is often the point of the test)
+		}
 		finally {
 			client.stop();
 			scheduler.shutdown();

@@ -62,7 +62,7 @@ public class ConversationServiceImpl implements ConversationService {
 		for (var userId : List.of(callerId, otherUserId)) {
 			participants.save(Participant.joining(conversation.getId(), userId, ParticipantRole.MEMBER, now, 0));
 		}
-		events.conversationChanged(conversation.getId(), List.of());
+		events.conversationChanged(conversation.getId());
 		return new StartedConversation(assembler.assemble(List.of(conversation), callerId).getFirst(), true);
 	}
 

@@ -9,3 +9,11 @@ Events are addressed to users, not to conversations: the publisher decides the r
 - Every instance receives every event and drops the ones for users not connected to it. Fine for a few instances; if traffic grows, partition by user or switch to a real relay.
 - The publisher is behind `RealtimePublisher`, so moving to a broker relay later touches one class.
 - An event carries its recipient list, so a very large group makes a larger message (at most 256 ids).
+- Delivery is best effort and not durable: an instance restarting, or RabbitMQ reconnecting, misses events. Clients
+  must fetch the conversation list and catch up with `afterSeq` after every reconnect.
+- Events can arrive in a different order than they happened (they are published after commit, once the conversation
+  lock is released). Clients order messages by `seq` and treat `receipts.updated` values as only ever increasing.
+- Local delivery also goes through RabbitMQ, so a RabbitMQ outage stops realtime even on a single instance; REST keeps
+  working.
+- A control event (`auth.revoked`) travels the same way to close a user's sockets on every instance (password reset).
+

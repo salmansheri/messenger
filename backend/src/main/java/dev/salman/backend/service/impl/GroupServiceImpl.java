@@ -83,7 +83,7 @@ public class GroupServiceImpl implements GroupService {
 		conversations.save(group);
 		addMember(group, callerId, ParticipantRole.ADMIN, 0);
 		others.forEach(userId -> addMember(group, userId, ParticipantRole.MEMBER, 0));
-		events.conversationChanged(group.getId(), List.of());
+		events.conversationChanged(group.getId());
 		return assembler.assemble(List.of(group), callerId).getFirst();
 	}
 
@@ -93,7 +93,7 @@ public class GroupServiceImpl implements GroupService {
 		var locked = lockGroup(callerId, conversationId);
 		locked.requireAdmin();
 		locked.conversation().setName(name.strip());
-		events.conversationChanged(conversationId, List.of());
+		events.conversationChanged(conversationId);
 		return assembler.assemble(List.of(locked.conversation()), callerId).getFirst();
 	}
 
@@ -111,7 +111,7 @@ public class GroupServiceImpl implements GroupService {
 		}
 		// The new member's join point is the latest Message now, so everything sent so far stays out of their reach.
 		addMember(locked.conversation(), userId, ParticipantRole.MEMBER, locked.conversation().getLastSeq());
-		events.conversationChanged(conversationId, List.of());
+		events.conversationChanged(conversationId);
 		return assembler.assemble(List.of(locked.conversation()), callerId).getFirst();
 	}
 
@@ -137,7 +137,7 @@ public class GroupServiceImpl implements GroupService {
 		var target = participants.findByConversationIdAndUserId(conversationId, userId)
 				.orElseThrow(() -> new NotFoundException("No such participant."));
 		target.setRole(ParticipantRole.ADMIN);
-		events.conversationChanged(conversationId, List.of());
+		events.conversationChanged(conversationId);
 	}
 
 	@Override

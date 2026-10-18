@@ -20,7 +20,7 @@ final class MessageStatuses {
 		if (!message.getSenderId().equals(viewerId)) {
 			return null;
 		}
-		return ReceiptFrontier.of(viewerId, members).statusOf(message.getSeq());
+		return ReceiptFrontier.ofOthers(viewerId, members).statusOf(message.getSeq());
 	}
 
 }

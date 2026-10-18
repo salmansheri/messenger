@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
@@ -20,9 +19,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Tracks open sockets and when each one's access token runs out. A socket may live no longer than its token: frames
- * after that moment are refused and {@link #closeExpired()} closes idle sockets, so a long-lived connection is no
- * more of a revocation gap than a REST call with the same token.
+ * Tracks open sockets: which User each belongs to once authenticated, and when its access token runs out. A socket may
+ * live no longer than its token: frames after that are refused and {@link #closeExpired()} closes sockets that have
+ * gone quiet, so a long-lived connection is no more of a revocation gap than a REST call with the same token.
+ * {@link #closeAllFor} drops every socket of a User at once (password reset). Sockets that never authenticate need no
+ * sweep here: the transport drops one that sends nothing (time to first message), and a bare heartbeat or any frame
+ * before CONNECT makes the protocol layer close it.
  */
 @Slf4j
 @Component
@@ -31,9 +33,12 @@ public class StompSessions {
 
 	private static final Duration CLOSE_DELAY = Duration.ofMillis(200);
 
+	private record Authenticated(String userId, Instant expiresAt) {
+	}
+
 	private final Clock clock;
 	private final ConcurrentMap<String, WebSocketSession> sockets = new ConcurrentHashMap<>();
-	private final ConcurrentMap<String, Instant> expiries = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, Authenticated> authenticated = new ConcurrentHashMap<>();
 
 	/** Registers the decorator that remembers each socket from the moment it opens until it closes. */
 	public void register(WebSocketTransportRegistration registry) {
@@ -47,20 +52,25 @@ public class StompSessions {
 			@Override
 			public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
 				sockets.remove(session.getId());
-				expiries.remove(session.getId());
+				authenticated.remove(session.getId());
 				super.afterConnectionClosed(session, closeStatus);
 			}
 		});
 	}
 
-	public void authenticated(String sessionId, Instant tokenExpiresAt) {
-		expiries.put(sessionId, tokenExpiresAt);
+	/** Records who the socket belongs to and how long its token is good for. */
+	public void authenticated(String sessionId, String userId, Instant tokenExpiresAt) {
+		authenticated.put(sessionId, new Authenticated(userId, tokenExpiresAt));
 	}
 
-	/** True while the socket's access token has not run out. */
+	public boolean isAuthenticated(String sessionId) {
+		return authenticated.containsKey(sessionId);
+	}
+
+	/** True while the socket has authenticated and its access token has not run out. */
 	public boolean isLive(String sessionId) {
-		var expiresAt = expiries.get(sessionId);
-		return expiresAt != null && clock.instant().isBefore(expiresAt);
+		var session = authenticated.get(sessionId);
+		return session != null && clock.instant().isBefore(session.expiresAt());
 	}
 
 	/** Closes the socket a moment from now, so the ERROR frame explaining why can still be delivered first. */
@@ -69,9 +79,18 @@ public class StompSessions {
 				CLOSE_DELAY.toMillis(), TimeUnit.MILLISECONDS));
 	}
 
-	@Scheduled(fixedDelayString = "PT30S")
+	/** Closes every socket this instance holds for the User. Other instances do the same on the same event. */
+	public void closeAllFor(String userId) {
+		authenticated.forEach((sessionId, session) -> {
+			if (session.userId().equals(userId)) {
+				close(sessionId);
+			}
+		});
+	}
+
+	@Scheduled(fixedDelayString = "PT10S")
 	public void closeExpired() {
-		expiries.keySet().stream().filter(id -> !isLive(id)).forEach(this::close);
+		authenticated.keySet().stream().filter(id -> !isLive(id)).forEach(this::close);
 	}
 
 	private void close(String sessionId) {
