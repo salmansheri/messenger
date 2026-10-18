@@ -199,6 +199,50 @@ public class AuthClient {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}/messages", conversationId));
 	}
 
+	public ResultActions createGroup(String accessToken, String name, Object... userIds) throws Exception {
+		return createGroupBody(accessToken, Map.of("name", name, "userIds", java.util.List.of(userIds)));
+	}
+
+	public ResultActions createGroupBody(String accessToken, Object body) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/groups")
+				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions conversation(String accessToken, String conversationId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}", conversationId)
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions rename(String accessToken, String conversationId, Object name) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.patch("/api/v1/conversations/{id}", conversationId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("name", name)))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions addParticipant(String accessToken, String conversationId, Object userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/participants", conversationId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("userId", userId)))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions removeParticipant(String accessToken, String conversationId, String userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/conversations/{id}/participants/{userId}",
+				conversationId, userId).header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions promote(String accessToken, String conversationId, String userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/participants/{userId}/promote",
+				conversationId, userId).header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions leave(String accessToken, String conversationId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/leave", conversationId)
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions meWithoutToken() throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
 	}

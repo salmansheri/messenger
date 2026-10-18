@@ -43,4 +43,8 @@ public class Participant {
 	@Column(name = "joined_at", nullable = false)
 	private Instant joinedAt;
 
+	/** Messages with a Sequence number up to this were sent before the Participant joined and are not theirs to read. */
+	@Column(name = "joined_after_seq", nullable = false)
+	private long joinedAfterSeq;
+
 }

@@ -42,6 +42,7 @@ public class MessageServiceImpl implements MessageService {
 	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body) {
 		requireParticipant(callerId, conversationId);
 		var conversation = conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
+		requireParticipant(callerId, conversationId); // again, under the lock: a removal may have just committed
 
 		var existing = messages.findByConversationIdAndSenderIdAndClientMessageId(conversationId, callerId,
 				clientMessageId);
@@ -69,20 +70,24 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	@Transactional(readOnly = true)
 	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit) {
-		requireParticipant(callerId, conversationId); // first, so a non-participant never learns more than a 404
+		var joinedAfterSeq = participants.findByConversationIdAndUserId(conversationId, callerId)
+				.orElseThrow(MessageServiceImpl::notFound).getJoinedAfterSeq(); // first, so outsiders only see a 404
 		if (beforeSeq != null && afterSeq != null) {
 			throw new BadRequestException("Use either beforeSeq or afterSeq, not both.");
 		}
-		// One extra row tells whether more exist beyond this page.
+		// One extra row tells whether more exist beyond this page. Nothing at or before the join point is visible.
 		var fetch = Limit.of(limit + 1);
 		List<Message> found;
 		if (afterSeq != null) {
-			found = messages.findByConversationIdAndSeqGreaterThanOrderBySeqAsc(conversationId, afterSeq, fetch);
+			found = messages.findByConversationIdAndSeqGreaterThanOrderBySeqAsc(conversationId,
+					Math.max(afterSeq, joinedAfterSeq), fetch);
 		}
 		else {
 			found = new ArrayList<>(beforeSeq != null
-					? messages.findByConversationIdAndSeqLessThanOrderBySeqDesc(conversationId, beforeSeq, fetch)
-					: messages.findByConversationIdOrderBySeqDesc(conversationId, fetch));
+					? messages.findByConversationIdAndSeqGreaterThanAndSeqLessThanOrderBySeqDesc(conversationId,
+							joinedAfterSeq, beforeSeq, fetch)
+					: messages.findByConversationIdAndSeqGreaterThanOrderBySeqDesc(conversationId, joinedAfterSeq,
+							fetch));
 		}
 		var hasMore = found.size() > limit;
 		var page = new ArrayList<>(hasMore ? found.subList(0, limit) : found);

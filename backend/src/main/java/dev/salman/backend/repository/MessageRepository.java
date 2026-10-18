@@ -16,11 +16,12 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 	Optional<Message> findByConversationIdAndSenderIdAndClientMessageId(UUID conversationId, UUID senderId,
 			UUID clientMessageId);
 
-	/** The newest messages, newest first. */
-	List<Message> findByConversationIdOrderBySeqDesc(UUID conversationId, Limit limit);
+	/** The newest messages after {@code minSeq} (the Participant's join point), newest first. */
+	List<Message> findByConversationIdAndSeqGreaterThanOrderBySeqDesc(UUID conversationId, long minSeq, Limit limit);
 
-	/** Messages older than {@code seq}, newest first. */
-	List<Message> findByConversationIdAndSeqLessThanOrderBySeqDesc(UUID conversationId, long seq, Limit limit);
+	/** Messages between {@code minSeq} and {@code beforeSeq} (both exclusive), newest first. */
+	List<Message> findByConversationIdAndSeqGreaterThanAndSeqLessThanOrderBySeqDesc(UUID conversationId, long minSeq,
+			long beforeSeq, Limit limit);
 
 	/** Messages newer than {@code seq}, oldest first. */
 	List<Message> findByConversationIdAndSeqGreaterThanOrderBySeqAsc(UUID conversationId, long seq, Limit limit);

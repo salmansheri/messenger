@@ -20,4 +20,12 @@ public interface ConversationService {
 	/** The caller's Conversations, most recently active first; never anyone else's. */
 	List<ConversationResponse> listFor(UUID callerId);
 
+	/**
+	 * One of the caller's Conversations.
+	 *
+	 * @throws dev.salman.backend.exception.NotFoundException when the caller is not a Participant (or it does not
+	 *         exist: the two look the same)
+	 */
+	ConversationResponse get(UUID callerId, UUID conversationId);
+
 }
