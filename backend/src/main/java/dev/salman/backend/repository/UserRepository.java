@@ -32,7 +32,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	/** Records when the User was last connected; touches that one column only. */
 	@Transactional
 	@Modifying
-	@Query("update User u set u.lastSeenAt = :at where u.id = :id")
+	@Query("update User u set u.lastSeenAt = :at where u.id = :id and (u.lastSeenAt is null or u.lastSeenAt < :at)")
 	void updateLastSeen(UUID id, Instant at);
 
 }

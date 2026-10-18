@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class TypingServiceImpl implements TypingService {
 
 	private static final int MAX_STARTS = 10;
+	private static final int MAX_STOPS = 30; // generous, but a stop fans out to everyone too
 	private static final Duration WINDOW = Duration.ofSeconds(10);
 
 	private final ParticipantRepository participants;
@@ -29,13 +30,12 @@ public class TypingServiceImpl implements TypingService {
 		if (!participants.existsByConversationIdAndUserId(conversationId, callerId)) {
 			throw new NotFoundException("Conversation not found.");
 		}
-		if (typing) {
-			try {
-				rateLimiter.hit("rl:typing:" + callerId + ":" + conversationId, MAX_STARTS, WINDOW);
-			}
-			catch (RateLimitedException tooFast) {
-				return; // a flood of "typing" is simply dropped; clients repeat it every few seconds anyway
-			}
+		try {
+			rateLimiter.hit("rl:typing" + (typing ? "" : "-stop") + ":" + callerId + ":" + conversationId,
+					typing ? MAX_STARTS : MAX_STOPS, WINDOW);
+		}
+		catch (RateLimitedException tooFast) {
+			return; // a flood is simply dropped; clients repeat "typing" every few seconds anyway
 		}
 		events.typingChanged(conversationId, callerId, typing);
 	}

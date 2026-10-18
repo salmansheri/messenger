@@ -95,6 +95,15 @@ class RealtimeTests extends RealtimeIntegrationTest {
 	}
 
 	@Test
+	void aDestinationThatLooksLikeAnIdButIsNotOneIsRefused() throws Exception {
+		var socket = listening(ada);
+
+		socket.send("/app/conversations/" + "z".repeat(36) + "/typing", Map.of("typing", true));
+
+		assertThat(socket.awaitRefused()).isTrue();
+	}
+
+	@Test
 	void aSocketStopsWorkingWhenItsAccessTokenExpires() throws Exception {
 		var socket = listening(ada);
 		var conversation = idOf(client.startDirect(ada.accessToken(), grace.id()));

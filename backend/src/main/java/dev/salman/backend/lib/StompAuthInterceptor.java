@@ -30,7 +30,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
 	private static final String BEARER = "Bearer ";
 	private static final Set<String> LISTENABLE = Set.of("/user/queue/events", "/user/queue/errors");
-	private static final Pattern RECEIPTS = Pattern.compile("^/app/conversations/[0-9a-fA-F-]{36}/(receipts|typing)$");
+	private static final Pattern ALLOWED_SENDS = Pattern.compile(
+			"^/app/conversations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(receipts|typing)$");
 
 	private final JwtDecoder jwtDecoder;
 	private final UserRepository users;
@@ -95,7 +96,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 	}
 
 	private static boolean isAllowedSend(String destination) {
-		return destination != null && RECEIPTS.matcher(destination).matches();
+		return destination != null && ALLOWED_SENDS.matcher(destination).matches();
 	}
 
 	private MessagingException refuse(StompHeaderAccessor accessor, String reason) {

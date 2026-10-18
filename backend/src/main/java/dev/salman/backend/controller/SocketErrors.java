@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
+import org.springframework.messaging.handler.annotation.support.MethodArgumentTypeMismatchException;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -40,7 +41,8 @@ public class SocketErrors {
 			error.put("detail", "Invalid request content.");
 			error.put("errors", fields);
 		}
-		else if (exception instanceof MessageConversionException) {
+		else if (exception instanceof MessageConversionException
+				|| exception instanceof MethodArgumentTypeMismatchException) {
 			error.put("status", 400);
 			error.put("title", "Bad Request");
 			error.put("detail", "The message could not be read.");

@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -76,11 +77,11 @@ public class StompSessions {
 	}
 
 	/** Every authenticated socket on this instance whose access token is still good, as socket id to User id. */
-	public Map<String, String> liveSessions() {
-		var live = new HashMap<String, String>();
+	public Map<String, UUID> liveSessions() {
+		var live = new HashMap<String, UUID>();
 		authenticated.forEach((sessionId, session) -> {
 			if (clock.instant().isBefore(session.expiresAt())) {
-				live.put(sessionId, session.userId());
+				live.put(sessionId, UUID.fromString(session.userId()));
 			}
 		});
 		return live;

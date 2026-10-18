@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import dev.salman.backend.lib.PresenceHeartbeat;
+import dev.salman.backend.service.PresenceService;
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
@@ -27,6 +28,9 @@ class PresenceTests extends RealtimeIntegrationTest {
 
 	@Autowired
 	PresenceHeartbeat heartbeat;
+
+	@Autowired
+	PresenceService presence;
 
 	private AuthClient client;
 	private Account ada;
@@ -158,6 +162,71 @@ class PresenceTests extends RealtimeIntegrationTest {
 		}
 
 		client.presence(ada.accessToken(), conversation).andExpect(jsonPath("$[0].online").value(true));
+	}
+
+	// ---- what survives restarts and races
+
+	@Test
+	void lastSeenIsStoredAtDisconnectNotOnlyWhenTheGraceEnds() throws Exception {
+		var forAda = listening(ada);
+		var forGrace = connected(grace);
+		forAda.await(e -> presenceOf(e, grace, true));
+
+		forGrace.close();
+
+		// the grace period is 1s and the sweep only acts after it, so a value this soon was written at disconnect
+		var deadline = System.currentTimeMillis() + 700;
+		Boolean stored = false;
+		while (!Boolean.TRUE.equals(stored) && System.currentTimeMillis() < deadline) {
+			stored = jdbc.queryForObject("select last_seen_at is not null from users where id = ?", Boolean.class,
+					UUID.fromString(grace.id()));
+			Thread.sleep(25);
+		}
+		assertThat(stored).isTrue();
+	}
+
+	@Test
+	void aUserWhoseInstanceDiedIsStillDeclaredOfflineWithALastSeen() throws Exception {
+		var forAda = listening(ada);
+		connected(grace);
+		forAda.await(e -> presenceOf(e, grace, true));
+
+		clock.advance(Duration.ofSeconds(40)); // the heartbeat never comes: no disconnect event either
+
+		var event = forAda.await(e -> presenceOf(e, grace, false));
+		assertThat(event.get("lastSeenAt").isNull()).isFalse();
+		assertThat(jdbc.queryForObject("select last_seen_at is not null from users where id = ?", Boolean.class,
+				UUID.fromString(grace.id()))).isTrue();
+	}
+
+	@Test
+	void aHeartbeatThatLandsAfterTheDisconnectDoesNotLeaveTheUserOnlineForever() throws Exception {
+		var forAda = listening(ada);
+		var user = UUID.fromString(grace.id());
+		presence.connected(user, "socket-1");
+		forAda.await(e -> presenceOf(e, grace, true));
+
+		presence.disconnected(user, "socket-1");
+		presence.refresh(user, java.util.List.of("socket-1")); // a heartbeat that was already in flight
+		clock.advance(Duration.ofSeconds(40));
+
+		assertThat(forAda.await(e -> presenceOf(e, grace, false))).isNotNull();
+	}
+
+	@Test
+	void lastSeenOnlyEverMovesForward() throws Exception {
+		var user = UUID.fromString(grace.id());
+		presence.connected(user, "socket-1");
+		clock.advance(Duration.ofSeconds(10));
+		presence.disconnected(user, "socket-1");
+		var later = jdbc.queryForObject("select last_seen_at from users where id = ?", java.sql.Timestamp.class, user);
+
+		clock.reset();
+		presence.connected(user, "socket-2");
+		presence.disconnected(user, "socket-2"); // an older time arriving afterwards
+
+		assertThat(jdbc.queryForObject("select last_seen_at from users where id = ?", java.sql.Timestamp.class, user))
+				.isEqualTo(later);
 	}
 
 	// ---- who can see it
