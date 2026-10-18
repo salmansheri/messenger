@@ -38,6 +38,8 @@ frontend/.next/
 frontend/out/
 frontend/build/
 frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
 frontend/.vercel
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts

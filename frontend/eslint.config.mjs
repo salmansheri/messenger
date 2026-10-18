@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated from the backend's OpenAPI document (bun run api).
+    "lib/api/generated/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

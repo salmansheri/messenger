@@ -1,69 +1,69 @@
-import Image from "next/image";
+import { AppShell } from "@/components/app-shell";
+
+/** A first look at the design: the index column, then the reading column with message lines. Sample copy only. */
+const INDEX = [
+  { name: "Ada Lovelace", line: "The engine is ready for the notes.", time: "14:02", unread: 2 },
+  { name: "Analytical Engine", line: "Grace: compiled it twice, same result", time: "13:40", unread: 0 },
+  { name: "Linus Torvalds", line: "Sent the patch.", time: "Mon", unread: 0 },
+];
+
+const LINES = [
+  { who: "Ada Lovelace", own: false, time: "14:01", text: "Have you looked at the notes on the engine yet?" },
+  { who: "Ada Lovelace", own: false, time: "14:02", text: "The engine is ready for the notes." },
+  { who: "You", own: true, time: "14:03", text: "Reading them now. Section G is the one to watch." },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <AppShell>
+      <div className="grid flex-1 md:grid-cols-[19rem_1fr]">
+        <nav aria-label="Conversations" className="border-b border-rule md:border-r md:border-b-0">
+          <h2 className="px-4 pt-5 pb-2 font-serif text-sm tracking-wide text-ink-muted uppercase sm:px-6">
+            Conversations
+          </h2>
+          <ul>
+            {INDEX.map((entry) => (
+              <li key={entry.name} className="border-t border-rule px-4 py-3 first:border-t-0 sm:px-6">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-serif text-base font-semibold">{entry.name}</span>
+                  <span className="font-mono text-xs text-ink-muted">{entry.time}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-sm text-ink-muted">{entry.line}</p>
+                  {entry.unread > 0 && (
+                    <span className="rounded-full bg-accent px-2 text-xs font-medium text-on-accent">
+                      {entry.unread}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <section aria-label="A conversation" className="flex flex-col px-4 py-6 sm:px-8">
+          <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Conversations, set in type.</h1>
+          <p className="mt-2 max-w-prose text-ink-muted">
+            Lines in a column, not bubbles in a pile. Names on a rail, times in the margin.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          <ol className="mt-8 flex max-w-2xl flex-col gap-1">
+            {LINES.map((line) => (
+              <li
+                key={line.time}
+                className={`grid grid-cols-[3.5rem_1fr] gap-3 border-l-2 py-1.5 pl-3 ${
+                  line.own ? "border-accent bg-band" : "border-rule"
+                }`}
+              >
+                <time className="pt-0.5 font-mono text-xs text-ink-muted">{line.time}</time>
+                <div>
+                  <span className="font-serif text-sm font-semibold">{line.who}</span>
+                  <p className="leading-relaxed">{line.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </AppShell>
   );
 }
