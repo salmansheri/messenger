@@ -27,6 +27,8 @@ export default defineConfig({
       url: `${BACKEND_URL}/actuator/health`,
       reuseExistingServer: true,
       timeout: 300_000,
+      // A clean shutdown lets Spring stop the compose containers it started; a kill would leave them holding ports.
+      gracefulShutdown: { signal: "SIGTERM", timeout: 60_000 },
       env: {
         APP_OTP_MAX_SENDS_PER_IP_PER_HOUR: "100000",
         APP_LOOKUP_MAX_PER_MINUTE: "100000",

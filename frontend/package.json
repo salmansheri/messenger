@@ -10,7 +10,7 @@
     "api": "openapi-ts",
     "test": "vitest run",
     "e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.2",
