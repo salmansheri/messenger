@@ -19,7 +19,6 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -32,17 +31,18 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class StompSessions {
 
 	private static final Duration CLOSE_DELAY = Duration.ofMillis(200);
 
-	private record Authenticated(String userId, Instant expiresAt) {
-	}
-
 	private final Clock clock;
 	private final ConcurrentMap<String, WebSocketSession> sockets = new ConcurrentHashMap<>();
 	private final ConcurrentMap<String, Authenticated> identities = new ConcurrentHashMap<>();
+
+	// Written by hand: IDE Java servers mis-analyse Lombok's generated constructor next to the nested record below.
+	public StompSessions(Clock clock) {
+		this.clock = clock;
+	}
 
 	/** Registers the decorator that remembers each socket from the moment it opens until it closes. */
 	public void register(WebSocketTransportRegistration registry) {
@@ -122,6 +122,9 @@ public class StompSessions {
 				log.debug("Could not close socket {}", sessionId, e);
 			}
 		}
+	}
+
+	private record Authenticated(String userId, Instant expiresAt) {
 	}
 
 }
