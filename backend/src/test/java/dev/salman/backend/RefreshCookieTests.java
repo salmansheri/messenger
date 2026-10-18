@@ -2,6 +2,7 @@ package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -115,6 +116,34 @@ class RefreshCookieTests extends IntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN))
 				.andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+	}
+
+	@Test
+	void aBrowserFromTheListedFrontendMayReadRetryAfterOnARateLimitedResponse() throws Exception {
+		var email = AuthClient.uniqueEmail();
+		for (int send = 0; send < 5; send++) {
+			mvc.perform(post("/api/v1/auth/resend-verification").header("Origin", ALLOWED_ORIGIN)
+					.contentType("application/json").content("{\"email\":\"" + email + "\"}"))
+					.andExpect(status().isNoContent());
+		}
+
+		mvc.perform(post("/api/v1/auth/resend-verification").header("Origin", ALLOWED_ORIGIN)
+				.contentType("application/json").content("{\"email\":\"" + email + "\"}"))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(header().exists("Retry-After"))
+				.andExpect(header().string("Access-Control-Expose-Headers", org.hamcrest.Matchers.containsString("Retry-After")));
+	}
+
+	@Test
+	void theListedFrontendMayUseEveryMethodTheApiHasAfterAPreflight() throws Exception {
+		for (var method : new String[] { "GET", "POST", "PATCH", "DELETE" }) {
+			mvc.perform(options("/api/v1/conversations/00000000-0000-0000-0000-000000000000")
+					.header("Origin", ALLOWED_ORIGIN).header("Access-Control-Request-Method", method)
+					.header("Access-Control-Request-Headers", "authorization,content-type"))
+					.andExpect(status().isOk())
+					.andExpect(header().string("Access-Control-Allow-Methods",
+							org.hamcrest.Matchers.containsString(method)));
+		}
 	}
 
 }

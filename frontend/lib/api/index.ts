@@ -3,7 +3,7 @@ import { NETWORK_FAILURE, problemFrom } from "./problem";
 
 export * as sdk from "./generated/sdk.gen";
 export * from "./generated/types.gen";
-export { ApiProblem } from "./problem";
+export { ApiProblem, NETWORK_FAILURE } from "./problem";
 
 /** The one place the backend's address is configured. The browser calls it directly (see ADR 0003). */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -17,7 +17,7 @@ export function setAccessTokenProvider(provider: () => string | undefined) {
 
 client.setConfig({ baseUrl: API_URL, credentials: "include", auth: () => accessToken() });
 
-type Result<T> = { data?: T; error?: unknown; response: Response };
+type Result<T> = { data?: T; error?: unknown; response?: Response };
 
 /** Awaits an SDK call and returns its data, or throws an {@link ApiProblem} for any failure, including no answer. */
 export async function call<T>(request: Promise<Result<T>>): Promise<T> {
@@ -27,8 +27,10 @@ export async function call<T>(request: Promise<Result<T>>): Promise<T> {
   } catch {
     throw problemFrom(undefined, NETWORK_FAILURE, new Headers());
   }
-  if (result.error !== undefined || !result.response.ok) {
-    throw problemFrom(result.error, result.response.status, result.response.headers);
+  const { response } = result;
+  if (!response) throw problemFrom(undefined, NETWORK_FAILURE, new Headers());
+  if (result.error !== undefined || !response.ok) {
+    throw problemFrom(result.error, response.status, response.headers);
   }
   return result.data as T;
 }
