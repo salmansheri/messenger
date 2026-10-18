@@ -48,6 +48,9 @@ public class ProblemSecurityHandlers implements AuthenticationEntryPoint, Access
 		problem.put("instance", request.getRequestURI());
 
 		response.setStatus(status.value());
+		if (status == HttpStatus.UNAUTHORIZED) {
+			response.setHeader("WWW-Authenticate", "Bearer");
+		}
 		response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 		response.setCharacterEncoding("UTF-8");
 		response.getWriter().write(jsonMapper.writeValueAsString(problem));

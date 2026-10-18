@@ -3,6 +3,8 @@ package dev.salman.backend.support;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.util.Map;
+
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -53,6 +55,53 @@ public class AuthClient {
 
 	public ResultActions resendVerification(String email) throws Exception {
 		return postJson("/api/v1/auth/resend-verification", Map.of("email", email));
+	}
+
+	public ResultActions login(String email, String password) throws Exception {
+		return postJson("/api/v1/auth/login", Map.of("email", email, "password", password));
+	}
+
+	public ResultActions refresh(String refreshToken) throws Exception {
+		return postJson("/api/v1/auth/refresh", Map.of("refreshToken", refreshToken));
+	}
+
+	public ResultActions logout(String refreshToken) throws Exception {
+		return postJson("/api/v1/auth/logout", Map.of("refreshToken", refreshToken));
+	}
+
+	public ResultActions me(String accessToken) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions meWithoutToken() throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me"));
+	}
+
+	/** Signs up and verifies a fresh account; returns its email. */
+	public String registerVerified() throws Exception {
+		var email = uniqueEmail();
+		registerVerified(email, "Ada Lovelace", PASSWORD);
+		return email;
+	}
+
+	public void registerVerified(String email, String displayName, String password) throws Exception {
+		signUp(email, displayName, password).andReturn();
+		verifyEmail(email, latestCode(email)).andReturn();
+	}
+
+	public record Tokens(String accessToken, String refreshToken) {
+	}
+
+	/** Logs in a verified account and returns the issued tokens. */
+	public Tokens loginForTokens(String email, String password) throws Exception {
+		var body = login(email, password).andReturn().getResponse().getContentAsString();
+		var node = json.readTree(body);
+		return new Tokens(node.get("accessToken").asString(), node.get("refreshToken").asString());
+	}
+
+	public Tokens tokensFrom(ResultActions result) throws Exception {
+		var node = json.readTree(result.andReturn().getResponse().getContentAsString());
+		return new Tokens(node.get("accessToken").asString(), node.get("refreshToken").asString());
 	}
 
 	public ResultActions postJson(String path, Object body) throws Exception {

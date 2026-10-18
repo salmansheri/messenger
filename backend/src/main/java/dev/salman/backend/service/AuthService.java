@@ -1,5 +1,7 @@
 package dev.salman.backend.service;
 
+import dev.salman.backend.dto.TokenResponse;
+
 public interface AuthService {
 
 	/**
@@ -14,5 +16,14 @@ public interface AuthService {
 
 	/** Emails a fresh Verification code to an unverified User; does nothing for any other email. */
 	void resendVerification(String email, String clientIp);
+
+	/**
+	 * Signs in a verified User.
+	 *
+	 * @throws dev.salman.backend.exception.UnauthorizedException for an unknown email or wrong password
+	 * @throws dev.salman.backend.exception.EmailNotVerifiedException when the password is right but the email is
+	 *         not yet verified
+	 */
+	TokenResponse login(String email, String password);
 
 }

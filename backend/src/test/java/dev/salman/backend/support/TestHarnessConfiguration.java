@@ -15,6 +15,12 @@ public class TestHarnessConfiguration {
 
 	@Bean
 	@Primary
+	MutableClock testClock() {
+		return new MutableClock();
+	}
+
+	@Bean
+	@Primary
 	RecordingNotificationSender recordingNotificationSender() {
 		return new RecordingNotificationSender();
 	}

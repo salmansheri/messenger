@@ -1,5 +1,6 @@
 package dev.salman.backend.support;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,14 @@ public abstract class IntegrationTest {
 
 	@Autowired
 	protected JsonMapper json;
+
+	@Autowired
+	protected MutableClock clock;
+
+	@BeforeEach
+	void resetClock() {
+		clock.reset();
+	}
 
 	protected AuthClient auth() {
 		return new AuthClient(mvc, json, emails);

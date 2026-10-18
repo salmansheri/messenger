@@ -6,14 +6,19 @@ import org.springframework.stereotype.Service;
 
 import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.entity.User;
+import dev.salman.backend.dto.TokenResponse;
 import dev.salman.backend.exception.ConflictException;
+import dev.salman.backend.exception.EmailNotVerifiedException;
 import dev.salman.backend.exception.InvalidVerificationCodeException;
+import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.lib.EmailSender;
 import dev.salman.backend.lib.Emails;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.AuthService;
+import dev.salman.backend.service.TokenService;
 import dev.salman.backend.service.VerificationCodeService;
 import dev.salman.backend.service.VerificationCodeService.Purpose;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -25,6 +30,15 @@ public class AuthServiceImpl implements AuthService {
 	private final VerificationCodeService codes;
 	private final EmailSender emailSender;
 	private final AppProperties props;
+	private final TokenService tokens;
+
+	/** Checked against when the email is unknown, so unknown and known emails take the same time. */
+	private String unknownUserPasswordHash;
+
+	@PostConstruct
+	void init() {
+		unknownUserPasswordHash = passwordEncoder.encode("unknown-user-placeholder");
+	}
 
 	@Override
 	public String signUp(String rawEmail, String displayName, String password, String clientIp) {
@@ -72,6 +86,21 @@ public class AuthServiceImpl implements AuthService {
 		emailSender.send(email, "Verify your email",
 				"Your verification code is %s. It expires in %d minutes.".formatted(code,
 						props.otp().ttl().toMinutes()));
+	}
+
+
+	@Override
+	public TokenResponse login(String rawEmail, String password) {
+		var user = users.findByEmail(Emails.normalize(rawEmail));
+		var matches = passwordEncoder.matches(password,
+				user.map(User::getPasswordHash).orElse(unknownUserPasswordHash));
+		if (user.isEmpty() || !matches) {
+			throw new UnauthorizedException("Invalid email or password.");
+		}
+		if (!user.get().isEmailVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+		return tokens.startSession(user.get());
 	}
 
 }

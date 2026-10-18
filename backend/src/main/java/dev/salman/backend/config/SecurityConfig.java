@@ -30,6 +30,10 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers(PUBLIC_PATHS).permitAll()
 						.anyRequest().authenticated())
+				.oauth2ResourceServer(o -> o
+						.jwt(Customizer.withDefaults())
+						.authenticationEntryPoint(problems)
+						.accessDeniedHandler(problems))
 				.exceptionHandling(e -> e
 						.authenticationEntryPoint(problems)
 						.accessDeniedHandler(problems))
