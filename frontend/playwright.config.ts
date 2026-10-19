@@ -13,12 +13,15 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  workers: 2,
+  workers: 3,
   reporter: [["list"]],
   use: { baseURL: FRONTEND_URL, trace: "retain-on-failure" },
+  // Every test runs on a desktop and on a phone, in the light and in the dark (the app follows the system by default).
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
-    { name: "phone", use: { ...devices["Pixel 7"] } },
+    { name: "desktop-light", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, colorScheme: "light" } },
+    { name: "desktop-dark", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, colorScheme: "dark" } },
+    { name: "phone-light", use: { ...devices["Pixel 7"], colorScheme: "light" } },
+    { name: "phone-dark", use: { ...devices["Pixel 7"], colorScheme: "dark" } },
   ],
   webServer: [
     {
@@ -39,11 +42,16 @@ export default defineConfig({
       },
     },
     {
-      command: "bun dev",
+      // A production build by default: a development server compiles each page on its first visit, which makes a test
+      // that is the first to visit one slow or flaky. E2E_DEV=1 uses the development server for quick iteration.
+      command: process.env.E2E_DEV === "1" ? "bun dev" : "bun run build && bunx next start -p 3001",
       url: FRONTEND_URL,
       reuseExistingServer: true,
-      timeout: 120_000,
-      env: { NEXT_PUBLIC_API_URL: BACKEND_URL },
+      timeout: 240_000,
+      env: {
+        NEXT_PUBLIC_API_URL: BACKEND_URL,
+        ...(process.env.E2E_DEV === "1" ? {} : { NEXT_DIST_DIR: ".next-e2e" }),
+      },
     },
   ],
 });

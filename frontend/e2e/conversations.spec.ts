@@ -111,7 +111,7 @@ test.describe("starting a Direct conversation", () => {
     await expect(page).toHaveURL(/\/app\/c\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("heading", { name: "Grace Hopper", level: 1 })).toBeVisible();
     const opened = idFrom(page);
-    if (testInfo.project.name !== "phone") {
+    if (!testInfo.project.name.startsWith("phone")) {
       // (on a phone the list steps aside while a Conversation is open)
       await expect(index(page).getByRole("link", { name: /Grace Hopper/ })).toHaveAttribute("aria-current", "page");
     }
@@ -207,7 +207,7 @@ test.describe("on a desktop and on a phone", () => {
   test("the index and the open Conversation share the screen on a desktop and take turns on a phone", async ({
     page,
   }, testInfo) => {
-    const phone = testInfo.project.name === "phone";
+    const phone = testInfo.project.name.startsWith("phone");
     const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
     const conversation = await startDirectVia(await signIn(grace.email), me.id);
     await signInThroughTheForm(page, me);

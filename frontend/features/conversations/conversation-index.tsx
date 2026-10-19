@@ -28,7 +28,7 @@ export function ConversationIndex() {
       </div>
 
       {list.status === "pending" && (
-        <p className="px-4 py-6 text-ink-muted sm:px-6" aria-busy="true">
+        <p className="px-4 py-6 text-ink-muted sm:px-6" role="status" aria-busy="true">
           Loading your Conversations…
         </p>
       )}

@@ -30,7 +30,7 @@ export function SettingsView() {
           Your account
         </h2>
         {me.isPending && (
-          <p className="mt-2 text-ink-muted" aria-busy="true">
+          <p className="mt-2 text-ink-muted" role="status" aria-busy="true">
             Loading your details…
           </p>
         )}

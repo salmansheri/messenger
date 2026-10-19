@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
@@ -32,6 +33,11 @@ export function ConversationPane() {
         <PaneHeader>Conversation</PaneHeader>
         <div className="px-4 py-6 sm:px-8">
           <Notice tone="problem">{messageFor(toProblem(list.error))}</Notice>
+          <p className="mt-4">
+            <Button variant="quiet" onClick={list.retry}>
+              Try again
+            </Button>
+          </p>
         </div>
       </>
     );
@@ -41,7 +47,7 @@ export function ConversationPane() {
     return (
       <>
         <PaneHeader>Conversation</PaneHeader>
-        <p className="px-4 py-6 text-ink-muted sm:px-8" aria-busy="true">
+        <p className="px-4 py-6 text-ink-muted sm:px-8" role="status" aria-busy="true">
           Loading…
         </p>
       </>

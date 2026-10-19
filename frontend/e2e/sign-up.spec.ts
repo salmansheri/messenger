@@ -14,6 +14,35 @@ import {
 } from "./support/auth-screens";
 import { latestCodeFor } from "./support/mailpit";
 
+test.describe("showing a password", () => {
+  for (const [path, field] of [
+    ["/sign-up", "Password"],
+    ["/sign-in", "Password"],
+    ["/reset-password", "New password"],
+  ] as const) {
+    test(`${path}: a button shows what was typed and hides it again, without sending anything`, async ({ page }) => {
+      const sent: string[] = [];
+      // (the silent session check on every page load is a POST too; what matters is that nothing is submitted)
+      page.on("request", (request) => request.method() === "POST" && !request.url().endsWith("/auth/refresh") && sent.push(request.url()));
+      await page.goto(path);
+      await waitForForm(page);
+      const input = page.getByRole("main").getByLabel(field, { exact: true });
+      await input.fill("correct-horse-battery");
+      await expect(input).toHaveAttribute("type", "password");
+
+      await page.getByRole("button", { name: "Show password" }).click();
+      await expect(input).toHaveAttribute("type", "text");
+      await expect(input).toHaveValue("correct-horse-battery");
+      await expect(page.getByRole("button", { name: "Hide password" }), "the same button, now offering to hide").toBeFocused();
+
+      await page.keyboard.press("Enter"); // pressing the focused button again hides it
+      await expect(input).toHaveAttribute("type", "password");
+      await expect(page.getByRole("button", { name: "Show password" })).toBeVisible();
+      expect(sent, "revealing a password is not submitting the form").toEqual([]);
+    });
+  }
+});
+
 test.describe("sign up and verify", () => {
   test("a visitor signs up, enters the emailed code and ends up with a verified account", async ({ page }) => {
     const account = await signUpThroughTheForm(page);

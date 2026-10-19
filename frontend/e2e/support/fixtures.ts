@@ -5,10 +5,10 @@ import { test as base, type Page } from "@playwright/test";
  * as the test's project), so one test can play several people at once. Contexts are closed when the test ends.
  */
 export const test = base.extend<{ openSession: () => Promise<Page> }>({
-  openSession: async ({ browser, baseURL, viewport, userAgent, isMobile, hasTouch, deviceScaleFactor }, provide) => {
+  openSession: async ({ browser, baseURL, viewport, userAgent, isMobile, hasTouch, deviceScaleFactor, colorScheme }, provide) => {
     const opened: { close: () => Promise<void> }[] = [];
     await provide(async () => {
-      const context = await browser.newContext({ baseURL, viewport, userAgent, isMobile, hasTouch, deviceScaleFactor });
+      const context = await browser.newContext({ baseURL, viewport, userAgent, isMobile, hasTouch, deviceScaleFactor, colorScheme });
       opened.push(context);
       return context.newPage();
     });

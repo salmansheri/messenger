@@ -17,5 +17,13 @@ export function RequireSession({ children }: { children: ReactNode }) {
     router.replace(state.left ? "/sign-in" : signInPathFor(pathname));
   }, [state, pathname, router]);
 
+  if (state.status === "loading") {
+    // Nothing to see yet, but a screen reader should not meet a blank page.
+    return (
+      <p role="status" className="sr-only">
+        Checking that you are signed in…
+      </p>
+    );
+  }
   return state.status === "signedIn" ? children : null;
 }

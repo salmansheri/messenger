@@ -12,6 +12,7 @@ import { statusFor, type Frontier } from "@/features/receipts/status";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
+import { announcementOf, unannounced } from "./announce";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
@@ -62,22 +63,40 @@ export function MessageView({ conversation, myId }: Props) {
   );
   const pending = useSyncExternalStore(outbox.subscribe, outbox.getSnapshot, outbox.getSnapshot);
 
+  const confirmed = useMemo(() => confirmedMessages(history.data?.pages ?? []), [history.data]);
   const items = useMemo(
     () =>
       buildTimeline({
-        confirmed: confirmedMessages(history.data?.pages ?? []),
+        confirmed,
         pending,
         myId,
         firstUnreadSeq: openedAt.firstUnread,
         now: new Date(),
       }),
-    [history.data, pending, myId, openedAt.firstUnread],
+    [confirmed, pending, myId, openedAt.firstUnread],
   );
 
   const names = useMemo(
     () => new Map(conversation.participants?.map((participant) => [participant.userId, participant.displayName]) ?? []),
     [conversation.participants],
   );
+
+  // New Messages from other people are spoken (politely) as they arrive; the ones already there when the view opens are not.
+  const [spoken, setSpoken] = useState<{ upTo: number; lines: { seq: number; text: string }[] }>();
+  const newest = confirmed.at(-1)?.seq ?? 0;
+  if (history.data && (!spoken || newest > spoken.upTo)) {
+    const fresh = spoken ? unannounced(confirmed, spoken.upTo, myId) : [];
+    setSpoken({
+      upTo: Math.max(newest, spoken?.upTo ?? 0),
+      lines: [
+        ...(spoken?.lines ?? []),
+        ...fresh.map((message) => ({
+          seq: message.seq ?? 0,
+          text: announcementOf(message, names.get(message.senderId) ?? "Someone"),
+        })),
+      ].slice(-5),
+    });
+  }
 
   const scroller = useRef<HTMLDivElement>(null);
   const positioned = useRef(false);
@@ -158,7 +177,7 @@ export function MessageView({ conversation, myId }: Props) {
 
   if (history.isPending) {
     return (
-      <p className="px-4 py-6 text-ink-muted sm:px-8" aria-busy="true">
+      <p className="px-4 py-6 text-ink-muted sm:px-8" role="status" aria-busy="true">
         Loading Messages…
       </p>
     );
@@ -167,7 +186,15 @@ export function MessageView({ conversation, myId }: Props) {
   return (
     <>
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div ref={scroller} onScroll={scrolled} className="min-h-0 flex-1 overflow-y-auto py-4">
+        {/* Focusable, so the arrow and page keys can scroll the history even when it holds nothing else to tab to. */}
+        <div
+          ref={scroller}
+          onScroll={scrolled}
+          tabIndex={0}
+          role="region"
+          aria-label="Message history"
+          className="min-h-0 flex-1 overflow-y-auto py-4"
+        >
           {/* The same height whether or not there is more, so reaching the oldest Message does not move the page. */}
           <div className="flex h-12 items-center justify-center px-4 text-sm sm:px-8">
             {history.hasNextPage ? (
@@ -198,6 +225,11 @@ export function MessageView({ conversation, myId }: Props) {
             Jump to latest
           </Button>
         )}
+      </div>
+      <div role="log" aria-label="New Messages" className="sr-only">
+        {spoken?.lines.map((line) => (
+          <p key={line.seq}>{line.text}</p>
+        ))}
       </div>
       <TypingLine conversationId={conversationId} names={names} />
       <Composer

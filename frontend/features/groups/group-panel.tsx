@@ -1,7 +1,7 @@
 "use client";
 
 import { revalidateLogic, useForm } from "@tanstack/react-form";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
@@ -25,6 +25,15 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
   const onlyAdmin = isAdmin && participants.filter((participant) => participant.role === "ADMIN").length === 1;
   const actions = useGroupActions(conversationId);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
+  // Focus follows the confirmation: onto the safe choice when it opens, back to "Leave Group" when it is cancelled.
+  const focusCancel = useCallback((element: HTMLElement | null) => element?.focus(), []);
+  const returnToLeave = useRef(false);
+  const focusLeave = useCallback((element: HTMLElement | null) => {
+    if (element && returnToLeave.current) {
+      returnToLeave.current = false;
+      element.focus();
+    }
+  }, []);
 
   // One change to a Participant at a time: while one is under way the others wait, whichever row they are on.
   const changing = actions.promote.isPending || actions.remove.isPending;
@@ -111,8 +120,10 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
                   Leave
                 </Button>
                 <Button
+                  ref={focusCancel}
                   variant="quiet"
                   onClick={() => {
+                    returnToLeave.current = true;
                     setConfirmingLeave(false);
                     actions.clearFailure();
                   }}
@@ -122,7 +133,7 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
               </div>
             </div>
           ) : (
-            <Button variant="quiet" onClick={() => setConfirmingLeave(true)}>
+            <Button ref={focusLeave} variant="quiet" onClick={() => setConfirmingLeave(true)}>
               Leave Group
             </Button>
           )}

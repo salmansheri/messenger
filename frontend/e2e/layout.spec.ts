@@ -9,7 +9,7 @@ test.describe("layout", () => {
     const reading = await page.getByRole("region", { name: "A conversation" }).boundingBox();
     expect(index && reading).toBeTruthy();
 
-    if (testInfo.project.name === "desktop") {
+    if (testInfo.project.name.startsWith("desktop")) {
       expect(reading!.x).toBeGreaterThanOrEqual(index!.x + index!.width - 1);
       expect(Math.abs(reading!.y - index!.y)).toBeLessThan(80);
     } else {
