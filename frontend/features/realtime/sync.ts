@@ -1,11 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { ConversationResponse, UserProfile } from "@/lib/api";
+import { listQueryKey, meQueryKey, type ConversationResponse, type UserProfile } from "@/lib/api";
 import { parseEvent } from "@/lib/realtime/events";
-import { conversationsKey } from "@/features/conversations/queries";
 import { catchUpHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
-import { allMessagesKey, messagesKey } from "@/features/messages/queries";
-import { meKey } from "@/features/session/use-me";
+import { allMessagesKey, historyConversationId, messagesKey } from "@/features/messages/queries";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
 import { mergeFrontier, type Frontier } from "@/features/receipts/status";
 import { applyToHistory, applyToList, applyUnread } from "./apply-event";
@@ -22,13 +20,13 @@ const fetching = (queryClient: QueryClient, key: readonly unknown[]) => queryCli
  */
 export function recordUnread(queryClient: QueryClient, report: { conversationId: string; readSeq: number; unreadCount: number }) {
   const key = readPositionKey(report.conversationId);
-  const list = queryClient.getQueryData<ConversationResponse[]>(conversationsKey);
+  const list = queryClient.getQueryData<ConversationResponse[]>(listQueryKey());
   const result = applyUnread(list ?? [], queryClient.getQueryData<number>(key), report);
   queryClient.setQueryData<number>(key, result.readSeq);
-  if (fetching(queryClient, conversationsKey)) {
-    void queryClient.invalidateQueries({ queryKey: conversationsKey });
+  if (fetching(queryClient, listQueryKey())) {
+    void queryClient.invalidateQueries({ queryKey: listQueryKey() });
   } else if (list && result.list !== list) {
-    queryClient.setQueryData(conversationsKey, result.list);
+    queryClient.setQueryData(listQueryKey(), result.list);
   }
 }
 
@@ -42,15 +40,15 @@ export function handleEvent(queryClient: QueryClient, body: string) {
     return;
   }
 
-  if (fetching(queryClient, conversationsKey)) {
-    void queryClient.invalidateQueries({ queryKey: conversationsKey });
+  if (fetching(queryClient, listQueryKey())) {
+    void queryClient.invalidateQueries({ queryKey: listQueryKey() });
   } else {
-    const list = queryClient.getQueryData<ConversationResponse[]>(conversationsKey);
+    const list = queryClient.getQueryData<ConversationResponse[]>(listQueryKey());
     if (list) {
-      const myId = queryClient.getQueryData<UserProfile>(meKey)?.id;
+      const myId = queryClient.getQueryData<UserProfile>(meQueryKey())?.id;
       const next = applyToList(list, event, myId);
-      if (next.list !== list) queryClient.setQueryData(conversationsKey, next.list);
-      if (next.refetch) void queryClient.invalidateQueries({ queryKey: conversationsKey });
+      if (next.list !== list) queryClient.setQueryData(listQueryKey(), next.list);
+      if (next.refetch) void queryClient.invalidateQueries({ queryKey: listQueryKey() });
     }
   }
 
@@ -76,12 +74,12 @@ export function handleEvent(queryClient: QueryClient, body: string) {
  * loaded history is missing.
  */
 export function catchUp(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: conversationsKey });
+  void queryClient.invalidateQueries({ queryKey: listQueryKey() });
   queryClient
     .getQueryCache()
     .findAll({ queryKey: allMessagesKey })
     .forEach((query) => {
-      const conversationId = query.queryKey[1];
-      if (typeof conversationId === "string") void catchUpHistory(queryClient, conversationId);
+      const conversationId = historyConversationId(query.queryKey);
+      if (conversationId) void catchUpHistory(queryClient, conversationId);
     });
 }

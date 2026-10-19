@@ -7,12 +7,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem } from "@/lib/api";
+import { loginMutation, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { session } from "@/lib/auth/app-session";
 import { useSession } from "@/features/session/session-provider";
 import { verificationEmail } from "./remembered-email";
-import { signInSchema, type SignInData, type SignInValues } from "./schemas";
+import { signInSchema, type SignInValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { signInMessageFor } from "./wording";
 
@@ -28,21 +28,21 @@ export function SignInForm() {
   const problems = useServerProblems(FIELDS);
 
   const signIn = useMutation({
-    mutationFn: async (data: SignInData) => {
-      const issued = await call(sdk.login({ body: data }));
-      if (!issued.accessToken || !issued.expiresIn) throw new Error("The sign-in answer had no access token.");
-      return { accessToken: issued.accessToken, expiresInSeconds: issued.expiresIn };
-    },
+    ...loginMutation(),
     onMutate: () => problems.clearAll(),
-    onSuccess: (tokens) => {
+    onSuccess: (issued) => {
+      if (!issued.accessToken || !issued.expiresIn) {
+        problems.showForm("Something went wrong on our side. Try again in a moment.");
+        return;
+      }
       queryClient.clear(); // nothing from an earlier person's session may show up for this one
-      session.signedIn(tokens);
+      session.signedIn({ accessToken: issued.accessToken, expiresInSeconds: issued.expiresIn });
     },
-    onError: (error, data) => {
+    onError: (error, { body }) => {
       const problem = toProblem(error);
       if (problem.status === 403) {
         // The password was right but the address was never verified: carry on at the verification screen.
-        verificationEmail.remember(data.email);
+        verificationEmail.remember(body.email);
         router.push("/verify");
         return;
       }
@@ -54,7 +54,7 @@ export function SignInForm() {
     defaultValues,
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: focusFirstInvalid,
-    onSubmit: ({ value }) => signIn.mutateAsync(signInSchema.parse(value)).catch(() => undefined),
+    onSubmit: ({ value }) => signIn.mutateAsync({ body: signInSchema.parse(value) }).catch(() => undefined),
   });
 
   return (

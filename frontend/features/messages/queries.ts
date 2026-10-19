@@ -1,14 +1,22 @@
 "use client";
 
 import { useInfiniteQuery, type QueryClient } from "@tanstack/react-query";
-import { call, sdk, type MessagePage, type MessageResponse } from "@/lib/api";
+import { historyInfiniteOptions, historyInfiniteQueryKey, type MessagePage, type MessageResponse } from "@/lib/api";
 import { withMessage, type History } from "./history";
 
-/** The start of every Conversation's history key, for finding all loaded histories. */
-export const allMessagesKey = ["messages"] as const;
-export const messagesKey = (conversationId: string) => [...allMessagesKey, conversationId] as const;
-
 const OLDER_PAGE = 50;
+
+/** A Conversation's history as the query cache knows it (the key the generated paging options use). */
+export const messagesKey = (conversationId: string) => historyInfiniteQueryKey({ path: { conversationId } });
+
+/** The start of every Conversation's history key, for finding all the histories that are loaded. */
+export const allMessagesKey = [{ _id: "history", _infinite: true }];
+
+/** Which Conversation a history key belongs to. */
+export function historyConversationId(key: readonly unknown[]): string | undefined {
+  const params = key[0] as { path?: { conversationId?: string } } | undefined;
+  return params?.path?.conversationId;
+}
 
 /**
  * A Conversation's history, newest page first and older ones on demand (`beforeSeq`). `firstPage` is how many of the
@@ -16,16 +24,12 @@ const OLDER_PAGE = 50;
  */
 export function useMessageHistory(conversationId: string, firstPage: number) {
   return useInfiniteQuery({
-    queryKey: messagesKey(conversationId),
-    initialPageParam: undefined as number | undefined,
-    queryFn: ({ pageParam }) =>
-      call(
-        sdk.history_({
-          path: { conversationId },
-          query: pageParam === undefined ? { limit: firstPage } : { beforeSeq: pageParam, limit: OLDER_PAGE },
-        }),
-      ),
-    getNextPageParam: (page: MessagePage) => (page.hasMore ? page.messages?.[0]?.seq : undefined),
+    ...historyInfiniteOptions({ path: { conversationId } }),
+    initialPageParam: { path: { conversationId }, query: { limit: firstPage } },
+    getNextPageParam: (page: MessagePage) => {
+      const oldest = page.hasMore ? page.messages?.[0]?.seq : undefined;
+      return oldest === undefined ? undefined : { path: { conversationId }, query: { beforeSeq: oldest, limit: OLDER_PAGE } };
+    },
     // Leaving a Conversation drops its history, so opening it again always starts from what the server has now
     // (positioning on stale pages would leave the view at an old bottom with the new Messages below it).
     gcTime: 0,

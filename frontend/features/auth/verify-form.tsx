@@ -7,11 +7,11 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem } from "@/lib/api";
+import { resendVerificationMutation, toProblem, verifyEmailMutation } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
 import { verificationEmail } from "./remembered-email";
-import { codeSchema, emailSchema, verifySchema, type VerifyData, type VerifyValues } from "./schemas";
+import { codeSchema, emailSchema, verifySchema, type VerifyValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { VerifiedView } from "./verified-view";
 import { useWrongTries } from "./use-wrong-tries";
@@ -29,7 +29,7 @@ export function VerifyForm() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const verify = useMutation({
-    mutationFn: (data: VerifyData) => call(sdk.verifyEmail({ body: data })),
+    ...verifyEmailMutation(),
     onMutate: () => {
       setNotice(null);
       problems.clearAll();
@@ -38,26 +38,26 @@ export function VerifyForm() {
       verificationEmail.forget();
       setVerified(true);
     },
-    onError: (error, data) => {
+    onError: (error, { body }) => {
       const problem = toProblem(error);
       if (problem.status !== 400) {
         problems.show(problem);
         return;
       }
-      problems.showForm(wrongTries.refused(data.email, problem));
+      problems.showForm(wrongTries.refused(body.email, problem));
     },
   });
 
   const resend = useMutation({
-    mutationFn: (email: string) => call(sdk.resendVerification({ body: { email } })),
+    ...resendVerificationMutation(),
     onMutate: () => {
       setNotice(null);
       problems.clearAll();
     },
-    onSuccess: (_, email) => {
+    onSuccess: (_, { body }) => {
       wrongTries.reset();
       form.resetField("code");
-      setNotice(`A new code is on its way to ${email}. The old one no longer works.`);
+      setNotice(`A new code is on its way to ${body.email}. The old one no longer works.`);
     },
     onError: (error) => problems.show(toProblem(error), codesMessageFor),
   });
@@ -68,7 +68,7 @@ export function VerifyForm() {
     defaultValues,
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: focusFirstInvalid,
-    onSubmit: ({ value }) => verify.mutateAsync(verifySchema.parse(value)).catch(() => undefined),
+    onSubmit: ({ value }) => verify.mutateAsync({ body: verifySchema.parse(value) }).catch(() => undefined),
   });
 
   // Coming from sign-up, the address is already known and only the code is missing.
@@ -88,7 +88,7 @@ export function VerifyForm() {
       problems.showField("email", address.error.issues[0].message);
       return;
     }
-    resend.mutate(address.data);
+    resend.mutate({ body: { email: address.data } });
   }
 
   if (verified) return <VerifiedView />;

@@ -4,9 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem, type ConversationResponse } from "@/lib/api";
+import { listQueryKey, sdk, toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
-import { conversationsKey } from "@/features/conversations/queries";
 import { formatClock } from "@/features/conversations/present";
 import { useFrontier } from "@/features/receipts/queries";
 import { statusFor, type Frontier } from "@/features/receipts/status";
@@ -46,10 +45,10 @@ export function MessageView({ conversation, myId }: Props) {
 
   const [outbox] = useState(() =>
     createOutbox({
-      send: (clientMessageId, body) => call(sdk.send({ path: { conversationId }, body: { clientMessageId, body } })),
+      send: async (clientMessageId, body) => (await sdk.send({ path: { conversationId }, body: { clientMessageId, body } })).data,
       onSent: (message) => {
         addMessageToHistory(queryClient, message);
-        void queryClient.invalidateQueries({ queryKey: conversationsKey });
+        void queryClient.invalidateQueries({ queryKey: listQueryKey() });
       },
     }),
   );

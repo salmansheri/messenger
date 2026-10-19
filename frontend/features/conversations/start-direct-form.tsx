@@ -6,13 +6,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk } from "@/lib/api";
+import { listQueryKey, sdk } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { emailSchema } from "@/features/auth/schemas";
 import { shownError, useServerProblems } from "@/features/auth/server-problems";
 import { useMe } from "@/features/session/use-me";
 import { PaneHeader } from "./pane-header";
-import { conversationsKey } from "./queries";
 import { SelfConversationError, startDirectOutcome } from "./wording";
 
 const FIELDS = ["email"] as const;
@@ -27,14 +26,14 @@ export function StartDirectForm() {
 
   const start = useMutation({
     mutationFn: async (email: string) => {
-      const person = await call(sdk.lookup({ body: { email } }));
+      const { data: person } = await sdk.lookup({ body: { email } });
       if (!person.id) throw new Error("The lookup answer had no user id.");
       if (person.id === me.data?.id) throw new SelfConversationError();
-      return call(sdk.startDirect({ body: { userId: person.id } }));
+      return (await sdk.startDirect({ body: { userId: person.id } })).data;
     },
     onMutate: () => problems.clearAll(),
     onSuccess: async (conversation) => {
-      await queryClient.invalidateQueries({ queryKey: conversationsKey });
+      await queryClient.invalidateQueries({ queryKey: listQueryKey() });
       router.push(`/app/c/${conversation.id}`);
     },
     onError: (error) => {

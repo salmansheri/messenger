@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem } from "@/lib/api";
+import { logoutMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { messageFor } from "@/lib/api/messages";
 import { useMe } from "./use-me";
@@ -13,7 +13,7 @@ export function SettingsView() {
   const me = useMe();
 
   const signOut = useMutation({
-    mutationFn: () => call(sdk.logout()),
+    ...logoutMutation(),
     onSuccess: () => {
       queryClient.clear();
       session.end(); // the signed-in area then sends the person to sign-in
@@ -62,7 +62,7 @@ export function SettingsView() {
           </div>
         )}
         <div className="mt-4">
-          <Button variant="primary" onClick={() => signOut.mutate()} busy={signOut.isPending}>
+          <Button variant="primary" onClick={() => signOut.mutate({})} busy={signOut.isPending}>
             {signOut.isPending ? "Signing out…" : "Sign out"}
           </Button>
         </div>

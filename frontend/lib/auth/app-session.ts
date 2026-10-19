@@ -1,4 +1,4 @@
-import { call, sdk, setAccessTokenProvider } from "@/lib/api";
+import { sdk, setAccessTokenProvider } from "@/lib/api";
 import { createSession } from "./session";
 
 /**
@@ -7,7 +7,7 @@ import { createSession } from "./session";
  */
 export const session = createSession({
   async requestTokens() {
-    const issued = await call(sdk.refresh());
+    const { data: issued } = await sdk.refresh();
     if (!issued.accessToken || !issued.expiresIn) throw new Error("The refresh answer had no access token.");
     return { accessToken: issued.accessToken, expiresInSeconds: issued.expiresIn };
   },

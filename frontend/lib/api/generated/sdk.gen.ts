@@ -18,7 +18,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-export const lookup = <ThrowOnError extends boolean = false>(options: Options<LookupData, ThrowOnError>): RequestResult<LookupResponses, unknown, ThrowOnError> => (options.client ?? client).post<LookupResponses, unknown, ThrowOnError>({
+export const lookup = <ThrowOnError extends boolean = true>(options: Options<LookupData, ThrowOnError>): RequestResult<LookupResponses, unknown, ThrowOnError> => (options.client ?? client).post<LookupResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/users/lookup',
     ...options,
@@ -28,7 +28,7 @@ export const lookup = <ThrowOnError extends boolean = false>(options: Options<Lo
     }
 });
 
-export const register = <ThrowOnError extends boolean = false>(options: Options<RegisterData, ThrowOnError>): RequestResult<RegisterResponses, unknown, ThrowOnError> => (options.client ?? client).post<RegisterResponses, unknown, ThrowOnError>({
+export const register = <ThrowOnError extends boolean = true>(options: Options<RegisterData, ThrowOnError>): RequestResult<RegisterResponses, unknown, ThrowOnError> => (options.client ?? client).post<RegisterResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/devices',
     ...options,
@@ -38,7 +38,7 @@ export const register = <ThrowOnError extends boolean = false>(options: Options<
     }
 });
 
-export const report = <ThrowOnError extends boolean = false>(options: Options<ReportData, ThrowOnError>): RequestResult<ReportResponses, unknown, ThrowOnError> => (options.client ?? client).post<ReportResponses, unknown, ThrowOnError>({
+export const report = <ThrowOnError extends boolean = true>(options: Options<ReportData, ThrowOnError>): RequestResult<ReportResponses, unknown, ThrowOnError> => (options.client ?? client).post<ReportResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/receipts',
     ...options,
@@ -48,7 +48,7 @@ export const report = <ThrowOnError extends boolean = false>(options: Options<Re
     }
 });
 
-export const addParticipant = <ThrowOnError extends boolean = false>(options: Options<AddParticipantData, ThrowOnError>): RequestResult<AddParticipantResponses, unknown, ThrowOnError> => (options.client ?? client).post<AddParticipantResponses, unknown, ThrowOnError>({
+export const addParticipant = <ThrowOnError extends boolean = true>(options: Options<AddParticipantData, ThrowOnError>): RequestResult<AddParticipantResponses, unknown, ThrowOnError> => (options.client ?? client).post<AddParticipantResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/participants',
     ...options,
@@ -58,19 +58,19 @@ export const addParticipant = <ThrowOnError extends boolean = false>(options: Op
     }
 });
 
-export const promote = <ThrowOnError extends boolean = false>(options: Options<PromoteData, ThrowOnError>): RequestResult<PromoteResponses, unknown, ThrowOnError> => (options.client ?? client).post<PromoteResponses, unknown, ThrowOnError>({
+export const promote = <ThrowOnError extends boolean = true>(options: Options<PromoteData, ThrowOnError>): RequestResult<PromoteResponses, unknown, ThrowOnError> => (options.client ?? client).post<PromoteResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/participants/{userId}/promote',
     ...options
 });
 
-export const history_ = <ThrowOnError extends boolean = false>(options: Options<HistoryData, ThrowOnError>): RequestResult<HistoryResponses, unknown, ThrowOnError> => (options.client ?? client).get<HistoryResponses, unknown, ThrowOnError>({
+export const history_ = <ThrowOnError extends boolean = true>(options: Options<HistoryData, ThrowOnError>): RequestResult<HistoryResponses, unknown, ThrowOnError> => (options.client ?? client).get<HistoryResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/messages',
     ...options
 });
 
-export const send = <ThrowOnError extends boolean = false>(options: Options<SendData, ThrowOnError>): RequestResult<SendResponses, unknown, ThrowOnError> => (options.client ?? client).post<SendResponses, unknown, ThrowOnError>({
+export const send = <ThrowOnError extends boolean = true>(options: Options<SendData, ThrowOnError>): RequestResult<SendResponses, unknown, ThrowOnError> => (options.client ?? client).post<SendResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/messages',
     ...options,
@@ -80,13 +80,13 @@ export const send = <ThrowOnError extends boolean = false>(options: Options<Send
     }
 });
 
-export const leave = <ThrowOnError extends boolean = false>(options: Options<LeaveData, ThrowOnError>): RequestResult<LeaveResponses, unknown, ThrowOnError> => (options.client ?? client).post<LeaveResponses, unknown, ThrowOnError>({
+export const leave = <ThrowOnError extends boolean = true>(options: Options<LeaveData, ThrowOnError>): RequestResult<LeaveResponses, unknown, ThrowOnError> => (options.client ?? client).post<LeaveResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/leave',
     ...options
 });
 
-export const create = <ThrowOnError extends boolean = false>(options: Options<CreateData, ThrowOnError>): RequestResult<CreateResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateResponses, unknown, ThrowOnError>({
+export const create = <ThrowOnError extends boolean = true>(options: Options<CreateData, ThrowOnError>): RequestResult<CreateResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/groups',
     ...options,
@@ -96,7 +96,7 @@ export const create = <ThrowOnError extends boolean = false>(options: Options<Cr
     }
 });
 
-export const startDirect = <ThrowOnError extends boolean = false>(options: Options<StartDirectData, ThrowOnError>): RequestResult<StartDirectResponses, unknown, ThrowOnError> => (options.client ?? client).post<StartDirectResponses, unknown, ThrowOnError>({
+export const startDirect = <ThrowOnError extends boolean = true>(options: Options<StartDirectData, ThrowOnError>): RequestResult<StartDirectResponses, unknown, ThrowOnError> => (options.client ?? client).post<StartDirectResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/direct',
     ...options,
@@ -106,7 +106,7 @@ export const startDirect = <ThrowOnError extends boolean = false>(options: Optio
     }
 });
 
-export const verifyEmail = <ThrowOnError extends boolean = false>(options: Options<VerifyEmailData, ThrowOnError>): RequestResult<VerifyEmailResponses, unknown, ThrowOnError> => (options.client ?? client).post<VerifyEmailResponses, unknown, ThrowOnError>({
+export const verifyEmail = <ThrowOnError extends boolean = true>(options: Options<VerifyEmailData, ThrowOnError>): RequestResult<VerifyEmailResponses, unknown, ThrowOnError> => (options.client ?? client).post<VerifyEmailResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/verify-email',
     ...options,
@@ -116,7 +116,7 @@ export const verifyEmail = <ThrowOnError extends boolean = false>(options: Optio
     }
 });
 
-export const signUp = <ThrowOnError extends boolean = false>(options: Options<SignUpData, ThrowOnError>): RequestResult<SignUpResponses, unknown, ThrowOnError> => (options.client ?? client).post<SignUpResponses, unknown, ThrowOnError>({
+export const signUp = <ThrowOnError extends boolean = true>(options: Options<SignUpData, ThrowOnError>): RequestResult<SignUpResponses, unknown, ThrowOnError> => (options.client ?? client).post<SignUpResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/signup',
     ...options,
@@ -126,7 +126,7 @@ export const signUp = <ThrowOnError extends boolean = false>(options: Options<Si
     }
 });
 
-export const resetPassword = <ThrowOnError extends boolean = false>(options: Options<ResetPasswordData, ThrowOnError>): RequestResult<ResetPasswordResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResetPasswordResponses, unknown, ThrowOnError>({
+export const resetPassword = <ThrowOnError extends boolean = true>(options: Options<ResetPasswordData, ThrowOnError>): RequestResult<ResetPasswordResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResetPasswordResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/reset-password',
     ...options,
@@ -136,7 +136,7 @@ export const resetPassword = <ThrowOnError extends boolean = false>(options: Opt
     }
 });
 
-export const resendVerification = <ThrowOnError extends boolean = false>(options: Options<ResendVerificationData, ThrowOnError>): RequestResult<ResendVerificationResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResendVerificationResponses, unknown, ThrowOnError>({
+export const resendVerification = <ThrowOnError extends boolean = true>(options: Options<ResendVerificationData, ThrowOnError>): RequestResult<ResendVerificationResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResendVerificationResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/resend-verification',
     ...options,
@@ -146,13 +146,13 @@ export const resendVerification = <ThrowOnError extends boolean = false>(options
     }
 });
 
-export const refresh = <ThrowOnError extends boolean = false>(options?: Options<RefreshData, ThrowOnError>): RequestResult<RefreshResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RefreshResponses, unknown, ThrowOnError>({
+export const refresh = <ThrowOnError extends boolean = true>(options?: Options<RefreshData, ThrowOnError>): RequestResult<RefreshResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RefreshResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/refresh',
     ...options
 });
 
-export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, unknown, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({
+export const logout = <ThrowOnError extends boolean = true>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, unknown, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/logout',
     ...options,
@@ -162,7 +162,7 @@ export const logout = <ThrowOnError extends boolean = false>(options?: Options<L
     }
 });
 
-export const login = <ThrowOnError extends boolean = false>(options: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, unknown, ThrowOnError> => (options.client ?? client).post<LoginResponses, unknown, ThrowOnError>({
+export const login = <ThrowOnError extends boolean = true>(options: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, unknown, ThrowOnError> => (options.client ?? client).post<LoginResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/login',
     ...options,
@@ -172,7 +172,7 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
     }
 });
 
-export const forgotPassword = <ThrowOnError extends boolean = false>(options: Options<ForgotPasswordData, ThrowOnError>): RequestResult<ForgotPasswordResponses, unknown, ThrowOnError> => (options.client ?? client).post<ForgotPasswordResponses, unknown, ThrowOnError>({
+export const forgotPassword = <ThrowOnError extends boolean = true>(options: Options<ForgotPasswordData, ThrowOnError>): RequestResult<ForgotPasswordResponses, unknown, ThrowOnError> => (options.client ?? client).post<ForgotPasswordResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/auth/forgot-password',
     ...options,
@@ -182,13 +182,13 @@ export const forgotPassword = <ThrowOnError extends boolean = false>(options: Op
     }
 });
 
-export const get = <ThrowOnError extends boolean = false>(options: Options<GetData, ThrowOnError>): RequestResult<GetResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetResponses, unknown, ThrowOnError>({
+export const get = <ThrowOnError extends boolean = true>(options: Options<GetData, ThrowOnError>): RequestResult<GetResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}',
     ...options
 });
 
-export const rename = <ThrowOnError extends boolean = false>(options: Options<RenameData, ThrowOnError>): RequestResult<RenameResponses, unknown, ThrowOnError> => (options.client ?? client).patch<RenameResponses, unknown, ThrowOnError>({
+export const rename = <ThrowOnError extends boolean = true>(options: Options<RenameData, ThrowOnError>): RequestResult<RenameResponses, unknown, ThrowOnError> => (options.client ?? client).patch<RenameResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}',
     ...options,
@@ -198,31 +198,31 @@ export const rename = <ThrowOnError extends boolean = false>(options: Options<Re
     }
 });
 
-export const me = <ThrowOnError extends boolean = false>(options?: Options<MeData, ThrowOnError>): RequestResult<MeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeResponses, unknown, ThrowOnError>({
+export const me = <ThrowOnError extends boolean = true>(options?: Options<MeData, ThrowOnError>): RequestResult<MeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/users/me',
     ...options
 });
 
-export const list = <ThrowOnError extends boolean = false>(options?: Options<ListData, ThrowOnError>): RequestResult<ListResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListResponses, unknown, ThrowOnError>({
+export const list = <ThrowOnError extends boolean = true>(options?: Options<ListData, ThrowOnError>): RequestResult<ListResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations',
     ...options
 });
 
-export const presence = <ThrowOnError extends boolean = false>(options: Options<PresenceData, ThrowOnError>): RequestResult<PresenceResponses, unknown, ThrowOnError> => (options.client ?? client).get<PresenceResponses, unknown, ThrowOnError>({
+export const presence = <ThrowOnError extends boolean = true>(options: Options<PresenceData, ThrowOnError>): RequestResult<PresenceResponses, unknown, ThrowOnError> => (options.client ?? client).get<PresenceResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/presence',
     ...options
 });
 
-export const unregister = <ThrowOnError extends boolean = false>(options: Options<UnregisterData, ThrowOnError>): RequestResult<UnregisterResponses, unknown, ThrowOnError> => (options.client ?? client).delete<UnregisterResponses, unknown, ThrowOnError>({
+export const unregister = <ThrowOnError extends boolean = true>(options: Options<UnregisterData, ThrowOnError>): RequestResult<UnregisterResponses, unknown, ThrowOnError> => (options.client ?? client).delete<UnregisterResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/devices/{deviceId}',
     ...options
 });
 
-export const removeParticipant = <ThrowOnError extends boolean = false>(options: Options<RemoveParticipantData, ThrowOnError>): RequestResult<RemoveParticipantResponses, unknown, ThrowOnError> => (options.client ?? client).delete<RemoveParticipantResponses, unknown, ThrowOnError>({
+export const removeParticipant = <ThrowOnError extends boolean = true>(options: Options<RemoveParticipantData, ThrowOnError>): RequestResult<RemoveParticipantResponses, unknown, ThrowOnError> => (options.client ?? client).delete<RemoveParticipantResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/participants/{userId}',
     ...options

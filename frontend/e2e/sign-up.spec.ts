@@ -10,6 +10,7 @@ import {
   problem,
   signUpThroughTheForm,
   verifyEmailField,
+  waitForForm,
 } from "./support/auth-screens";
 import { latestCodeFor } from "./support/mailpit";
 
@@ -40,6 +41,7 @@ test.describe("sign up and verify", () => {
     const sent: string[] = [];
     page.on("request", (request) => request.url().includes("/auth/signup") && sent.push(request.url()));
     await page.goto("/sign-up");
+    await waitForForm(page);
 
     await page.getByRole("button", { name: "Create account" }).click();
 

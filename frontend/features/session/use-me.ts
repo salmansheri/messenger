@@ -1,11 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { call, sdk } from "@/lib/api";
-
-export const meKey = ["me"] as const;
+import { meOptions } from "@/lib/api";
 
 /** The signed-in User's own profile. */
 export function useMe() {
-  return useQuery({ queryKey: meKey, queryFn: () => call(sdk.me()) });
+  return useQuery(meOptions());
 }

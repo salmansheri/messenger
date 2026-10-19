@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem } from "@/lib/api";
+import { forgotPasswordMutation, resetPasswordMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { AuthCard } from "./auth-card";
@@ -16,7 +16,6 @@ import { PasswordChangedView } from "./password-changed-view";
 import {
   emailSchema,
   resetPasswordSchema,
-  type ResetPasswordData,
   type ResetPasswordValues,
 } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
@@ -43,7 +42,7 @@ export function ResetPasswordForm() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const reset = useMutation({
-    mutationFn: (data: ResetPasswordData) => call(sdk.resetPassword({ body: data })),
+    ...resetPasswordMutation(),
     onMutate: () => {
       setNotice(null);
       problems.clearAll();
@@ -56,18 +55,18 @@ export function ResetPasswordForm() {
       queryClient.clear();
       setChanged(true);
     },
-    onError: (error, data) => {
+    onError: (error, { body }) => {
       const problem = toProblem(error);
       if (problem.status !== 400) {
         problems.show(problem);
         return;
       }
-      problems.showForm(wrongTries.refused(data.email, problem));
+      problems.showForm(wrongTries.refused(body.email, problem));
     },
   });
 
   const resend = useMutation({
-    mutationFn: (email: string) => call(sdk.forgotPassword({ body: { email } })),
+    ...forgotPasswordMutation(),
     onMutate: () => {
       setNotice(null);
       problems.clearAll();
@@ -87,7 +86,7 @@ export function ResetPasswordForm() {
     defaultValues,
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: focusFirstInvalid,
-    onSubmit: ({ value }) => reset.mutateAsync(resetPasswordSchema.parse(value)).catch(() => undefined),
+    onSubmit: ({ value }) => reset.mutateAsync({ body: resetPasswordSchema.parse(value) }).catch(() => undefined),
   });
 
   // Coming from the previous screen, the address is already known and the code is what is missing.
@@ -107,7 +106,7 @@ export function ResetPasswordForm() {
       problems.showField("email", address.error.issues[0].message);
       return;
     }
-    resend.mutate(address.data);
+    resend.mutate({ body: { email: address.data } });
   }
 
   if (changed) return <PasswordChangedView />;

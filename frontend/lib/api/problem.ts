@@ -49,3 +49,12 @@ export function problemFrom(body: unknown, status: number, headers: Headers): Ap
     retryAfter(headers),
   );
 }
+
+/**
+ * Any failure of a call as an {@link ApiProblem}: the backend's error body with the answer it came in, or a network
+ * failure when there was no answer (the request never got through, or was cancelled). A problem stays as it is.
+ */
+export function asProblem(error: unknown, response: Response | undefined): ApiProblem {
+  if (error instanceof ApiProblem) return error;
+  return problemFrom(response ? error : undefined, response?.status ?? NETWORK_FAILURE, response?.headers ?? new Headers());
+}

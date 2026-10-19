@@ -7,10 +7,10 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { call, sdk, toProblem } from "@/lib/api";
+import { signUpMutation, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { verificationEmail } from "./remembered-email";
-import { signUpSchema, type SignUpData, type SignUpValues } from "./schemas";
+import { signUpSchema, type SignUpValues } from "./schemas";
 import { shownError, useServerProblems } from "./server-problems";
 import { codesMessageFor } from "./wording";
 
@@ -23,10 +23,10 @@ export function SignUpForm() {
   const problems = useServerProblems(FIELDS);
 
   const signUp = useMutation({
-    mutationFn: (data: SignUpData) => call(sdk.signUp({ body: data })),
+    ...signUpMutation(),
     onMutate: () => problems.clearAll(),
-    onSuccess: (_, data) => {
-      verificationEmail.remember(data.email);
+    onSuccess: (_, { body }) => {
+      verificationEmail.remember(body.email);
       router.push("/verify");
     },
     onError: (error) => problems.show(toProblem(error), codesMessageFor),
@@ -39,7 +39,7 @@ export function SignUpForm() {
     validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
     onSubmitInvalid: focusFirstInvalid,
     // The same checks again, plus trimming and lower-casing the address; the mutation reports its own failures.
-    onSubmit: ({ value }) => signUp.mutateAsync(signUpSchema.parse(value)).catch(() => undefined),
+    onSubmit: ({ value }) => signUp.mutateAsync({ body: signUpSchema.parse(value) }).catch(() => undefined),
   });
 
   return (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiProblem, NETWORK_FAILURE, problemFrom } from "./problem";
+import { ApiProblem, NETWORK_FAILURE, asProblem, problemFrom } from "./problem";
 
 const headers = (init: Record<string, string> = {}) => new Headers(init);
 
@@ -52,5 +52,28 @@ describe("problemFrom", () => {
   it("keeps only string field messages", () => {
     const problem = problemFrom({ errors: { name: "is blank", count: 3 } }, 400, headers());
     expect(problem.errors).toEqual({ name: "is blank" });
+  });
+});
+
+describe("asProblem", () => {
+  it("makes a problem from the error body and the answer that came with it", () => {
+    const problem = asProblem({ title: "Too Many Requests" }, new Response(null, { status: 429, headers: { "Retry-After": "30" } }));
+    expect(problem).toBeInstanceOf(ApiProblem);
+    expect(problem.status).toBe(429);
+    expect(problem.title).toBe("Too Many Requests");
+    expect(problem.retryAfterSeconds).toBe(30);
+  });
+
+  it("calls a request that got no answer a network failure, whatever the error was", () => {
+    for (const error of [new TypeError("Failed to fetch"), new DOMException("aborted", "AbortError"), undefined]) {
+      const problem = asProblem(error, undefined);
+      expect(problem.status).toBe(NETWORK_FAILURE);
+      expect(problem.isNetworkFailure).toBe(true);
+    }
+  });
+
+  it("leaves a problem that already is one as it is", () => {
+    const problem = problemFrom({ title: "Nope" }, 403, headers());
+    expect(asProblem(problem, new Response(null, { status: 500 }))).toBe(problem);
   });
 });

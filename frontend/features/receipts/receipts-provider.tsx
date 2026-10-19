@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { call, sdk } from "@/lib/api";
+import { sdk } from "@/lib/api";
 import { useConversations } from "@/features/conversations/queries";
 import { recordUnread } from "@/features/realtime/sync";
 import { useMe } from "@/features/session/use-me";
@@ -20,7 +20,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [reporter] = useState(() =>
     createReceiptReporter({
-      send: (conversationId, body) => call(sdk.report({ path: { conversationId }, body })),
+      send: async (conversationId, body) => (await sdk.report({ path: { conversationId }, body })).data,
       onResult(conversationId, result) {
         if (result.readSeq !== undefined && result.unreadCount !== undefined) {
           recordUnread(queryClient, { conversationId, readSeq: result.readSeq, unreadCount: result.unreadCount });

@@ -17,6 +17,7 @@ export async function fillSignUp(page: Page, account: NewAccount) {
 /** Signs up through the form and waits until the verification screen is showing. */
 export async function signUpThroughTheForm(page: Page, account = newAccount()) {
   await page.goto("/sign-up");
+  await waitForForm(page);
   await fillSignUp(page, account);
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   return account;
@@ -44,9 +45,22 @@ export const info = (page: Page) => page.getByRole("main").getByRole("status");
  */
 export const verifyEmailField = (page: Page) => page.getByRole("textbox", { name: "Email address" });
 
+/**
+ * Waits until React has taken over the form on a freshly loaded page. A press or a keystroke before that is handled by
+ * the browser instead (the form submits itself, or what was typed is thrown away when the page comes alive), which a
+ * cold development server, compiling the page on first visit, makes easy to hit.
+ */
+export async function waitForForm(page: Page) {
+  await page.waitForFunction(() => {
+    const form = document.querySelector("main form");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps$"));
+  });
+}
+
 /** Signs in through the sign-in form and waits until the signed-in app is showing. */
 export async function signInThroughTheForm(page: Page, account: { email: string; password: string }) {
   await page.goto("/sign-in");
+  await waitForForm(page);
   await submitSignIn(page, account);
   await expect(page).toHaveURL(/\/app$/);
 }

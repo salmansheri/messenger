@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { call, sdk } from "@/lib/api";
+import { sdk } from "@/lib/api";
 import { latestSeq, type History } from "./history";
 import { addMessageToHistory, messagesKey } from "./queries";
 
@@ -14,7 +14,7 @@ export async function catchUpHistory(queryClient: QueryClient, conversationId: s
   let after = latestSeq(history);
   try {
     for (;;) {
-      const page = await call(sdk.history_({ path: { conversationId }, query: { afterSeq: after, limit: 100 } }));
+      const { data: page } = await sdk.history_({ path: { conversationId }, query: { afterSeq: after, limit: 100 } });
       const messages = page.messages ?? [];
       messages.forEach((message) => addMessageToHistory(queryClient, message));
       const newest = messages.at(-1)?.seq;

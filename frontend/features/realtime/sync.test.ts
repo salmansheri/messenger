@@ -1,8 +1,6 @@
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ConversationResponse } from "@/lib/api";
-import { conversationsKey } from "@/features/conversations/queries";
-import { meKey } from "@/features/session/use-me";
+import { listQueryKey, meQueryKey, type ConversationResponse } from "@/lib/api";
 import { catchUp, handleEvent } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
@@ -32,11 +30,11 @@ afterEach(() => stops.splice(0).forEach((stop) => stop()));
 /** A client with the list on screen (an observer), as it is in the app; each fetch is answered by the test. */
 function withList(initial: ConversationResponse[]) {
   const client = new QueryClient();
-  client.setQueryData(meKey, { id: "me" });
-  client.setQueryData(conversationsKey, initial);
+  client.setQueryData(meQueryKey(), { id: "me" });
+  client.setQueryData(listQueryKey(), initial);
   const answers: ReturnType<typeof deferred<ConversationResponse[]>>[] = [];
   const observer = new QueryObserver(client, {
-    queryKey: conversationsKey,
+    queryKey: listQueryKey(),
     staleTime: Infinity,
     queryFn: () => {
       const answer = deferred<ConversationResponse[]>();
@@ -54,7 +52,7 @@ describe("handleEvent", () => {
 
     handleEvent(client, newMessage(3));
 
-    const list = client.getQueryData<ConversationResponse[]>(conversationsKey);
+    const list = client.getQueryData<ConversationResponse[]>(listQueryKey());
     expect(list?.[0].lastMessage?.seq).toBe(3);
     expect(list?.[0].unreadCount).toBe(1);
     expect(answers, "nothing needed asking for").toHaveLength(0);
@@ -62,7 +60,7 @@ describe("handleEvent", () => {
 
   it("does not patch a list whose request is under way (its answer would undo the patch), but asks again", async () => {
     const { client, answers } = withList([conversation(2, 0)]);
-    void client.invalidateQueries({ queryKey: conversationsKey }); // a request starts
+    void client.invalidateQueries({ queryKey: listQueryKey() }); // a request starts
     await Promise.resolve();
     expect(answers).toHaveLength(1);
 
@@ -70,22 +68,22 @@ describe("handleEvent", () => {
     await Promise.resolve();
 
     expect(answers, "the request was restarted, so its answer is not older than the event").toHaveLength(2);
-    expect(client.getQueryData<ConversationResponse[]>(conversationsKey)?.[0].lastMessage?.seq, "not patched").toBe(2);
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].lastMessage?.seq, "not patched").toBe(2);
 
     answers[0].resolve([conversation(2, 0)]); // the cancelled one answering late changes nothing
     answers[1].resolve([conversation(3, 1)]);
-    await client.getQueryCache().find({ queryKey: conversationsKey })?.promise;
-    expect(client.getQueryData<ConversationResponse[]>(conversationsKey)?.[0].lastMessage?.seq).toBe(3);
+    await client.getQueryCache().find({ queryKey: listQueryKey() })?.promise;
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].lastMessage?.seq).toBe(3);
   });
 
   it("ignores what is not an event, and kinds it does not act on", () => {
     const { client, answers } = withList([conversation(2, 0)]);
-    const before = client.getQueryData(conversationsKey);
+    const before = client.getQueryData(listQueryKey());
 
     handleEvent(client, "not json");
     handleEvent(client, JSON.stringify({ type: "typing.changed", conversationId: "c1" }));
 
-    expect(client.getQueryData(conversationsKey)).toBe(before);
+    expect(client.getQueryData(listQueryKey())).toBe(before);
     expect(answers).toHaveLength(0);
   });
 });

@@ -1,17 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { call, sdk, type ConversationResponse } from "@/lib/api";
+import { listOptions, type ConversationResponse } from "@/lib/api";
 import { useMe } from "@/features/session/use-me";
-
-export const conversationsKey = ["conversations"] as const;
 
 /**
  * The signed-in person's Conversations, most recently active first, with their participants, latest Message and
  * unread count: one request for the whole list, however many Conversations there are.
  */
 export function useConversations() {
-  return useQuery({ queryKey: conversationsKey, queryFn: () => call(sdk.list()) });
+  return useQuery(listOptions());
 }
 
 /** The list together with who is looking at it (a Direct conversation is named after the other person). */
