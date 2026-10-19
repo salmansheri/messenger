@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { revalidateLogic, useForm } from "@tanstack/react-form";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import type { ConversationResponse } from "@/lib/api";
-import { emailSchema } from "@/features/auth/schemas";
+import { shownError } from "@/features/auth/server-problems";
+import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
 import { ParticipantList } from "@/features/presence/participant-list";
-import { checkGroupName } from "./schemas";
-import { useGroupActions, type PanelFailure } from "./use-group-actions";
+import { AddAddressField } from "./add-address-field";
+import { groupNameSchema } from "./schemas";
+import { useGroupActions } from "./use-group-actions";
 
 /**
  * A Group's information and management, under its header: the Participants (admins first, with who is online), and
@@ -21,20 +24,11 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
   const isAdmin = participants.some((participant) => participant.userId === myId && participant.role === "ADMIN");
   const onlyAdmin = isAdmin && participants.filter((participant) => participant.role === "ADMIN").length === 1;
   const actions = useGroupActions(conversationId);
-
-  const [address, setAddress] = useState("");
-  const [addressError, setAddressError] = useState<string>();
   const [confirmingLeave, setConfirmingLeave] = useState(false);
 
-  const addressProblem = addressError ?? (actions.failure?.about === "address" ? actions.failure.message : undefined);
-
-  function add(event: FormEvent) {
-    event.preventDefault();
-    const parsed = emailSchema.safeParse(address);
-    if (!parsed.success) return setAddressError(parsed.error.issues[0].message);
-    setAddressError(undefined);
-    actions.add.mutate(parsed.data, { onSuccess: () => setAddress("") });
-  }
+  // One change to a Participant at a time: while one is under way the others wait, whichever row they are on.
+  const changing = actions.promote.isPending || actions.remove.isPending;
+  const failure = actions.failure;
 
   return (
     <details className="text-sm">
@@ -48,7 +42,8 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
             key={conversation.name}
             current={conversation.name ?? ""}
             pending={actions.rename.isPending}
-            refused={actions.failure}
+            refusal={failure?.about === "name" ? failure.message : undefined}
+            onEdit={actions.clearFailure}
             onRename={(name) => actions.rename.mutate({ path: { conversationId }, body: { name } })}
           />
         )}
@@ -66,8 +61,8 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
                       {participant.role !== "ADMIN" && (
                         <Button
                           variant="quiet"
-                          aria-label={`Promote ${who}`}
-                          busy={actions.promote.isPending}
+                          aria-label={`Make Admin (${who})`}
+                          busy={changing}
                           onClick={() => actions.promote.mutate({ path: { conversationId, userId } })}
                         >
                           Make Admin
@@ -76,7 +71,7 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
                       <Button
                         variant="quiet"
                         aria-label={`Remove ${who}`}
-                        busy={actions.remove.isPending}
+                        busy={changing}
                         onClick={() => actions.remove.mutate({ path: { conversationId, userId } })}
                       >
                         Remove
@@ -89,28 +84,20 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
         />
 
         {isAdmin && (
-          <form onSubmit={add} noValidate className="flex items-end gap-3">
-            <div className="min-w-0 flex-1">
-              <Field
-                label="Add a person by email"
-                type="email"
-                autoComplete="off"
-                value={address}
-                onChange={(event) => {
-                  setAddress(event.target.value);
-                  setAddressError(undefined);
-                  actions.clearFailure();
-                }}
-                error={addressProblem}
-              />
-            </div>
-            <Button type="submit" variant="quiet" busy={actions.add.isPending} className="mb-2.5">
-              {actions.add.isPending ? "Adding…" : "Add"}
-            </Button>
-          </form>
+          <AddAddressField
+            pending={actions.add.isPending}
+            error={failure?.about === "address" ? failure.message : undefined}
+            onEdit={actions.clearFailure}
+            onAdd={(email) =>
+              actions.add.mutateAsync(email).then(
+                () => true,
+                () => false, // the failure is shown by the action itself
+              )
+            }
+          />
         )}
 
-        {actions.failure?.about === "panel" && <Notice tone="problem">{actions.failure.message}</Notice>}
+        {failure && (failure.about === "panel" || failure.about === "form") && <Notice tone="problem">{failure.message}</Notice>}
 
         <div>
           {confirmingLeave ? (
@@ -123,7 +110,13 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
                 <Button busy={actions.leave.isPending} onClick={() => actions.leave.mutate({ path: { conversationId } })}>
                   Leave
                 </Button>
-                <Button variant="quiet" onClick={() => setConfirmingLeave(false)}>
+                <Button
+                  variant="quiet"
+                  onClick={() => {
+                    setConfirmingLeave(false);
+                    actions.clearFailure();
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
@@ -139,42 +132,50 @@ export function GroupPanel({ conversation, myId }: { conversation: ConversationR
   );
 }
 
-/** The Group's name, changeable by an Admin. A refusal of the name shows under it. */
+/** The Group's name, changeable by an Admin. A refusal of the name shows under it until it is edited. */
 function RenameForm({
   current,
   pending,
-  refused,
+  refusal,
+  onEdit,
   onRename,
 }: {
   current: string;
   pending: boolean;
-  refused: PanelFailure | undefined;
+  refusal: string | undefined;
+  onEdit: () => void;
   onRename: (name: string) => void;
 }) {
-  const [name, setName] = useState(current);
-  const [error, setError] = useState<string>();
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const checked = checkGroupName(name);
-    if (!checked.ok) return setError(checked.message);
-    setError(undefined);
-    onRename(checked.name);
-  }
+  const { ref: formElement, focusFirstInvalid } = useFormElement();
+  const form = useForm({
+    defaultValues: { name: current },
+    validationLogic: revalidateLogic({ mode: "submit", modeAfterSubmission: "change" }),
+    onSubmitInvalid: focusFirstInvalid,
+    onSubmit: ({ value }) => {
+      const name = groupNameSchema.parse(value.name);
+      if (name !== current) onRename(name); // the same name is not a change worth asking the server about
+    },
+  });
 
   return (
-    <form onSubmit={submit} noValidate className="flex items-end gap-3">
+    <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="flex items-end gap-3">
       <div className="min-w-0 flex-1">
-        <Field
-          label="Group name"
-          autoComplete="off"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            setError(undefined);
-          }}
-          error={error ?? (refused?.about === "name" ? refused.message : undefined)}
-        />
+        <form.Field name="name" validators={{ onDynamic: groupNameSchema }}>
+          {(field) => (
+            <Field
+              label="Group name"
+              autoComplete="off"
+              name={field.name}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => {
+                field.handleChange(event.target.value);
+                onEdit();
+              }}
+              error={shownError(field.state.meta, refusal)}
+            />
+          )}
+        </form.Field>
       </div>
       <Button type="submit" variant="quiet" busy={pending} className="mb-2.5">
         Rename

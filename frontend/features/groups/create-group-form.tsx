@@ -9,12 +9,12 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { createMutation, listQueryKey, lookupMutation, toProblem } from "@/lib/api";
 import { submitHandler, useFormElement } from "@/lib/forms/form-helpers";
-import { emailSchema } from "@/features/auth/schemas";
 import { shownError, useServerProblems } from "@/features/auth/server-problems";
 import { PaneHeader } from "@/features/conversations/pane-header";
 import { useMe } from "@/features/session/use-me";
 import { addPerson, type Person } from "./members";
-import { checkGroupName } from "./schemas";
+import { AddAddressField } from "./add-address-field";
+import { checkGroupName, groupNameSchema } from "./schemas";
 import { groupFailure } from "./wording";
 
 const FIELDS = ["name"] as const;
@@ -31,37 +31,36 @@ export function CreateGroupForm() {
   const problems = useServerProblems(FIELDS);
   const addressInput = useRef<HTMLInputElement>(null);
 
-  const [people, setPeople] = useState<Person[]>([]);
-  const [address, setAddress] = useState("");
+  // The people are kept in a ref as well as in state, so an add that finishes later reads the list as it is by then.
+  const people = useRef<Person[]>([]);
+  const [shown, setShown] = useState<Person[]>([]);
   const [addressError, setAddressError] = useState<string>();
   const [peopleError, setPeopleError] = useState<string>();
+  const lookup = useMutation(lookupMutation());
 
-  const lookup = useMutation({
-    ...lookupMutation(),
-    onSuccess: (found, { body }) => {
-      if (!found.id) return;
-      const added = addPerson(people, { id: found.id, displayName: found.displayName ?? body.email, email: body.email }, me.data?.id);
+  function setPeople(next: Person[]) {
+    people.current = next;
+    setShown(next);
+  }
+
+  /** Looks the address up and adds the person as a chip; says whether that worked. */
+  async function addAddress(email: string): Promise<boolean> {
+    setAddressError(undefined);
+    try {
+      const found = await lookup.mutateAsync({ body: { email } });
+      if (!found.id) return false;
+      const added = addPerson(people.current, { id: found.id, displayName: found.displayName ?? email, email }, me.data?.id);
       if (!added.ok) {
         setAddressError(added.message);
-        return;
+        return false;
       }
       setPeople(added.people);
       setPeopleError(undefined);
-      // Clear the box only if it still holds the address just added: the person may already be typing the next one.
-      setAddress((current) => (current.trim().toLowerCase() === body.email ? "" : current));
-      addressInput.current?.focus();
-    },
-    onError: (error) => setAddressError(groupFailure(toProblem(error), "add").message),
-  });
-
-  function addAddress() {
-    const parsed = emailSchema.safeParse(address);
-    if (!parsed.success) {
-      setAddressError(parsed.error.issues[0].message);
-      return;
+      return true;
+    } catch (error) {
+      setAddressError(groupFailure(toProblem(error), "add").message);
+      return false;
     }
-    setAddressError(undefined);
-    lookup.mutate({ body: { email: parsed.data } });
   }
 
   const create = useMutation({
@@ -86,12 +85,13 @@ export function CreateGroupForm() {
     onSubmit: ({ value }) => {
       const name = checkGroupName(value.name);
       if (!name.ok) return;
-      if (people.length === 0) {
+      if (people.current.length === 0) {
         setPeopleError("Add at least one person.");
         addressInput.current?.focus();
         return;
       }
-      return create.mutateAsync({ body: { name: name.name, userIds: people.map((person) => person.id) } }).catch(() => undefined);
+      // The mutation reports its own failures (onError), so a rejection here has nothing more to say.
+      return create.mutateAsync({ body: { name: name.name, userIds: people.current.map((person) => person.id) } }).catch(() => undefined);
     },
   });
 
@@ -101,10 +101,7 @@ export function CreateGroupForm() {
       <div className="w-full max-w-md px-4 py-8 sm:px-8">
         <p className="text-ink-muted">Give the Group a name, then add people by the exact email address they signed up with.</p>
         <form ref={formElement} onSubmit={submitHandler(form)} noValidate className="mt-6 flex flex-col gap-5">
-          <form.Field
-            name="name"
-            validators={{ onDynamic: ({ value }) => { const checked = checkGroupName(value); return checked.ok ? undefined : checked.message; } }}
-          >
+          <form.Field name="name" validators={{ onDynamic: groupNameSchema }}>
             {(field) => (
               <Field
                 label="Group name"
@@ -122,35 +119,17 @@ export function CreateGroupForm() {
           </form.Field>
 
           <div className="flex flex-col gap-3">
-            <div className="flex items-end gap-3">
-              <div className="min-w-0 flex-1">
-                <Field
-                  ref={addressInput}
-                  label="Add a person by email"
-                  type="email"
-                  autoComplete="off"
-                  value={address}
-                  onChange={(event) => {
-                    setAddress(event.target.value);
-                    setAddressError(undefined);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault(); // Enter adds the person; it must not create the Group
-                      addAddress();
-                    }
-                  }}
-                  error={addressError ?? peopleError}
-                />
-              </div>
-              <Button type="button" variant="quiet" busy={lookup.isPending} onClick={addAddress} className="mb-2.5">
-                {lookup.isPending ? "Adding…" : "Add"}
-              </Button>
-            </div>
+            <AddAddressField
+              inputRef={addressInput}
+              pending={lookup.isPending}
+              error={addressError ?? peopleError}
+              onEdit={() => setAddressError(undefined)}
+              onAdd={addAddress}
+            />
 
-            {people.length > 0 && (
+            {shown.length > 0 && (
               <ul aria-label="People in this Group" className="flex flex-wrap gap-2">
-                {people.map((person) => (
+                {shown.map((person) => (
                   <li key={person.id} className="flex items-center gap-2 rounded-sm border border-rule bg-surface px-2.5 py-1 text-sm">
                     <span>
                       <span className="font-serif font-semibold">{person.displayName}</span>{" "}
@@ -160,7 +139,10 @@ export function CreateGroupForm() {
                       type="button"
                       aria-label={`Remove ${person.displayName}`}
                       className="text-ink-muted hover:text-ink"
-                      onClick={() => setPeople((current) => current.filter((candidate) => candidate.id !== person.id))}
+                      onClick={() => {
+                        setPeople(people.current.filter((candidate) => candidate.id !== person.id));
+                        addressInput.current?.focus(); // the button that was pressed is gone: keep the keyboard somewhere useful
+                      }}
                     >
                       <span aria-hidden>×</span>
                     </button>

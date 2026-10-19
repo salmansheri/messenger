@@ -73,6 +73,7 @@ test.describe("creating a Group", () => {
 
     await page.getByRole("button", { name: "Remove Ada Lovelace" }).click();
     await expect(chips).toHaveCount(0);
+    await expect(address, "focus moves to the address box, not to nowhere").toBeFocused();
     await address.fill(ada.email);
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(chips).toHaveCount(1);
@@ -89,6 +90,43 @@ test.describe("creating a Group", () => {
 
     // The people in it see it appear in their list, with no reload.
     await expect(index(adas).getByRole("link", { name: /Analytical Engine/ })).toBeVisible();
+  });
+});
+
+test.describe("adding people while a lookup is slow", () => {
+  test("never wipes the next address being typed, and never adds twice", async ({ page }) => {
+    const [me, ada, linus] = await Promise.all([
+      createVerifiedAccount("Me Myself"),
+      createVerifiedAccount("Ada Lovelace"),
+      createVerifiedAccount("Linus Torvalds"),
+    ]);
+    await signInThroughTheForm(page, me);
+    await page.goto("/app/new/group");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let lookups = 0;
+    await page.route("**/users/lookup", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      lookups++;
+      if (lookups === 1) await gate; // the first lookup is slow
+      await route.continue();
+    });
+
+    const address = page.getByLabel("Add a person by email");
+    await address.fill(ada.email);
+    await address.press("Enter");
+    await address.press("Enter"); // pressed again while it is under way: nothing more is sent
+    await address.fill(linus.email); // and the next address is typed meanwhile
+    release();
+
+    const chips = page.getByRole("list", { name: "People in this Group" }).getByRole("listitem");
+    await expect(chips).toHaveCount(1);
+    await expect(chips.first()).toContainText("Ada Lovelace");
+    await expect(address, "what was typed meanwhile is still there").toHaveValue(linus.email);
+    expect(lookups).toBe(1);
+
+    await address.press("Enter");
+    await expect(chips).toHaveCount(2);
   });
 });
 
@@ -152,11 +190,11 @@ test.describe("managing a Group", () => {
     await expect(page.getByText("That person is already in this Group.")).toBeVisible();
 
     // Promote a member: they gain the controls, live.
-    await page.getByRole("button", { name: "Promote Grace Hopper" }).click();
+    await page.getByRole("button", { name: "Make Admin (Grace Hopper)" }).click();
     await expect(participants(page).filter({ hasText: "Grace Hopper" })).toContainText("Admin");
     await expect(graces.getByLabel("Group name")).toBeVisible();
     await expect(graces.getByLabel("Add a person by email")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Promote Grace Hopper" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Make Admin (Grace Hopper)" })).toHaveCount(0);
 
     // Remove a member: the list shrinks for the others, and for them the Conversation leaves their list.
     await page.getByRole("button", { name: "Remove Linus Torvalds" }).click();

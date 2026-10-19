@@ -1,8 +1,11 @@
 /** Someone found by their exact email address, shown as a chip until the Group is created. */
 export type Person = { id: string; displayName: string; email: string };
 
-/** A Group has at most 256 Participants; the person creating it is one. */
-export const MAX_OTHERS = 255;
+/** The most Participants a Group can have. */
+export const MAX_PARTICIPANTS = 256;
+
+/** The most people to add to a new Group: the person creating it is one of the Participants. */
+export const MAX_OTHERS = MAX_PARTICIPANTS - 1;
 
 /** The list with one more person, or why they cannot be added. The old list is not changed. */
 export function addPerson(
@@ -15,7 +18,7 @@ export function addPerson(
     return { ok: false, message: `${person.displayName} is already in the list.` };
   }
   if (people.length >= MAX_OTHERS) {
-    return { ok: false, message: "A Group can have at most 256 Participants, you included." };
+    return { ok: false, message: `A Group can have at most ${MAX_PARTICIPANTS} Participants, you included.` };
   }
   return { ok: true, people: [...people, person] };
 }

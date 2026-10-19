@@ -35,8 +35,16 @@ describe("groupFailure", () => {
     expect(groupFailure(problem(404, "No such participant."), "promote").message).toBe("That person is no longer in this Group.");
   });
 
-  it("says the Conversation is gone when it cannot be found any more", () => {
+  it("says the Group is gone when it cannot be found any more", () => {
     expect(groupFailure(problem(404, "Conversation not found."), "rename").message).toBe("This Group was not found.");
+    expect(groupFailure(problem(404), "leave").message).toBe("This Group was not found.");
+  });
+
+  it("does not depend on the backend's wording for a 404: what was asked decides what is missing", () => {
+    const odd = "Something else entirely.";
+    expect(groupFailure(problem(404, odd), "add").about).toBe("address");
+    expect(groupFailure(problem(404, odd), "remove").message).toBe("That person is no longer in this Group.");
+    expect(groupFailure(problem(404, odd), "rename").message).toBe("This Group was not found.");
   });
 
   it("uses the general wording for being throttled, a busy server and no connection", () => {
