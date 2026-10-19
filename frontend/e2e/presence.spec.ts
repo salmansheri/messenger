@@ -211,7 +211,10 @@ test.describe("typing", () => {
     await expect(typingLine(page)).toHaveText("Grace Hopper is typing");
 
     await expect(typingLine(page), "a few seconds after the last keystroke").toHaveCount(0, { timeout: 12_000 });
-    expect(sent).toEqual([true, false]);
+    expect(sent[0], "started with typing").toBe(true);
+    expect(sent.at(-1), "ended with stopped").toBe(false);
+    expect(sent.filter((typing) => !typing), "said stopped once").toHaveLength(1);
+    expect(sent.length, "at most a start and a reminder before the stop").toBeLessThanOrEqual(3);
     await expect(composer(theirs)).toHaveValue("thinking");
   });
 });

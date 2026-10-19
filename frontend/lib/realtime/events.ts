@@ -1,8 +1,8 @@
 import type { MessageResponse } from "@/lib/api";
 
 /**
- * What the app acts on. `ignored` is any other well-formed event (kinds that do not exist
- * yet): those are known to be events, but nothing here uses them.
+ * What the app acts on. `ignored` is any other well-formed event (a kind that does not exist yet): it is known to be
+ * an event, but nothing here uses it.
  */
 export type RealtimeEvent =
   | { type: "message.created"; conversationId: string; message: MessageResponse }

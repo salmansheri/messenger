@@ -33,11 +33,25 @@ describe("the typing sender", () => {
     const { sender, sent } = setup();
     sender.keystroke();
     vi.advanceTimersByTime(3_900);
-    expect(sent).toEqual([true]);
+    expect(sent, "reminded at 3s, so the others do not give up on a pause").toEqual([true, true]);
     vi.advanceTimersByTime(200);
-    expect(sent).toEqual([true, false]);
+    expect(sent).toEqual([true, true, false]);
     vi.advanceTimersByTime(60_000);
-    expect(sent, "nothing more once stopped").toEqual([true, false]);
+    expect(sent, "nothing more once stopped").toEqual([true, true, false]);
+  });
+
+  it("never leaves the others waiting longer than the reminder, even when typing comes in bursts with pauses", () => {
+    const times: number[] = [];
+    const start = Date.now();
+    const sender = createTypingSender({ publish: (typing) => typing && times.push(Date.now() - start) });
+    sender.keystroke(); // 0s
+    vi.advanceTimersByTime(2_990);
+    sender.keystroke(); // 2.99s
+    vi.advanceTimersByTime(3_990);
+    sender.keystroke(); // 6.98s: after a pause of nearly four seconds
+    vi.advanceTimersByTime(3_000);
+    const gaps = times.slice(1).map((time, index) => time - times[index]);
+    expect(Math.max(...gaps), "the others forget after six seconds, so no gap may come near it").toBeLessThanOrEqual(3_000);
   });
 
   it("says stopped at once when told to (sent, or the box emptied), but only if it had said typing", () => {

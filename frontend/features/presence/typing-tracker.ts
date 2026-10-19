@@ -3,7 +3,8 @@ type Options = {
   ttlMs?: number;
 };
 
-const NOBODY: readonly string[] = [];
+/** The list for a Conversation where nobody is typing (always the same one, so readers see no change). */
+export const NOBODY: readonly string[] = [];
 
 /**
  * Who is typing where, as other people's "typing" and "stopped" notices say. Notices can be lost (the typist's

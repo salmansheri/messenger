@@ -1,6 +1,7 @@
 "use client";
 
 import type { ConversationResponse } from "@/lib/api";
+import { OnlineDot } from "./online-dot";
 import { presenceText } from "./text";
 import { usePresence } from "./use-presence";
 
@@ -27,7 +28,7 @@ export function ParticipantList({ conversation, myId }: { conversation: Conversa
               {participant.role === "ADMIN" && <span className="font-mono text-xs text-ink-muted uppercase">Admin</span>}
               {!mine && (
                 <span className="flex items-center gap-1.5 text-ink-muted">
-                  {view?.online && <span aria-hidden className="size-2 rounded-full bg-accent" />}
+                  {view?.online && <OnlineDot />}
                   {presenceText(view, now)}
                 </span>
               )}

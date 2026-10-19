@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useSyncExterna
 import { API_URL } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { createConnection, type Connection, type ConnectionStatus } from "@/lib/realtime/connection";
-import { createTypingTracker, type TypingTracker } from "@/features/presence/typing-tracker";
+import { createTypingTracker, NOBODY, type TypingTracker } from "@/features/presence/typing-tracker";
 import { catchUp, handleEvent } from "./sync";
 
 const socketUrl = `${API_URL.replace(/^http/, "ws")}/ws`;
@@ -60,8 +60,6 @@ export function useConnectionStatus(): ConnectionStatus {
     () => "connected",
   );
 }
-
-const NOBODY: readonly string[] = [];
 
 /** The ids of the people typing in a Conversation right now. */
 export function useTypingUsers(conversationId: string): readonly string[] {

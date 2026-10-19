@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse } from "@/lib/api";
-import { conversationTitle, formatClock, formatDay, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
+import {
+  conversationTitle,
+  formatClock,
+  formatDay,
+  formatWhen,
+  lastLine,
+  otherParticipantId,
+  unreadLabel,
+  unreadSpeech,
+} from "./present";
 
 const ME = "me-id";
 
@@ -118,6 +127,17 @@ describe("unreadSpeech", () => {
     expect(unreadSpeech(2)).toBe("2 unread Messages");
     expect(unreadSpeech(99)).toBe("99 unread Messages");
     expect(unreadSpeech(100)).toBe("More than 99 unread Messages");
+  });
+});
+
+describe("otherParticipantId", () => {
+  it("is the Participant who is not you", () => {
+    expect(otherParticipantId(direct(), ME)).toBe("grace-id");
+    expect(otherParticipantId(direct(), "grace-id")).toBe(ME);
+  });
+  it("is nothing when there is nobody else", () => {
+    expect(otherParticipantId(direct({ participants: [] }), ME)).toBeUndefined();
+    expect(otherParticipantId(direct({ participants: undefined }), ME)).toBeUndefined();
   });
 });
 

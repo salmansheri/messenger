@@ -10,7 +10,7 @@ import { MessageView } from "@/features/messages/message-view";
 import { ParticipantList } from "@/features/presence/participant-list";
 import { PresenceLine } from "@/features/presence/presence-line";
 import { PaneHeader } from "./pane-header";
-import { conversationTitle } from "./present";
+import { conversationTitle, otherParticipantId } from "./present";
 import { useConversationList } from "./queries";
 
 /**
@@ -75,10 +75,7 @@ export function ConversationPane() {
           conversation.type === "GROUP" ? (
             <ParticipantList conversation={conversation} myId={list.myId} />
           ) : (
-            <PresenceLine
-              conversationId={conversation.id ?? ""}
-              userId={conversation.participants?.find((participant) => participant.userId !== list.myId)?.userId}
-            />
+            <PresenceLine conversationId={conversation.id ?? ""} userId={otherParticipantId(conversation, list.myId)} />
           )
         }
       >

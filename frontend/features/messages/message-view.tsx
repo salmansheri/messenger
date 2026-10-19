@@ -51,7 +51,6 @@ export function MessageView({ conversation, myId }: Props) {
   const typingSender = useMemo(() => createTypingSender({ publish: publishTyping }), [publishTyping]);
   useEffect(() => () => typingSender.stop(), [typingSender]);
 
-
   const [outbox] = useState(() =>
     createOutbox({
       send: async (clientMessageId, body) => (await sdk.send({ path: { conversationId }, body: { clientMessageId, body } })).data,

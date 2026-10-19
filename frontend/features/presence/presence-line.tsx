@@ -1,5 +1,6 @@
 "use client";
 
+import { OnlineDot } from "./online-dot";
 import { presenceText } from "./text";
 import { usePresence } from "./use-presence";
 
@@ -9,7 +10,7 @@ export function PresenceLine({ conversationId, userId }: { conversationId: strin
   const view = presence.data?.find((candidate) => candidate.userId === userId);
   return (
     <p className="flex min-h-5 items-center gap-2 text-sm text-ink-muted" data-presence={view ? (view.online ? "online" : "offline") : undefined}>
-      {view?.online && <span aria-hidden className="size-2 rounded-full bg-accent" />}
+      {view?.online && <OnlineDot />}
       {presenceText(view, new Date())}
     </p>
   );

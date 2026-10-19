@@ -7,6 +7,11 @@ export function conversationTitle(conversation: ConversationResponse, myId: stri
   return other?.displayName || "Conversation";
 }
 
+/** The other person in a Direct conversation (the first Participant who is not the viewer). */
+export function otherParticipantId(conversation: ConversationResponse, myId: string | undefined): string | undefined {
+  return conversation.participants?.find((participant) => participant.userId !== myId)?.userId;
+}
+
 /** The latest Message as one short line: who said it where that matters, and nothing if none was sent yet. */
 export function lastLine(conversation: ConversationResponse, myId: string | undefined): string {
   const message = conversation.lastMessage;

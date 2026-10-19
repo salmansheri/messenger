@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { listQueryKey, meQueryKey, type ConversationResponse, type PresenceView, type UserProfile } from "@/lib/api";
+import { listQueryKey, meQueryKey, presenceQueryKey, type ConversationResponse, type PresenceView, type UserProfile } from "@/lib/api";
 import { parseEvent } from "@/lib/realtime/events";
 import { catchUpHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
@@ -50,7 +50,11 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     }
     return;
   }
-  if (event.type === "message.created") typing.stopped(event.conversationId, event.message.senderId ?? ""); // sending ends typing
+  if (event.type === "message.created" && event.message.senderId) typing.stopped(event.conversationId, event.message.senderId); // sending ends typing
+  // Someone may have joined or left, and the new Participant's presence is not in what is loaded.
+  if (event.type === "conversation.changed") {
+    void queryClient.invalidateQueries({ queryKey: presenceQueryKey({ path: { conversationId: event.conversationId } }) });
+  }
 
   if (event.type === "unread.updated") {
     recordUnread(queryClient, event);

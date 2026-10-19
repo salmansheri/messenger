@@ -1,6 +1,14 @@
-import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import { QueryClient, QueryObserver, partialMatchKey } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
-import { listQueryKey, meQueryKey, presenceQueryKey, type ConversationResponse, type PresenceView } from "@/lib/api";
+import {
+  historyInfiniteQueryKey,
+  listQueryKey,
+  meQueryKey,
+  presenceQueryKey,
+  type ConversationResponse,
+  type PresenceView,
+} from "@/lib/api";
+import { allMessagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
 import { catchUp, handleEvent } from "./sync";
@@ -123,7 +131,31 @@ describe("typing and presence events", () => {
     handleEvent(client, JSON.stringify({ type: "presence.changed", userId: "grace", online: true }), createTypingTracker());
 
     expect(client.getQueryData<PresenceView[]>(key)).toEqual([{ userId: "grace", online: true, lastSeenAt: undefined }]);
-    expect(allPresenceKey).toEqual([{ _id: "presence" }]);
+  });
+
+  it("asks for a Conversation's presence again when the Conversation changed (someone new may have joined)", async () => {
+    const { client } = withList([conversation(2, 0)]);
+    const key = presenceQueryKey({ path: { conversationId: "c1" } });
+    const other = presenceQueryKey({ path: { conversationId: "c2" } });
+    let asked = 0;
+    const observe = (queryKey: typeof key) =>
+      new QueryObserver(client, { queryKey, staleTime: Infinity, queryFn: async () => (asked++, [] as PresenceView[]) }).subscribe(() => {});
+    stops.push(observe(key), observe(other));
+    await client.getQueryCache().find({ queryKey: key })?.promise;
+    await client.getQueryCache().find({ queryKey: other })?.promise;
+    asked = 0;
+
+    handleEvent(client, JSON.stringify({ type: "conversation.changed", conversationId: "c1" }), createTypingTracker());
+    await Promise.resolve();
+    await client.getQueryCache().find({ queryKey: key })?.promise;
+
+    expect(asked, "only that Conversation's presence").toBe(1);
+  });
+
+  it("finds every key the generated helpers make, so none is missed when the generator changes", () => {
+    expect(partialMatchKey(presenceQueryKey({ path: { conversationId: "c1" } }), allPresenceKey)).toBe(true);
+    expect(partialMatchKey(historyInfiniteQueryKey({ path: { conversationId: "c1" } }), allMessagesKey)).toBe(true);
+    expect(partialMatchKey(listQueryKey(), allPresenceKey)).toBe(false);
   });
 });
 
