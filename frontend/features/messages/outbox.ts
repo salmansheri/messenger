@@ -47,13 +47,16 @@ export function createOutbox({
   async function run(clientMessageId: string) {
     const entry = entries.find((candidate) => candidate.clientMessageId === clientMessageId);
     if (!entry) return;
+    let message: MessageResponse;
     try {
-      const message = await send(clientMessageId, entry.body);
-      update(clientMessageId, () => undefined);
-      onSent(message);
+      message = await send(clientMessageId, entry.body);
     } catch (error) {
       update(clientMessageId, (current) => ({ ...current, status: "failed", error }));
+      return;
     }
+    // The stored Message is handed on before the pending one goes, so there is never a moment with neither on screen.
+    onSent(message);
+    update(clientMessageId, () => undefined);
   }
 
   function enqueue(clientMessageId: string) {

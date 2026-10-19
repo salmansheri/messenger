@@ -12,8 +12,9 @@ import { useConversationList } from "./queries";
 
 /**
  * One Conversation, found in the list that is already loaded (so opening it asks the server for nothing more). Its
- * Messages come from the server one page at a time (`MessageView`). A Conversation that is not in the list is, as far as the server is concerned,
- * not the person's to see, and gets the same plain answer whether it never existed or is someone else's.
+ * Messages come from the server one page at a time (`MessageView`). A Conversation that is not in the list is, as far
+ * as the server is concerned, not the person's to see, and gets the same plain answer whether it never existed or is
+ * someone else's.
  */
 export function ConversationPane() {
   const { id } = useParams<{ id: string }>();

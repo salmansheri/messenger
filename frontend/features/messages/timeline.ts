@@ -28,6 +28,8 @@ export type TimelineItem =
       createdAt: string | undefined;
       /** Set while the Message is not confirmed yet. */
       pending?: Pending;
+      /** Written by the person looking at the view. */
+      mine: boolean;
       /** The first of a run from the same sender: the one that carries the name. */
       startsRun: boolean;
       seq?: number;
@@ -73,7 +75,6 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
   const items: TimelineItem[] = [];
   let day: string | undefined;
   let previousSender: string | undefined;
-  let lastWasMessage = false;
   for (const row of rows) {
     const label = formatDay(row.createdAt, now, timeZone);
     let breaks = false;
@@ -94,10 +95,10 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       body: row.body,
       createdAt: row.createdAt,
       pending: row.pending,
-      startsRun: breaks || !lastWasMessage || row.senderId !== previousSender,
+      mine: row.senderId === myId,
+      startsRun: breaks || row.senderId !== previousSender,
     });
     previousSender = row.senderId;
-    lastWasMessage = true;
   }
   return items;
 }

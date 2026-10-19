@@ -151,6 +151,34 @@ test.describe("reading Messages", () => {
     await expect.poll(async () => Math.abs((await anchorMessage.boundingBox())!.y - (await scroller.boundingBox())!.y - before)).toBeLessThan(4);
   });
 
+  test("if older Messages cannot be loaded, what is on screen stays, with a message, and the next try works", async ({
+    page,
+  }) => {
+    const { graceToken, myToken, id } = await aConversation(page);
+    for (let n = 1; n <= 70; n++) await sendMessageVia(graceToken, id, `Line ${n}`);
+    await readUpToVia(myToken, id, 70);
+    await page.reload();
+    await openConversation(page, id);
+    let failing = true;
+    await page.route(`**/conversations/${id}/messages?*beforeSeq=*`, (route) =>
+      failing ? route.abort("connectionreset") : route.fallback(),
+    );
+
+    const list = messages(page);
+    await expect(list.getByText("Line 70", { exact: true })).toBeInViewport();
+    await expect(page.getByText("Start of this Conversation")).toHaveCount(0);
+    await list.locator("xpath=..").evaluate((element) => (element.scrollTop = 0));
+
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("Could not reach the server");
+    await expect(list.getByText("Line 21", { exact: true }), "what was loaded is still there").toHaveCount(1);
+    await expect(composer(page)).toBeVisible();
+
+    failing = false;
+    await page.getByRole("button", { name: "Earlier Messages" }).click();
+    await expect(list.getByText("Line 1", { exact: true })).toHaveCount(1);
+    await expect(page.getByText("Start of this Conversation")).toBeVisible();
+  });
+
   test("opens at the first unread Message, marked, when there are unread Messages", async ({ page }) => {
     const { graceToken, myToken, id } = await aConversation(page);
     for (let n = 1; n <= 3; n++) await sendMessageVia(graceToken, id, `Read already ${n}`);

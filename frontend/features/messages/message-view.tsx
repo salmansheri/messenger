@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { call, sdk, toProblem, type ConversationResponse } from "@/lib/api";
@@ -13,9 +13,14 @@ import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
-const NEAR_BOTTOM = 80;
-const AWAY_FROM_BOTTOM = 240;
-const NEAR_TOP = 120;
+/** Within this many pixels of the bottom, the view follows new Messages. */
+const NEAR_BOTTOM_PX = 80;
+/** Further than this from the bottom, "Jump to latest" shows. */
+const AWAY_FROM_BOTTOM_PX = 240;
+/** Closer than this to the top, older Messages are asked for. */
+const NEAR_TOP_PX = 120;
+
+const distanceFromBottom = (element: HTMLElement) => element.scrollHeight - element.scrollTop - element.clientHeight;
 
 /** How many of the newest Messages to ask for first: the usual page, or enough to reach the first unread one. */
 const firstPageFor = (unread: number) => Math.min(100, Math.max(50, unread + 10));
@@ -79,8 +84,8 @@ export function MessageView({ conversation, myId }: Props) {
       if (unread) unread.scrollIntoView({ block: "start" });
       else if (openedAt.firstUnread !== undefined) element.scrollTop = 0; // the first unread is older than what was loaded
       else element.scrollTop = element.scrollHeight;
-      keepAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < NEAR_BOTTOM;
-      setAway(!keepAtBottom.current && element.scrollHeight - element.scrollTop - element.clientHeight > AWAY_FROM_BOTTOM);
+      keepAtBottom.current = distanceFromBottom(element) < NEAR_BOTTOM_PX;
+      setAway(distanceFromBottom(element) > AWAY_FROM_BOTTOM_PX);
     } else if (anchor.current && anchor.current.firstKey !== firstKey) {
       // Older Messages were added above: move down by what was added, so the Message being read stays where it was.
       element.scrollTop += element.scrollHeight - anchor.current.height;
@@ -90,20 +95,25 @@ export function MessageView({ conversation, myId }: Props) {
     }
   }, [items, firstKey, openedAt.firstUnread]);
 
-  function loadOlder() {
+  const { fetchNextPage } = history;
+  const olderAvailable = history.hasNextPage && !history.isFetchingNextPage;
+
+  /** Asks for the next page of older Messages, remembering the height so the reading position can be kept. */
+  const loadOlder = useCallback(() => {
     const element = scroller.current;
-    if (!element || !history.hasNextPage || history.isFetchingNextPage) return;
+    if (!element) return;
     anchor.current = { height: element.scrollHeight, firstKey };
-    void history.fetchNextPage();
-  }
+    void fetchNextPage().then((result) => {
+      if (result.isError) anchor.current = null; // nothing was added, so there is nothing to compensate for
+    });
+  }, [fetchNextPage, firstKey]);
 
   function scrolled() {
     const element = scroller.current;
     if (!element) return;
-    const fromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    keepAtBottom.current = fromBottom < NEAR_BOTTOM;
-    setAway(fromBottom > AWAY_FROM_BOTTOM);
-    if (element.scrollTop < NEAR_TOP) loadOlder();
+    keepAtBottom.current = distanceFromBottom(element) < NEAR_BOTTOM_PX;
+    setAway(distanceFromBottom(element) > AWAY_FROM_BOTTOM_PX);
+    if (element.scrollTop < NEAR_TOP_PX && olderAvailable) loadOlder();
   }
 
   function jumpToLatest() {
@@ -113,17 +123,13 @@ export function MessageView({ conversation, myId }: Props) {
   }
 
   // If the pointer was at the top when the first page arrived there may be nothing to scroll, so nothing would ever ask.
-  const { fetchNextPage } = history;
-  const fetchOlderIfNothingToScroll = history.hasNextPage && !history.isFetchingNextPage;
   useEffect(() => {
     const element = scroller.current;
-    if (element && fetchOlderIfNothingToScroll && element.scrollHeight <= element.clientHeight) {
-      anchor.current = { height: element.scrollHeight, firstKey };
-      void fetchNextPage();
-    }
-  }, [fetchOlderIfNothingToScroll, firstKey, fetchNextPage, items]);
+    if (element && olderAvailable && element.scrollHeight <= element.clientHeight) loadOlder();
+  }, [olderAvailable, loadOlder, items]);
 
-  if (history.isError) {
+  // Only a failed first load replaces the view; a failed later page leaves what is on screen (and what is unsent) alone.
+  if (history.isError && !history.data) {
     return (
       <div className="px-4 py-6 sm:px-8">
         <Notice tone="problem">{messageFor(toProblem(history.error))}</Notice>
@@ -148,19 +154,27 @@ export function MessageView({ conversation, myId }: Props) {
     <>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div ref={scroller} onScroll={scrolled} className="min-h-0 flex-1 overflow-y-auto py-4">
-          {history.hasNextPage && (
-            <p className="px-4 pb-4 text-center sm:px-8">
-              <Button variant="quiet" busy={history.isFetchingNextPage} onClick={loadOlder}>
+          {/* The same height whether or not there is more, so reaching the oldest Message does not move the page. */}
+          <div className="flex h-12 items-center justify-center px-4 text-sm sm:px-8">
+            {history.hasNextPage ? (
+              <Button variant="quiet" busy={history.isFetchingNextPage} onClick={() => olderAvailable && loadOlder()}>
                 {history.isFetchingNextPage ? "Loading earlier Messages…" : "Earlier Messages"}
               </Button>
-            </p>
+            ) : (
+              <span className="text-ink-muted">Start of this Conversation</span>
+            )}
+          </div>
+          {history.isError && (
+            <div className="px-4 pb-2 sm:px-8">
+              <Notice tone="problem">{messageFor(toProblem(history.error))}</Notice>
+            </div>
           )}
           {items.length === 0 ? (
             <p className="px-4 text-ink-muted sm:px-8">No Messages yet. Write the first one below.</p>
           ) : (
             <ol aria-label="Messages">
               {items.map((item) => (
-                <Row key={item.key} item={item} myId={myId} names={names} onRetry={outbox.retry} />
+                <Row key={item.key} item={item} names={names} onRetry={outbox.retry} />
               ))}
             </ol>
           )}
@@ -183,12 +197,10 @@ export function MessageView({ conversation, myId }: Props) {
 
 function Row({
   item,
-  myId,
   names,
   onRetry,
 }: {
   item: TimelineItem;
-  myId: string | undefined;
   names: Map<string | undefined, string | undefined>;
   onRetry: (clientMessageId: string) => void;
 }) {
@@ -206,7 +218,7 @@ function Row({
       </li>
     );
   }
-  const mine = item.senderId === myId;
+  const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   return (
     <li className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}>
@@ -216,13 +228,13 @@ function Row({
       <div className={`min-w-0 border-l-2 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
         {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
         <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
-        {item.pending?.status === "sending" && <p className="text-xs text-ink-muted">Sending…</p>}
-        {item.pending?.status === "failed" && (
+        {pending?.status === "sending" && <p className="text-xs text-ink-muted">Sending…</p>}
+        {pending?.status === "failed" && (
           <p className="flex flex-wrap items-center gap-x-3 text-sm">
             <span className="text-accent">
-              Not sent. {item.pending.error ? messageFor(toProblem(item.pending.error)) : ""}
+              Not sent. {pending.error ? messageFor(toProblem(pending.error)) : ""}
             </span>
-            <Button variant="quiet" onClick={() => onRetry(item.pending!.clientMessageId)}>
+            <Button variant="quiet" onClick={() => onRetry(pending.clientMessageId)}>
               Retry
             </Button>
           </p>

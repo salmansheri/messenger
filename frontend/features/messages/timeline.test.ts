@@ -94,6 +94,7 @@ describe("buildTimeline", () => {
 
   it("puts Messages being sent last, as the sender's own, and hides one the server already confirmed", () => {
     const items = build({
+      myId: "me",
       confirmed: [msg(1, "a", "2026-03-10T10:00:00Z"), { ...msg(2, "me", "2026-03-10T11:00:00Z"), clientMessageId: "done" }],
       pending: [pending("done", "already stored"), pending("new", "on its way"), pending("bad", "oops", "failed")],
     });
@@ -101,5 +102,6 @@ describe("buildTimeline", () => {
     expect(messages.map((i) => i.body)).toEqual(["m1", "m2", "on its way", "oops"]);
     expect(messages.map((i) => i.pending?.status)).toEqual([undefined, undefined, "sending", "failed"]);
     expect(messages.at(-1)?.key).toBe("pending-bad");
+    expect(messages.map((i) => i.mine)).toEqual([false, true, true, true]);
   });
 });

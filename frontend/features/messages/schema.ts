@@ -13,11 +13,14 @@ const bodySchema = z.string().superRefine((text, ctx) => {
       code: "custom",
       message: "This Message contains a character that cannot be sent. Remove it and try again.",
     });
-  } else if (characters(text.trim()) > LIMIT) {
-    ctx.addIssue({
-      code: "custom",
-      message: `This Message has ${characters(text.trim()).toLocaleString("en-US")} characters; the limit is ${LIMIT.toLocaleString("en-US")}.`,
-    });
+  } else {
+    const length = characters(text.trim());
+    if (length > LIMIT) {
+      ctx.addIssue({
+        code: "custom",
+        message: `This Message has ${length.toLocaleString("en-US")} characters; the limit is ${LIMIT.toLocaleString("en-US")}.`,
+      });
+    }
   }
 });
 

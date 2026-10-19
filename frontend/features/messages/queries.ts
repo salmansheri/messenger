@@ -23,6 +23,9 @@ export function useMessageHistory(conversationId: string, firstPage: number) {
         }),
       ),
     getNextPageParam: (page: MessagePage) => (page.hasMore ? page.messages?.[0]?.seq : undefined),
+    // Leaving a Conversation drops its history, so opening it again always starts from what the server has now
+    // (positioning on stale pages would leave the view at an old bottom with the new Messages below it).
+    gcTime: 0,
   });
 }
 
