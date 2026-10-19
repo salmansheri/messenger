@@ -272,6 +272,8 @@ test.describe("sending Messages", () => {
   test("when the connection fails the Message says not sent, and Retry delivers exactly one copy even if the first try had reached the server", async ({
     page,
   }) => {
+    // No live connection, so the stored Message cannot reach this page any other way than the retry's answer.
+    await page.routeWebSocket(/\/ws$/, (ws) => void ws.close());
     const { myToken, id } = await aConversation(page);
     await openConversation(page, id);
     let attempts = 0;

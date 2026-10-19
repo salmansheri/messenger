@@ -89,3 +89,23 @@ export async function readUpToVia(token: string, conversationId: string, readSeq
   const response = await post(`/api/v1/conversations/${conversationId}/receipts`, { readSeq }, token);
   if (response.status !== 200) throw new Error(`Receipt failed: ${response.status}`);
 }
+
+async function send(method: "PATCH" | "DELETE", path: string, token: string, body?: unknown) {
+  return fetch(`${BACKEND_URL}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/** Renames a Group through the backend. */
+export async function renameGroupVia(token: string, conversationId: string, name: string) {
+  const response = await send("PATCH", `/api/v1/conversations/${conversationId}`, token, { name });
+  if (response.status !== 200) throw new Error(`Rename failed: ${response.status}`);
+}
+
+/** Removes a Participant from a Group through the backend (the caller must be an Admin). */
+export async function removeParticipantVia(token: string, conversationId: string, userId: string) {
+  const response = await send("DELETE", `/api/v1/conversations/${conversationId}/participants/${userId}`, token);
+  if (response.status !== 200 && response.status !== 204) throw new Error(`Remove failed: ${response.status}`);
+}

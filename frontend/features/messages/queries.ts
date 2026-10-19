@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, type QueryClient } from "@tanstack/react-query";
 import { call, sdk, type MessagePage, type MessageResponse } from "@/lib/api";
+import { withMessage, type History } from "./history";
 
 export const messagesKey = (conversationId: string) => ["messages", conversationId] as const;
 
@@ -32,10 +33,5 @@ export function useMessageHistory(conversationId: string, firstPage: number) {
 /** Adds a stored Message to the newest page of an already loaded history (a Message already there is replaced). */
 export function addMessageToHistory(queryClient: QueryClient, message: MessageResponse) {
   if (!message.conversationId) return;
-  queryClient.setQueryData<{ pages: MessagePage[]; pageParams: unknown[] }>(messagesKey(message.conversationId), (history) => {
-    if (!history || history.pages.length === 0) return history;
-    const [newest, ...older] = history.pages;
-    const messages = [...(newest.messages ?? []).filter((known) => known.seq !== message.seq), message];
-    return { ...history, pages: [{ ...newest, messages }, ...older] };
-  });
+  queryClient.setQueryData<History>(messagesKey(message.conversationId), (history) => history && withMessage(history, message));
 }

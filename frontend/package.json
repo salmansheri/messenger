@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.5.0",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.4",
     "motion": "^14.3.0",

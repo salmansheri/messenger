@@ -32,6 +32,7 @@ export function createSession(deps: { requestTokens: () => Promise<Tokens> }) {
   let expiresAt = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<() => void>();
+  const replacedListeners = new Set<() => void>();
 
   function publish(next: SessionSnapshot) {
     const same =
@@ -56,6 +57,7 @@ export function createSession(deps: { requestTokens: () => Promise<Tokens> }) {
     expiresAt = Date.now() + tokens.expiresInSeconds * 1000;
     timer = setTimeout(() => void refresh(), renewalDelayMs(tokens.expiresInSeconds));
     publish({ status: "signedIn" });
+    replacedListeners.forEach((listener) => listener());
   }
 
   const refresh = singleFlight(async () => {
@@ -75,6 +77,11 @@ export function createSession(deps: { requestTokens: () => Promise<Tokens> }) {
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
+    },
+    /** Called whenever a new access token has been put in place (a sign-in or a renewal). Returns how to stop listening. */
+    onTokenReplaced(listener: () => void) {
+      replacedListeners.add(listener);
+      return () => void replacedListeners.delete(listener);
     },
     /** The access token to send, or nothing if there is none or it has run out. */
     token: () => (accessToken && Date.now() < expiresAt ? accessToken : undefined),

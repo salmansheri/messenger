@@ -153,6 +153,20 @@ describe("a session", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it("tells listeners each time the token is replaced, so a connection can be reopened with the new one", async () => {
+    const requestTokens = vi.fn().mockResolvedValueOnce(tokens("one")).mockResolvedValueOnce(tokens("two"));
+    const session = createSession({ requestTokens });
+    const seen: (string | undefined)[] = [];
+    const stop = session.onTokenReplaced(() => seen.push(session.token()));
+
+    await session.start();
+    await vi.advanceTimersByTimeAsync(minutes(14));
+    stop();
+    session.signedIn(tokens("three"));
+
+    expect(seen, "the new token is already in place when listeners hear").toEqual(["one", "two"]);
+  });
+
   it("lets a failed refresh be tried again later", async () => {
     const requestTokens = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce(tokens("back"));
     const session = createSession({ requestTokens });

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
@@ -19,6 +20,9 @@ import { useConversationList } from "./queries";
 export function ConversationPane() {
   const { id } = useParams<{ id: string }>();
   const list = useConversationList();
+  // Which Conversation this screen has already shown, so one that then disappears from the list (the person was removed
+  // or left) can be told apart from an address that never was theirs.
+  const [shownId, setShownId] = useState<string>();
 
   if (list.status === "error") {
     return (
@@ -43,12 +47,15 @@ export function ConversationPane() {
   }
 
   const conversation = list.items.find((candidate) => candidate.id === id);
+  if (conversation && shownId !== id) setShownId(id);
   if (!conversation) {
     return (
       <>
         <PaneHeader>Conversation</PaneHeader>
         <div className="px-4 py-6 sm:px-8">
-          <Notice tone="problem">This Conversation was not found.</Notice>
+          <Notice tone="problem">
+            {shownId === id ? "You are no longer part of this Conversation." : "This Conversation was not found."}
+          </Notice>
           <p className="mt-4 text-sm">
             <Link href="/app" className="underline underline-offset-4">
               Back to your Conversations
