@@ -54,8 +54,8 @@ export function ProductShot() {
         {/* On a phone the whole window would be too small to read, so it is shown zoomed in on the Messages. */}
         <div className="overflow-hidden rounded-lg border border-rule max-sm:h-[19rem]">
           <Image
-            src="/landing/conversation-app.png"
-            alt="Messenger open on a Conversation: the list of Conversations on the left, and on the right a column of Messages with names on a rail and times in the margin."
+            src="/landing/conversation-rubric.png"
+            alt="Rubric open on a Conversation: the list of Conversations on the left, and on the right a column of Messages with names on a rail and times in the margin."
             width={1559}
             height={769}
             sizes="(min-width: 1152px) 1100px, 100vw"

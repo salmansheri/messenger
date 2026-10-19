@@ -17,7 +17,7 @@ public class OpenApiConfig {
 	@Bean
 	OpenAPI messengerOpenApi() {
 		return new OpenAPI()
-				.info(new Info().title("Messenger API").version("v1")
+				.info(new Info().title("Rubric API").version("v1")
 						.description("REST API for the messenger backend. Realtime events use STOMP over WebSocket."))
 				.components(new Components().addSecuritySchemes(BEARER,
 						new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))

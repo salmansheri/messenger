@@ -7,7 +7,7 @@ const headline = (page: Page) => page.getByRole("heading", { level: 1 });
 
 /** The 3D transform of the product window, or "none". */
 const tilt = (page: Page) =>
-  page.getByRole("img", { name: /Messenger open on a Conversation/ }).evaluate((image) => {
+  page.getByRole("img", { name: /Rubric open on a Conversation/ }).evaluate((image) => {
     // the window is the image's ancestor that has a transform applied
     for (let element: Element | null = image; element; element = element.parentElement) {
       const transform = getComputedStyle(element).transform;
@@ -43,14 +43,14 @@ test.describe("the landing page", () => {
 
     await signInThroughTheForm(page, await createVerifiedAccount());
     await page.goto("/");
-    await expect(page.getByRole("banner").getByRole("link", { name: "Open Messenger" })).toHaveAttribute("href", "/app");
+    await expect(page.getByRole("banner").getByRole("link", { name: "Open Rubric" })).toHaveAttribute("href", "/app");
     await expect(page.getByRole("main").getByRole("link", { name: "Create an account" }), "no more asking to sign up").toHaveCount(0);
-    await expect(page.getByRole("main").getByRole("link", { name: "Open Messenger" }).first()).toHaveAttribute("href", "/app");
+    await expect(page.getByRole("main").getByRole("link", { name: "Open Rubric" }).first()).toHaveAttribute("href", "/app");
   });
 
   test("shows the app itself, and each part of the page has its own heading and a way to reach it", async ({ page }) => {
     await page.goto("/");
-    const shot = page.getByRole("img", { name: /Messenger open on a Conversation/ });
+    const shot = page.getByRole("img", { name: /Rubric open on a Conversation/ });
     await expect(shot).toBeVisible();
     expect(await shot.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
 

@@ -1,4 +1,4 @@
-# Messenger
+# Rubric
 
 A WhatsApp-style messaging service where verified users exchange text messages in direct and group conversations.
 

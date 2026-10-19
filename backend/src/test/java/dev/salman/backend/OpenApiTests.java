@@ -19,7 +19,7 @@ class OpenApiTests extends IntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 				.andExpect(jsonPath("$.openapi").value(startsWith("3.")))
-				.andExpect(jsonPath("$.info.title").value("Messenger API"));
+				.andExpect(jsonPath("$.info.title").value("Rubric API"));
 	}
 
 }

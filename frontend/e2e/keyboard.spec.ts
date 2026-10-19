@@ -43,7 +43,7 @@ test.describe("keyboard", () => {
 
     // Every stop on the way through the list shows where focus is.
     const stops: { name: string; visible: boolean }[] = [];
-    await page.getByRole("link", { name: "Messenger" }).focus();
+    await page.getByRole("link", { name: "Rubric" }).focus();
     for (let step = 0; step < 6; step++) {
       await page.keyboard.press("Tab");
       stops.push(await focused(page));

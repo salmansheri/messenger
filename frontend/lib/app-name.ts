@@ -1,1 +1,1 @@
-export const APP_NAME = "Messenger";
+export const APP_NAME = "Rubric";

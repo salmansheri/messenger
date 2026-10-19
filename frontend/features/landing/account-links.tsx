@@ -14,7 +14,7 @@ export function AccountLinks({ size = "regular" }: { size?: "regular" | "large" 
   if (session.status === "signedIn") {
     return (
       <Link href="/app" className={`${buttonStyles("primary")} ${big}`}>
-        Open Messenger
+        Open Rubric
       </Link>
     );
   }
