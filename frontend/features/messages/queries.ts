@@ -4,7 +4,9 @@ import { useInfiniteQuery, type QueryClient } from "@tanstack/react-query";
 import { call, sdk, type MessagePage, type MessageResponse } from "@/lib/api";
 import { withMessage, type History } from "./history";
 
-export const messagesKey = (conversationId: string) => ["messages", conversationId] as const;
+/** The start of every Conversation's history key, for finding all loaded histories. */
+export const allMessagesKey = ["messages"] as const;
+export const messagesKey = (conversationId: string) => [...allMessagesKey, conversationId] as const;
 
 const OLDER_PAGE = 50;
 

@@ -1,6 +1,8 @@
-import type { ConversationResponse } from "@/lib/api";
+import type { ConversationResponse, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 import { latestSeq, withMessage, type History } from "@/features/messages/history";
+
+const seqOf = (message: MessageResponse) => message.seq ?? 0;
 
 /**
  * How an event changes the Conversation list, without touching the old one. Events are best effort: they can arrive
@@ -21,7 +23,7 @@ export function applyToList(
 
   const { message } = event;
   const shown = known.lastMessage?.seq;
-  if (shown !== undefined && (message.seq ?? 0) <= shown) return { list, refetch: false };
+  if (shown !== undefined && seqOf(message) <= shown) return { list, refetch: false };
 
   const mine = message.senderId === myId;
   const updated: ConversationResponse = {
@@ -31,7 +33,7 @@ export function applyToList(
     unreadCount: mine ? 0 : (known.unreadCount ?? 0) + 1,
     updatedAt: message.createdAt ?? known.updatedAt,
   };
-  const skippedAhead = shown !== undefined && (message.seq ?? 0) > shown + 1;
+  const skippedAhead = shown !== undefined && seqOf(message) > shown + 1;
   return { list: [updated, ...list.filter((conversation) => conversation !== known)], refetch: skippedAhead };
 }
 
@@ -45,7 +47,7 @@ export function applyToHistory(
 ): { history: History | undefined; catchUp: boolean } {
   if (!history || event.type !== "message.created") return { history, catchUp: false };
   const have = latestSeq(history);
-  const seq = event.message.seq ?? 0;
+  const seq = seqOf(event.message);
   if (history.pages.some((page) => page.messages?.some((known) => known.seq === seq))) return { history, catchUp: false };
   return { history: withMessage(history, event.message), catchUp: have > 0 && seq > have + 1 };
 }

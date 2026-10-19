@@ -87,7 +87,11 @@ test.describe("the Conversation index", () => {
     await signInThroughTheForm(page, me);
     await expect(index(page).getByRole("listitem")).toHaveCount(3);
 
-    expect(requests.filter((path) => path === "/api/v1/conversations")).toHaveLength(1);
+    // One request returns the whole list. The live connection asks once more when it comes up, in case anything
+    // happened between the first answer and the subscription.
+    const listRequests = requests.filter((path) => path === "/api/v1/conversations").length;
+    expect(listRequests).toBeGreaterThanOrEqual(1);
+    expect(listRequests).toBeLessThanOrEqual(2);
     expect(requests.filter((path) => /\/conversations\/[0-9a-f-]{36}/.test(path))).toEqual([]);
   });
 });

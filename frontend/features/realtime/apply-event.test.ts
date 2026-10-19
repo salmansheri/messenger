@@ -85,7 +85,7 @@ describe("applyToList", () => {
     expect(result.refetch).toBe(false);
   });
 
-  it("asks for the list again when a Conversation changed, and only changes nothing else", () => {
+  it("asks for the list again when a Conversation changed, and changes nothing else", () => {
     const result = applyToList(list, { type: "conversation.changed", conversationId: "c1" }, ME);
     expect(result.list).toBe(list);
     expect(result.refetch).toBe(true);

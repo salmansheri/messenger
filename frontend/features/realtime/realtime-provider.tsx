@@ -1,16 +1,11 @@
 "use client";
 
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { API_URL, type ConversationResponse, type UserProfile } from "@/lib/api";
+import { API_URL } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { createConnection, type Connection, type ConnectionStatus } from "@/lib/realtime/connection";
-import { parseEvent } from "@/lib/realtime/events";
-import { conversationsKey } from "@/features/conversations/queries";
-import { catchUpHistory } from "@/features/messages/catch-up";
-import type { History } from "@/features/messages/history";
-import { messagesKey } from "@/features/messages/queries";
-import { applyToHistory, applyToList } from "./apply-event";
+import { catchUp, handleEvent } from "./sync";
 
 const socketUrl = `${API_URL.replace(/^http/, "ws")}/ws`;
 
@@ -18,43 +13,6 @@ const socketUrl = `${API_URL.replace(/^http/, "ws")}/ws`;
 async function currentToken() {
   if (!session.token()) await session.refresh();
   return session.token();
-}
-
-/** Puts one event into what is already loaded; anything that cannot be worked out from it asks the server again. */
-function handleEvent(queryClient: QueryClient, body: string) {
-  const event = parseEvent(body);
-  if (!event) return;
-
-  const list = queryClient.getQueryData<ConversationResponse[]>(conversationsKey);
-  if (list) {
-    const myId = queryClient.getQueryData<UserProfile>(["me"])?.id;
-    const next = applyToList(list, event, myId);
-    if (next.list !== list) queryClient.setQueryData(conversationsKey, next.list);
-    if (next.refetch) void queryClient.invalidateQueries({ queryKey: conversationsKey });
-  }
-
-  if (event.type === "message.created") {
-    const key = messagesKey(event.conversationId);
-    const history = queryClient.getQueryData<History>(key);
-    const next = applyToHistory(history, event);
-    if (next.history !== history) queryClient.setQueryData(key, next.history);
-    if (next.catchUp) void catchUpHistory(queryClient, event.conversationId);
-  }
-}
-
-/** After a connection is (re)established: whatever was loaded before it may have missed events, so fetch what is missing. */
-function catchUp(queryClient: QueryClient, attemptStartedAt: number) {
-  void queryClient.invalidateQueries({
-    queryKey: conversationsKey,
-    predicate: (query) => query.state.dataUpdatedAt < attemptStartedAt,
-  });
-  queryClient
-    .getQueryCache()
-    .findAll({ queryKey: ["messages"] })
-    .forEach((query) => {
-      const conversationId = query.queryKey[1];
-      if (typeof conversationId === "string") void catchUpHistory(queryClient, conversationId);
-    });
 }
 
 const ConnectionContext = createContext<Connection | null>(null);
@@ -70,7 +28,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       url: socketUrl,
       getToken: currentToken,
       onEvent: (body) => handleEvent(queryClient, body),
-      onConnected: (startedAt) => catchUp(queryClient, startedAt),
+      onConnected: () => catchUp(queryClient),
     }),
   );
 

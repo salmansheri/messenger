@@ -10,8 +10,8 @@ type Options = {
   getToken: () => Promise<string | undefined>;
   /** The body of each event frame. */
   onEvent: (body: string) => void;
-  /** Called each time the connection is up and listening, with when that attempt began (what was loaded earlier may have missed events). */
-  onConnected: (attemptStartedAt: number) => void;
+  /** Called each time the connection is up and listening: what was loaded before may have missed events. */
+  onConnected: () => void;
 };
 
 /**
@@ -22,8 +22,13 @@ type Options = {
  */
 export function createConnection({ url, getToken, onEvent, onConnected }: Options) {
   let status: ConnectionStatus = "connecting";
-  let attemptStartedAt = 0;
   let stopped = true;
+  /** An attempt has read its token and has not connected (or failed) yet. */
+  let attemptInFlight = false;
+  /** The token was replaced while an attempt was in flight, so the connection it makes must be redone. */
+  let reopenWanted = false;
+  /** The current drop is on purpose (a new token), not a lost connection, so it is not announced. */
+  let deliberateDrop = false;
   const listeners = new Set<() => void>();
 
   function setStatus(next: ConnectionStatus) {
@@ -37,20 +42,30 @@ export function createConnection({ url, getToken, onEvent, onConnected }: Option
     reconnectDelay: 1_000,
     reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
     maxReconnectDelay: 15_000,
+    connectionTimeout: 10_000,
     heartbeatIncoming: 10_000,
     heartbeatOutgoing: 10_000,
     async beforeConnect(self) {
-      attemptStartedAt = Date.now();
       const token = await getToken();
       self.connectHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      attemptInFlight = true;
     },
     onConnect() {
+      attemptInFlight = false;
+      if (reopenWanted) {
+        reopenWanted = false;
+        deliberateDrop = true;
+        client.forceDisconnect(); // it was opened with a token that has since been replaced
+        return;
+      }
+      deliberateDrop = false;
       client.subscribe("/user/queue/events", (frame) => onEvent(frame.body));
       setStatus("connected");
-      onConnected(attemptStartedAt);
+      onConnected();
     },
     onWebSocketClose() {
-      if (!stopped) setStatus("reconnecting");
+      attemptInFlight = false;
+      if (!stopped && !deliberateDrop) setStatus("reconnecting");
     },
   });
 
@@ -67,11 +82,17 @@ export function createConnection({ url, getToken, onEvent, onConnected }: Option
     /** Closes the connection and stops retrying. */
     stop() {
       stopped = true;
+      reopenWanted = false;
       void client.deactivate();
     },
     /** Drops the current connection so it is opened again, with whatever token is current by then. */
     reopen() {
-      client.forceDisconnect();
+      if (status === "connected") {
+        deliberateDrop = true;
+        client.forceDisconnect();
+      } else if (attemptInFlight) {
+        reopenWanted = true;
+      } // otherwise the next attempt has not read its token yet, and will read the new one
     },
   };
 }
