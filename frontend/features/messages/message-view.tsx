@@ -12,10 +12,10 @@ import { statusFor, type Frontier } from "@/features/receipts/status";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
-import { announcementOf, unannounced } from "./announce";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
+import { useAnnouncements } from "./use-announcements";
 import { useReportReading } from "./use-report-reading";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
@@ -81,22 +81,7 @@ export function MessageView({ conversation, myId }: Props) {
     [conversation.participants],
   );
 
-  // New Messages from other people are spoken (politely) as they arrive; the ones already there when the view opens are not.
-  const [spoken, setSpoken] = useState<{ upTo: number; lines: { seq: number; text: string }[] }>();
-  const newest = confirmed.at(-1)?.seq ?? 0;
-  if (history.data && (!spoken || newest > spoken.upTo)) {
-    const fresh = spoken ? unannounced(confirmed, spoken.upTo, myId) : [];
-    setSpoken({
-      upTo: Math.max(newest, spoken?.upTo ?? 0),
-      lines: [
-        ...(spoken?.lines ?? []),
-        ...fresh.map((message) => ({
-          seq: message.seq ?? 0,
-          text: announcementOf(message, names.get(message.senderId) ?? "Someone"),
-        })),
-      ].slice(-5),
-    });
-  }
+  const spoken = useAnnouncements(confirmed, history.data !== undefined, myId, (id) => names.get(id) ?? "Someone");
 
   const scroller = useRef<HTMLDivElement>(null);
   const positioned = useRef(false);
@@ -227,7 +212,7 @@ export function MessageView({ conversation, myId }: Props) {
         )}
       </div>
       <div role="log" aria-label="New Messages" className="sr-only">
-        {spoken?.lines.map((line) => (
+        {spoken.map((line) => (
           <p key={line.seq}>{line.text}</p>
         ))}
       </div>

@@ -1,7 +1,15 @@
 import { expect, test } from "./support/fixtures";
 import { expectAccessible } from "./support/a11y";
-import { createGroupVia, createVerifiedAccount, sendMessageVia, signIn, startDirectVia } from "./support/backend";
-import { signInThroughTheForm, waitForForm } from "./support/auth-screens";
+import {
+  createGroupVia,
+  createVerifiedAccount,
+  removeParticipantVia,
+  sendMessageVia,
+  signIn,
+  startDirectVia,
+} from "./support/backend";
+import { codeFor, enterCode, signInThroughTheForm, signUpThroughTheForm, waitForForm } from "./support/auth-screens";
+import { latestCodeFor } from "./support/mailpit";
 
 test.describe("accessibility and wording, on every screen (the project decides the theme and the width)", () => {
   test("the screens a visitor sees, with and without their error messages", async ({ page }) => {
@@ -92,5 +100,48 @@ test.describe("accessibility and wording, on every screen (the project decides t
     await page.goto(`/app/c/${crypto.randomUUID()}`);
     await expect(page.getByText("This Conversation was not found.")).toBeVisible();
     await expectAccessible(page, "a Conversation that is not found");
+  });
+
+  test("the views that confirm: address verified, password changed", async ({ page }) => {
+    const account = await signUpThroughTheForm(page);
+    await enterCode(page, await codeFor(account));
+    await expect(page.getByRole("heading", { name: "Your address is verified" })).toBeVisible();
+    await expectAccessible(page, "the verified view");
+
+    const person = await createVerifiedAccount();
+    await page.goto("/forgot-password");
+    await waitForForm(page);
+    await page.getByRole("main").getByLabel("Email address").fill(person.email);
+    const asked = new Date();
+    await page.getByRole("button", { name: "Send me a code" }).click();
+    await expect(page).toHaveURL(/\/reset-password$/);
+    await page.getByLabel("Code from the email").fill(await latestCodeFor(person.email, 15_000, asked));
+    await page.getByLabel("New password").fill("a-brand-new-password");
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByRole("heading", { name: "Your password has been changed" })).toBeVisible();
+    await expectAccessible(page, "the password-changed view");
+  });
+
+  test("a new Group's form with its errors, and a Conversation the person is no longer part of", async ({ page }) => {
+    const [me, admin] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Ada Lovelace")]);
+    const adminToken = await signIn(admin.email);
+    const group = await createGroupVia(adminToken, "Analytical Engine", [me.id]);
+    await signInThroughTheForm(page, me);
+
+    await page.goto("/app/new/group");
+    await expect(page.getByRole("heading", { level: 1, name: "New Group" })).toBeVisible();
+    await page.getByRole("button", { name: "Create Group" }).click();
+    await page.getByLabel("Add a person by email").fill("nobody-at-all@example.com");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByText("Give the Group a name.")).toBeVisible();
+    await expect(page.getByText(/No verified user has that email address/)).toBeVisible();
+    await expectAccessible(page, "the new Group form with its errors");
+
+    await page.goto(`/app/c/${group}`);
+    await expect(page.getByRole("heading", { level: 1, name: "Analytical Engine" })).toBeVisible();
+    await page.locator('[data-connection="connected"]').waitFor({ state: "attached" });
+    await removeParticipantVia(adminToken, group, me.id);
+    await expect(page.getByText("You are no longer part of this Conversation.")).toBeVisible();
+    await expectAccessible(page, "a Conversation the person is no longer part of");
   });
 });

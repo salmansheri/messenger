@@ -3,7 +3,7 @@ import { FRONTEND_URL } from "./playwright-urls";
 import { expect, test } from "./support/fixtures";
 import { expectAccessible } from "./support/a11y";
 import { createVerifiedAccount, sendMessageVia, signIn, startDirectVia } from "./support/backend";
-import { signInThroughTheForm } from "./support/auth-screens";
+import { fillSignUp, newAccount, problem as notice, signInThroughTheForm, waitForForm } from "./support/auth-screens";
 
 /** What the backend says when it is busy (503) or when someone is going too fast (429 with how long to wait). */
 function problem(route: Route, status: 429 | 503, retryAfter: number) {
@@ -20,12 +20,12 @@ function problem(route: Route, status: 429 | 503, retryAfter: number) {
   });
 }
 
-/** Answers GET requests for `path` with a problem while `refuse.on` is true, and lets everything else through. */
-async function refuseWhile(page: Page, matches: (url: URL) => boolean, status: 429 | 503, retryAfter = 300) {
+/** Answers requests (GET unless told otherwise) for the matching addresses with a problem while `refuse.on` is true, and lets everything else through. */
+async function refuseWhile(page: Page, matches: (url: URL) => boolean, status: 429 | 503, retryAfter = 300, method = "GET") {
   const refuse = { on: true };
   await page.route(
     (url) => matches(url),
-    (route) => (route.request().method() === "GET" && refuse.on ? problem(route, status, retryAfter) : route.fallback()),
+    (route) => (route.request().method() === method && refuse.on ? problem(route, status, retryAfter) : route.fallback()),
   );
   return refuse;
 }
@@ -58,6 +58,63 @@ test.describe("calm states", () => {
     await expect(page.getByRole("navigation", { name: "Conversations" }).getByRole("alert")).toHaveText(
       "You are doing that too often. Try again in 5 minutes.",
     );
+    await expectAccessible(page, "the list while rate limited");
+  });
+
+  test("signing in, signing up, starting a Conversation and creating a Group each say calmly when the server is busy or they are going too fast", async ({
+    page,
+  }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+
+    // Sign in: a busy server.
+    let refuse = await refuseWhile(page, (url) => url.pathname === "/api/v1/auth/login", 503, 5, "POST");
+    await page.goto("/sign-in");
+    await waitForForm(page);
+    await page.getByRole("main").getByLabel("Email address").fill(me.email);
+    await page.getByRole("main").getByLabel("Password", { exact: true }).fill("correct-horse-battery");
+    await page.getByRole("main").getByRole("button", { name: "Sign in" }).click();
+    await expect(notice(page)).toHaveText("The server is busy. Try again in a moment.");
+    refuse.on = false;
+    await page.getByRole("main").getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/app$/);
+
+    // Create a Group: a busy server, after a person was added.
+    refuse = await refuseWhile(page, (url) => url.pathname === "/api/v1/conversations/groups", 503, 5, "POST");
+    await page.goto("/app/new/group");
+    await waitForForm(page);
+    await page.getByLabel("Group name").fill("Analytical Engine");
+    await page.getByLabel("Add a person by email").fill(grace.email);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByRole("list", { name: "People in this Group" })).toBeVisible();
+    await page.getByRole("button", { name: "Create Group" }).click();
+    await expect(notice(page)).toHaveText("The server is busy. Try again in a moment.");
+    refuse.on = false;
+
+    // Start a Conversation: going too fast.
+    await refuseWhile(page, (url) => url.pathname === "/api/v1/users/lookup", 429, 300, "POST");
+    await page.goto("/app/new");
+    await waitForForm(page);
+    await page.getByLabel("Their email address").fill(grace.email);
+    await page.getByRole("button", { name: "Start Conversation" }).click();
+    await expect(notice(page)).toHaveText("You are doing that too often. Try again in 5 minutes.");
+  });
+
+  test("signing up when too many codes were asked for says when to try again", async ({ page }) => {
+    await refuseWhile(page, (url) => url.pathname === "/api/v1/auth/signup", 429, 3600, "POST");
+    await page.goto("/sign-up");
+    await waitForForm(page);
+    await fillSignUp(page, newAccount());
+    await expect(notice(page)).toHaveText("Too many codes were requested. Try again in 1 hour.");
+    await expectAccessible(page, "sign-up while rate limited");
+  });
+
+  test("signing out that cannot be done says so and leaves the person signed in", async ({ page }) => {
+    await signInThroughTheForm(page, await createVerifiedAccount("Me Myself"));
+    await refuseWhile(page, (url) => url.pathname === "/api/v1/auth/logout", 503, 5, "POST");
+    await page.goto("/app/settings");
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(notice(page)).toContainText("busy");
+    await expectAccessible(page, "settings while signing out is refused");
   });
 
   test("a Conversation whose Messages cannot be loaded says so, keeps the header, and can try again", async ({ page }) => {

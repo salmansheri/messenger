@@ -8,15 +8,13 @@ type FieldProps = Omit<ComponentPropsWithRef<"input">, "id"> & {
   error?: string;
   /** Extra guidance shown under the field while there is no error. */
   hint?: string;
-  /** For a password: a button to show what has been typed and to hide it again. */
-  revealable?: boolean;
 };
 
-/** A labelled input whose error and hint are announced with it. */
-export function Field({ label, error, hint, revealable, className = "", type, ...input }: FieldProps) {
+/** A labelled input whose error and hint are announced with it. A password field has a button to show it and hide it again. */
+export function Field({ label, error, hint, className = "", type, ...input }: FieldProps) {
   const id = useId();
   const [shown, setShown] = useState(false);
-  const reveals = revealable && type === "password";
+  const reveals = type === "password";
   const messageId = `${id}-message`;
   const message = error ?? hint;
   return (

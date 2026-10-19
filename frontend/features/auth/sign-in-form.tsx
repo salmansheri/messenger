@@ -81,7 +81,6 @@ export function SignInForm() {
           <Field
             label="Password"
             type="password"
-            revealable
             autoComplete="current-password"
             name={field.name}
             value={field.state.value}

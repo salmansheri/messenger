@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Page, WebSocketRoute } from "@playwright/test";
 import { expect, test } from "./support/fixtures";
 import { PASSWORD, createGroupVia, createVerifiedAccount, sendMessageVia, signIn, startDirectVia } from "./support/backend";
 import { signInThroughTheForm, waitForForm } from "./support/auth-screens";
@@ -87,6 +87,34 @@ test.describe("keyboard", () => {
   });
 });
 
+test.describe("focus follows the person from screen to screen", () => {
+  test("going to a Conversation, and back, puts focus on that screen's heading; a page load leaves the skip link first", async ({
+    page,
+  }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+    const id = await startDirectVia(await signIn(grace.email), me.id);
+    await signInThroughTheForm(page, me);
+
+    await page.goto("/app");
+    await expect(page.getByRole("navigation", { name: "Conversations" })).toBeVisible(); // the signed-in area appears once the session is checked
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Skip to content" }), "a fresh page starts at the top").toBeFocused();
+
+    await page.getByRole("navigation", { name: "Conversations" }).getByRole("link", { name: /Grace Hopper/ }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(`/app/c/${id}$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Grace Hopper" }), "focus is on the new screen").toBeFocused();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Conversations" })).toBeFocused();
+
+    await page.getByRole("link", { name: "Settings" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeFocused();
+  });
+});
+
 test.describe("announcements and motion", () => {
   test("new Messages from other people are announced politely; the ones already there and your own are not", async ({
     page,
@@ -110,6 +138,35 @@ test.describe("announcements and motion", () => {
     await sendMessageVia(graceToken, id, "Something\nnew");
     await expect(log).toHaveText("Grace Hopper: Something new");
     expect(await log.evaluate((element) => getComputedStyle(element).position), "it is out of sight, not removed").toBe("absolute");
+  });
+
+  test("Messages caught up after a lost connection are announced as a count, not read out one by one", async ({ page }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+    const graceToken = await signIn(grace.email);
+    const id = await startDirectVia(graceToken, me.id);
+    const refuse = { on: false };
+    let current: WebSocketRoute | undefined;
+    await page.routeWebSocket(/\/ws$/, (ws) => {
+      if (refuse.on) {
+        void ws.close();
+        return;
+      }
+      ws.connectToServer();
+      current = ws;
+    });
+    await signInThroughTheForm(page, me);
+    await page.goto(`/app/c/${id}`);
+    await live(page);
+    const log = page.getByRole("log", { name: "New Messages" });
+
+    refuse.on = true;
+    await current!.close();
+    await expect(page.locator('[data-connection="reconnecting"]')).toBeAttached();
+    for (let n = 1; n <= 5; n++) await sendMessageVia(graceToken, id, `Missed ${n}`);
+    refuse.on = false;
+
+    await expect(messages(page).getByText("Missed 5")).toBeVisible({ timeout: 30_000 });
+    await expect(log).toHaveText("5 new Messages");
   });
 
   test("with reduced motion the typing dots stand still and transitions are all but instant", async ({ page, openSession }) => {

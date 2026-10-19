@@ -167,7 +167,6 @@ export function ResetPasswordForm() {
             <Field
               label="New password"
               type="password"
-              revealable
               autoComplete="new-password"
               hint="8 to 72 characters."
               name={field.name}
