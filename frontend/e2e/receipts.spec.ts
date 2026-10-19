@@ -172,8 +172,8 @@ test.describe("unread counts", () => {
     await showIndex(page);
 
     // Some were read, the rest (below the screen) are still unread.
-    await expect(rowFor(page, id)).not.toContainText("60 unread");
+    await expect(rowFor(page, id)).not.toContainText(/\b60 unread/);
     await expect(rowFor(page, id)).toContainText(/\d+ unread Messages/);
-    await expect(rowFor(page, id)).not.toContainText("1 unread");
+    await expect(rowFor(page, id), "not read down to the last one").not.toContainText(/\b1 unread/);
   });
 });

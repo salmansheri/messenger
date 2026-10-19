@@ -1,6 +1,8 @@
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
-import { listQueryKey, meQueryKey, type ConversationResponse } from "@/lib/api";
+import { listQueryKey, meQueryKey, presenceQueryKey, type ConversationResponse, type PresenceView } from "@/lib/api";
+import { createTypingTracker } from "@/features/presence/typing-tracker";
+import { allPresenceKey } from "@/features/presence/use-presence";
 import { catchUp, handleEvent } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
@@ -50,7 +52,7 @@ describe("handleEvent", () => {
   it("puts a new Message into the list that is on screen", () => {
     const { client, answers } = withList([conversation(2, 0)]);
 
-    handleEvent(client, newMessage(3));
+    handleEvent(client, newMessage(3), createTypingTracker());
 
     const list = client.getQueryData<ConversationResponse[]>(listQueryKey());
     expect(list?.[0].lastMessage?.seq).toBe(3);
@@ -64,7 +66,7 @@ describe("handleEvent", () => {
     await Promise.resolve();
     expect(answers).toHaveLength(1);
 
-    handleEvent(client, newMessage(3));
+    handleEvent(client, newMessage(3), createTypingTracker());
     await Promise.resolve();
 
     expect(answers, "the request was restarted, so its answer is not older than the event").toHaveLength(2);
@@ -80,11 +82,48 @@ describe("handleEvent", () => {
     const { client, answers } = withList([conversation(2, 0)]);
     const before = client.getQueryData(listQueryKey());
 
-    handleEvent(client, "not json");
-    handleEvent(client, JSON.stringify({ type: "typing.changed", conversationId: "c1" }));
+    handleEvent(client, "not json", createTypingTracker());
+    handleEvent(client, JSON.stringify({ type: "something.new", conversationId: "c1" }), createTypingTracker());
 
     expect(client.getQueryData(listQueryKey())).toBe(before);
     expect(answers).toHaveLength(0);
+  });
+});
+
+describe("typing and presence events", () => {
+  const typingEvent = (typing: boolean, userId = "grace") =>
+    JSON.stringify({ type: "typing.changed", conversationId: "c1", userId, typing });
+
+  it("keeps track of who is typing, and forgets them when they stop", () => {
+    const { client } = withList([conversation(2, 0)]);
+    const tracker = createTypingTracker();
+
+    handleEvent(client, typingEvent(true), tracker);
+    expect(tracker.typing("c1")).toEqual(["grace"]);
+    handleEvent(client, typingEvent(false), tracker);
+    expect(tracker.typing("c1")).toEqual([]);
+  });
+
+  it("forgets someone who is typing when their Message arrives (sending ends typing)", () => {
+    const { client } = withList([conversation(2, 0)]);
+    const tracker = createTypingTracker();
+    handleEvent(client, typingEvent(true, "grace"), tracker);
+    handleEvent(client, typingEvent(true, "linus"), tracker);
+
+    handleEvent(client, newMessage(3), tracker); // sent by grace
+
+    expect(tracker.typing("c1")).toEqual(["linus"]);
+  });
+
+  it("shows a person online or offline in every Conversation's presence that has loaded", () => {
+    const { client } = withList([conversation(2, 0)]);
+    const key = presenceQueryKey({ path: { conversationId: "c1" } });
+    client.setQueryData<PresenceView[]>(key, [{ userId: "grace", online: false }]);
+
+    handleEvent(client, JSON.stringify({ type: "presence.changed", userId: "grace", online: true }), createTypingTracker());
+
+    expect(client.getQueryData<PresenceView[]>(key)).toEqual([{ userId: "grace", online: true, lastSeenAt: undefined }]);
+    expect(allPresenceKey).toEqual([{ _id: "presence" }]);
   });
 });
 

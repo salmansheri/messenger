@@ -8,7 +8,14 @@ import { checkMessageBody } from "./schema";
  * Where a Message is written. Enter sends, Shift+Enter starts a new line. A Message that breaks a rule is not sent;
  * the reason shows under the box until the text is edited.
  */
-export function Composer({ onSend }: { onSend: (body: string) => void }) {
+export function Composer({
+  onSend,
+  onTyping,
+}: {
+  onSend: (body: string) => void;
+  /** The box now has something in it (`true`) or is empty. Called on every change. */
+  onTyping?: (hasText: boolean) => void;
+}) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string>();
 
@@ -20,6 +27,7 @@ export function Composer({ onSend }: { onSend: (body: string) => void }) {
     }
     onSend(checked.body);
     setText("");
+    onTyping?.(false);
     setError(undefined);
   }
 
@@ -48,6 +56,7 @@ export function Composer({ onSend }: { onSend: (body: string) => void }) {
           onChange={(event) => {
             setText(event.target.value);
             setError(undefined);
+            onTyping?.(event.target.value.length > 0);
           }}
           onKeyDown={keyDown}
           placeholder="Write a Message"

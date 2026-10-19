@@ -1,11 +1,14 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { listQueryKey, meQueryKey, type ConversationResponse, type UserProfile } from "@/lib/api";
+import { listQueryKey, meQueryKey, type ConversationResponse, type PresenceView, type UserProfile } from "@/lib/api";
 import { parseEvent } from "@/lib/realtime/events";
 import { catchUpHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey } from "@/features/messages/queries";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
 import { mergeFrontier, type Frontier } from "@/features/receipts/status";
+import { applyPresence } from "@/features/presence/apply-presence";
+import type { TypingTracker } from "@/features/presence/typing-tracker";
+import { allPresenceKey } from "@/features/presence/use-presence";
 import { applyToHistory, applyToList, applyUnread } from "./apply-event";
 
 /**
@@ -31,9 +34,23 @@ export function recordUnread(queryClient: QueryClient, report: { conversationId:
 }
 
 /** Puts one event into what is already loaded; anything that cannot be worked out from it asks the server again. */
-export function handleEvent(queryClient: QueryClient, body: string) {
+export function handleEvent(queryClient: QueryClient, body: string, typing: TypingTracker) {
   const event = parseEvent(body);
   if (!event) return;
+
+  if (event.type === "typing.changed") {
+    if (event.typing) typing.started(event.conversationId, event.userId);
+    else typing.stopped(event.conversationId, event.userId);
+    return;
+  }
+  if (event.type === "presence.changed") {
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: allPresenceKey })) {
+      if (query.state.fetchStatus === "fetching") void queryClient.invalidateQueries({ queryKey: query.queryKey });
+      else queryClient.setQueryData<PresenceView[]>(query.queryKey, (views) => applyPresence(views, event));
+    }
+    return;
+  }
+  if (event.type === "message.created") typing.stopped(event.conversationId, event.message.senderId ?? ""); // sending ends typing
 
   if (event.type === "unread.updated") {
     recordUnread(queryClient, event);
@@ -75,6 +92,7 @@ export function handleEvent(queryClient: QueryClient, body: string) {
  */
 export function catchUp(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: listQueryKey() });
+  void queryClient.invalidateQueries({ queryKey: allPresenceKey });
   queryClient
     .getQueryCache()
     .findAll({ queryKey: allMessagesKey })

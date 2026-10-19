@@ -85,6 +85,10 @@ export function createConnection({ url, getToken, onEvent, onConnected }: Option
       reopenWanted = false;
       void client.deactivate();
     },
+    /** Sends a message to the server (JSON). Nothing happens while there is no connection: what is sent this way is momentary. */
+    publish(destination: string, body: unknown) {
+      if (client.connected) client.publish({ destination, body: JSON.stringify(body) });
+    },
     /** Drops the current connection so it is opened again, with whatever token is current by then. */
     reopen() {
       if (status === "connected") {

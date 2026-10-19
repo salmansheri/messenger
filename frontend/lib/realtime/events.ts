@@ -1,7 +1,7 @@
 import type { MessageResponse } from "@/lib/api";
 
 /**
- * What the app acts on. `ignored` is any other well-formed event (typing, presence, kinds that do not exist
+ * What the app acts on. `ignored` is any other well-formed event (kinds that do not exist
  * yet): those are known to be events, but nothing here uses them.
  */
 export type RealtimeEvent =
@@ -11,6 +11,10 @@ export type RealtimeEvent =
   | { type: "receipts.updated"; conversationId: string; deliveredUpTo: number; readUpTo: number }
   /** This person's own positions and unread count after a report (from any of their tabs or devices). */
   | { type: "unread.updated"; conversationId: string; deliveredSeq: number; readSeq: number; unreadCount: number }
+  /** Someone started (`typing: true`) or stopped typing. Never stored on the server. */
+  | { type: "typing.changed"; conversationId: string; userId: string; typing: boolean }
+  /** Someone who shares a Conversation with this person came online or went offline. */
+  | { type: "presence.changed"; userId: string; online: boolean; lastSeenAt: string | undefined }
   | { type: "ignored" };
 
 /** The named fields of an object as numbers, or nothing if any is missing or not a number. */
@@ -55,6 +59,18 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
       const found = numbers(payload, ["deliveredSeq", "readSeq", "unreadCount"]);
       return typeof conversationId === "string" && found ? { type: "unread.updated", conversationId, ...found } : undefined;
     }
+    case "typing.changed":
+      return typeof conversationId === "string" && typeof payload.userId === "string" && typeof payload.typing === "boolean"
+        ? { type: "typing.changed", conversationId, userId: payload.userId, typing: payload.typing }
+        : undefined;
+    case "presence.changed":
+      if (typeof payload.userId !== "string" || typeof payload.online !== "boolean") return undefined;
+      return {
+        type: "presence.changed",
+        userId: payload.userId,
+        online: payload.online,
+        lastSeenAt: typeof payload.lastSeenAt === "string" ? payload.lastSeenAt : undefined,
+      };
     default:
       return { type: "ignored" };
   }

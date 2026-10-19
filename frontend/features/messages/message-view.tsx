@@ -9,6 +9,9 @@ import { messageFor } from "@/lib/api/messages";
 import { formatClock } from "@/features/conversations/present";
 import { useFrontier } from "@/features/receipts/queries";
 import { statusFor, type Frontier } from "@/features/receipts/status";
+import { TypingLine } from "@/features/presence/typing-line";
+import { createTypingSender } from "@/features/presence/typing-sender";
+import { useTypingPublisher } from "@/features/realtime/realtime-provider";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
@@ -42,6 +45,12 @@ export function MessageView({ conversation, myId }: Props) {
   const history = useMessageHistory(conversationId, firstPageFor(openedAt.unread));
 
   const frontier = useFrontier(conversationId);
+
+  // What this person types is shared with the others (a start every few seconds at most, a stop when they stop or send).
+  const publishTyping = useTypingPublisher(conversationId);
+  const typingSender = useMemo(() => createTypingSender({ publish: publishTyping }), [publishTyping]);
+  useEffect(() => () => typingSender.stop(), [typingSender]);
+
 
   const [outbox] = useState(() =>
     createOutbox({
@@ -191,7 +200,9 @@ export function MessageView({ conversation, myId }: Props) {
           </Button>
         )}
       </div>
+      <TypingLine conversationId={conversationId} names={names} />
       <Composer
+        onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
         onSend={(body) => {
           keepAtBottom.current = true;
           outbox.submit(body);

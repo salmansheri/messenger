@@ -39,8 +39,29 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "unread.updated", conversationId: "c1", unreadCount: "1" }))).toBeUndefined();
   });
 
-  it("knows about kinds it does not act on yet, and about kinds it has never heard of, without failing", () => {
-    for (const type of ["typing.changed", "presence.changed", "something.new"]) {
+  it("reads that someone started or stopped typing", () => {
+    expect(
+      parseEvent(JSON.stringify({ type: "typing.changed", conversationId: "c1", userId: "u1", typing: true })),
+    ).toEqual({ type: "typing.changed", conversationId: "c1", userId: "u1", typing: true });
+    expect(parseEvent(JSON.stringify({ type: "typing.changed", conversationId: "c1", userId: "u1" }))).toBeUndefined();
+  });
+
+  it("reads that someone came online or went offline, with when they were last seen", () => {
+    expect(parseEvent(JSON.stringify({ type: "presence.changed", userId: "u1", online: true, lastSeenAt: null }))).toEqual({
+      type: "presence.changed",
+      userId: "u1",
+      online: true,
+      lastSeenAt: undefined,
+    });
+    expect(
+      parseEvent(JSON.stringify({ type: "presence.changed", userId: "u1", online: false, lastSeenAt: "2026-03-10T10:00:00Z" })),
+    ).toEqual({ type: "presence.changed", userId: "u1", online: false, lastSeenAt: "2026-03-10T10:00:00Z" });
+    expect(parseEvent(JSON.stringify({ type: "presence.changed", online: true }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "presence.changed", userId: "u1" }))).toBeUndefined();
+  });
+
+  it("knows about kinds it does not act on, and about kinds it has never heard of, without failing", () => {
+    for (const type of ["something.new", "auth.revoked"]) {
       expect(parseEvent(JSON.stringify({ type, conversationId: "c1" }))).toEqual({ type: "ignored" });
     }
   });

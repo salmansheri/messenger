@@ -7,6 +7,8 @@ import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
+import { ParticipantList } from "@/features/presence/participant-list";
+import { PresenceLine } from "@/features/presence/presence-line";
 import { PaneHeader } from "./pane-header";
 import { conversationTitle } from "./present";
 import { useConversationList } from "./queries";
@@ -68,7 +70,20 @@ export function ConversationPane() {
 
   return (
     <>
-      <PaneHeader>{conversationTitle(conversation, list.myId)}</PaneHeader>
+      <PaneHeader
+        detail={
+          conversation.type === "GROUP" ? (
+            <ParticipantList conversation={conversation} myId={list.myId} />
+          ) : (
+            <PresenceLine
+              conversationId={conversation.id ?? ""}
+              userId={conversation.participants?.find((participant) => participant.userId !== list.myId)?.userId}
+            />
+          )
+        }
+      >
+        {conversationTitle(conversation, list.myId)}
+      </PaneHeader>
       <MessageView key={conversation.id} conversation={conversation} myId={list.myId} />
     </>
   );
