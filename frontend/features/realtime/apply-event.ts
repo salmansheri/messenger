@@ -16,6 +16,15 @@ export function applyToList(
   myId: string | undefined,
 ): { list: ConversationResponse[]; refetch: boolean } {
   if (event.type === "conversation.changed") return { list, refetch: true };
+  if (event.type === "unread.updated") {
+    if (!list.some((conversation) => conversation.id === event.conversationId)) return { list, refetch: false };
+    return {
+      list: list.map((conversation) =>
+        conversation.id === event.conversationId ? { ...conversation, unreadCount: event.unreadCount } : conversation,
+      ),
+      refetch: false,
+    };
+  }
   if (event.type !== "message.created") return { list, refetch: false };
 
   const known = list.find((conversation) => conversation.id === event.conversationId);

@@ -1,12 +1,16 @@
 import type { MessageResponse } from "@/lib/api";
 
 /**
- * What the app acts on. `ignored` is any other well-formed event (receipts, typing, presence, kinds that do not exist
+ * What the app acts on. `ignored` is any other well-formed event (typing, presence, kinds that do not exist
  * yet): those are known to be events, but nothing here uses them.
  */
 export type RealtimeEvent =
   | { type: "message.created"; conversationId: string; message: MessageResponse }
   | { type: "conversation.changed"; conversationId: string }
+  /** How far everyone ELSE has got (the lowest of their positions), told to the sender of Messages. */
+  | { type: "receipts.updated"; conversationId: string; deliveredUpTo: number; readUpTo: number }
+  /** This person's own positions and unread count after a report (from any of their tabs or devices). */
+  | { type: "unread.updated"; conversationId: string; deliveredSeq: number; readSeq: number; unreadCount: number }
   | { type: "ignored" };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -32,6 +36,27 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
     }
     case "conversation.changed":
       return typeof conversationId === "string" ? { type: "conversation.changed", conversationId } : undefined;
+    case "receipts.updated":
+      if (typeof conversationId !== "string" || typeof payload.deliveredUpTo !== "number" || typeof payload.readUpTo !== "number") {
+        return undefined;
+      }
+      return { type: "receipts.updated", conversationId, deliveredUpTo: payload.deliveredUpTo, readUpTo: payload.readUpTo };
+    case "unread.updated":
+      if (
+        typeof conversationId !== "string" ||
+        typeof payload.deliveredSeq !== "number" ||
+        typeof payload.readSeq !== "number" ||
+        typeof payload.unreadCount !== "number"
+      ) {
+        return undefined;
+      }
+      return {
+        type: "unread.updated",
+        conversationId,
+        deliveredSeq: payload.deliveredSeq,
+        readSeq: payload.readSeq,
+        unreadCount: payload.unreadCount,
+      };
     default:
       return { type: "ignored" };
   }

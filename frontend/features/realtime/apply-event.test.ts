@@ -91,6 +91,25 @@ describe("applyToList", () => {
     expect(result.refetch).toBe(true);
   });
 
+  it("takes the unread count the server worked out for this person (their other tab or device may have read)", () => {
+    const result = applyToList(
+      list,
+      { type: "unread.updated", conversationId: "c1", deliveredSeq: 2, readSeq: 2, unreadCount: 0 },
+      ME,
+    );
+    expect(result.list.find((c) => c.id === "c1")?.unreadCount).toBe(0);
+    expect(result.list.map((c) => c.id), "the order does not change").toEqual(["c0", "c1"]);
+    expect(result.refetch).toBe(false);
+  });
+
+  it("does nothing about an unread count for a Conversation it does not show, and the same count twice is the same list", () => {
+    const unknown = applyToList(list, { type: "unread.updated", conversationId: "nope", deliveredSeq: 1, readSeq: 1, unreadCount: 0 }, ME);
+    expect(unknown.list).toBe(list);
+    const event = { type: "unread.updated", conversationId: "c1", deliveredSeq: 2, readSeq: 2, unreadCount: 0 } as const;
+    const once = applyToList(list, event, ME);
+    expect(applyToList(once.list, event, ME).list).toEqual(once.list);
+  });
+
   it("leaves the list alone for kinds of event it does not act on", () => {
     const result = applyToList(list, { type: "ignored" }, ME);
     expect(result.list).toBe(list);

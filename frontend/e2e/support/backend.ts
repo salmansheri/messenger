@@ -109,3 +109,9 @@ export async function removeParticipantVia(token: string, conversationId: string
   const response = await send("DELETE", `/api/v1/conversations/${conversationId}/participants/${userId}`, token);
   if (response.status !== 200 && response.status !== 204) throw new Error(`Remove failed: ${response.status}`);
 }
+
+/** Reports that the caller has received Messages up to a position. */
+export async function deliveredUpToVia(token: string, conversationId: string, deliveredSeq: number) {
+  const response = await post(`/api/v1/conversations/${conversationId}/receipts`, { deliveredSeq }, token);
+  if (response.status !== 200) throw new Error(`Receipt failed: ${response.status}`);
+}

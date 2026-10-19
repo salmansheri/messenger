@@ -19,8 +19,28 @@ describe("parseEvent", () => {
     });
   });
 
+  it("reads how far everyone else has got", () => {
+    expect(
+      parseEvent(JSON.stringify({ type: "receipts.updated", conversationId: "c1", deliveredUpTo: 5, readUpTo: 3 })),
+    ).toEqual({ type: "receipts.updated", conversationId: "c1", deliveredUpTo: 5, readUpTo: 3 });
+  });
+
+  it("reads the person's own new unread count", () => {
+    expect(
+      parseEvent(
+        JSON.stringify({ type: "unread.updated", conversationId: "c1", deliveredSeq: 9, readSeq: 8, unreadCount: 1 }),
+      ),
+    ).toEqual({ type: "unread.updated", conversationId: "c1", deliveredSeq: 9, readSeq: 8, unreadCount: 1 });
+  });
+
+  it("refuses receipt and unread events with numbers missing, rather than guessing", () => {
+    expect(parseEvent(JSON.stringify({ type: "receipts.updated", conversationId: "c1", deliveredUpTo: 5 }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "receipts.updated", deliveredUpTo: 5, readUpTo: 3 }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "unread.updated", conversationId: "c1", unreadCount: "1" }))).toBeUndefined();
+  });
+
   it("knows about kinds it does not act on yet, and about kinds it has never heard of, without failing", () => {
-    for (const type of ["receipts.updated", "typing.changed", "presence.changed", "something.new"]) {
+    for (const type of ["typing.changed", "presence.changed", "something.new"]) {
       expect(parseEvent(JSON.stringify({ type, conversationId: "c1" }))).toEqual({ type: "ignored" });
     }
   });

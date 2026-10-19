@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { SignedInShell } from "@/components/signed-in-shell";
+import { ReceiptsProvider } from "@/features/receipts/receipts-provider";
 import { RealtimeProvider } from "@/features/realtime/realtime-provider";
 import { RequireSession } from "@/features/session/require-session";
 
@@ -11,7 +12,9 @@ export default function SignedInLayout({ children }: { children: ReactNode }) {
     <Suspense fallback={null}>
       <RequireSession>
         <RealtimeProvider>
-          <SignedInShell>{children}</SignedInShell>
+          <ReceiptsProvider>
+            <SignedInShell>{children}</SignedInShell>
+          </ReceiptsProvider>
         </RealtimeProvider>
       </RequireSession>
     </Suspense>

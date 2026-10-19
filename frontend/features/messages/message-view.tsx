@@ -8,6 +8,9 @@ import { call, sdk, toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { conversationsKey } from "@/features/conversations/queries";
 import { formatClock } from "@/features/conversations/present";
+import { useFrontier } from "@/features/receipts/queries";
+import { useReceiptReporter } from "@/features/receipts/receipts-provider";
+import { statusFor, type Frontier } from "@/features/receipts/status";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
@@ -38,6 +41,9 @@ export function MessageView({ conversation, myId }: Props) {
   // Taken once when the Conversation opens: sending or reading changes the list's numbers, not where this view started.
   const [openedAt] = useState(() => ({ firstUnread: firstUnreadSeq(conversation), unread: conversation.unreadCount ?? 0 }));
   const history = useMessageHistory(conversationId, firstPageFor(openedAt.unread));
+
+  const frontier = useFrontier(conversationId);
+  const reporter = useReceiptReporter();
 
   const [outbox] = useState(() =>
     createOutbox({
@@ -94,6 +100,44 @@ export function MessageView({ conversation, myId }: Props) {
       element.scrollTop = element.scrollHeight;
     }
   }, [items, firstKey, openedAt.firstUnread]);
+
+  // Reading: the newest Message from someone else that has been on screen, reported while this tab is the one in use.
+  const mostSeen = useRef(0);
+  const reportSeen = useCallback(() => {
+    if (mostSeen.current > 0 && document.visibilityState === "visible" && document.hasFocus()) {
+      reporter.read(conversationId, mostSeen.current);
+    }
+  }, [reporter, conversationId]);
+
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const half = (entry.rootBounds?.height ?? 0) / 2;
+          // Half of the Message is in view, or half of the screen is taken up by it (a very long Message).
+          const seen = entry.isIntersecting && (entry.intersectionRatio >= 0.5 || entry.intersectionRect.height >= half);
+          const seq = Number((entry.target as HTMLElement).dataset.seq);
+          if (seen && seq > mostSeen.current) mostSeen.current = seq;
+        }
+        reportSeen();
+      },
+      { root: element, threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+    element.querySelectorAll("[data-seq]").forEach((row) => observer.observe(row));
+    return () => observer.disconnect();
+  }, [items, reportSeen]);
+
+  // Coming back to this tab (or window) counts as seeing what is on screen.
+  useEffect(() => {
+    window.addEventListener("focus", reportSeen);
+    document.addEventListener("visibilitychange", reportSeen);
+    return () => {
+      window.removeEventListener("focus", reportSeen);
+      document.removeEventListener("visibilitychange", reportSeen);
+    };
+  }, [reportSeen]);
 
   const { fetchNextPage } = history;
   const olderAvailable = history.hasNextPage && !history.isFetchingNextPage;
@@ -174,7 +218,7 @@ export function MessageView({ conversation, myId }: Props) {
           ) : (
             <ol aria-label="Messages">
               {items.map((item) => (
-                <Row key={item.key} item={item} names={names} onRetry={outbox.retry} />
+                <Row key={item.key} item={item} names={names} frontier={frontier} onRetry={outbox.retry} />
               ))}
             </ol>
           )}
@@ -198,10 +242,12 @@ export function MessageView({ conversation, myId }: Props) {
 function Row({
   item,
   names,
+  frontier,
   onRetry,
 }: {
   item: TimelineItem;
   names: Map<string | undefined, string | undefined>;
+  frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
 }) {
   if (item.kind === "day") {
@@ -221,10 +267,16 @@ function Row({
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   return (
-    <li className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}>
-      <time dateTime={item.createdAt} className="pt-1 font-mono text-xs text-ink-muted">
-        {formatClock(item.createdAt)}
-      </time>
+    <li
+      data-seq={!mine && item.seq !== undefined ? item.seq : undefined}
+      className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}
+    >
+      <div className="flex flex-col items-start gap-0.5 pt-1">
+        <time dateTime={item.createdAt} className="font-mono text-xs text-ink-muted">
+          {formatClock(item.createdAt)}
+        </time>
+        {mine && !pending && item.seq !== undefined && <ReceiptMark status={statusFor({ seq: item.seq, status: item.status }, frontier)} />}
+      </div>
       <div className={`min-w-0 border-l-2 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
         {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
         <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
@@ -241,5 +293,21 @@ function Row({
         )}
       </div>
     </li>
+  );
+}
+
+const STATUS_WORDS = { SENT: "Sent", DELIVERED: "Delivered", READ: "Read" } as const;
+
+/** How far a Message of the person's own has got, as dots: one for sent, two for delivered, two in the accent for read. */
+function ReceiptMark({ status }: { status: keyof typeof STATUS_WORDS }) {
+  return (
+    <span
+      role="img"
+      aria-label={STATUS_WORDS[status]}
+      title={STATUS_WORDS[status]}
+      className={`font-mono text-xs leading-none tracking-tighter ${status === "READ" ? "text-accent" : "text-ink-muted"}`}
+    >
+      {status === "SENT" ? "•" : "••"}
+    </span>
   );
 }

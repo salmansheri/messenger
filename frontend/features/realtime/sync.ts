@@ -6,6 +6,8 @@ import { catchUpHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { meKey } from "@/features/session/use-me";
+import { mergeFrontier } from "@/features/receipts/status";
+import { receiptsKey, type Frontier } from "@/features/receipts/queries";
 import { applyToHistory, applyToList } from "./apply-event";
 
 /**
@@ -31,6 +33,10 @@ export function handleEvent(queryClient: QueryClient, body: string) {
     }
   }
 
+  if (event.type === "receipts.updated") {
+    queryClient.setQueryData<Frontier>(receiptsKey(event.conversationId), (known) => mergeFrontier(known, event));
+    return;
+  }
   if (event.type !== "message.created") return;
   const key = messagesKey(event.conversationId);
   if (fetching(queryClient, key)) {

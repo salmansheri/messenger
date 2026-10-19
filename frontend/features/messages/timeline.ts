@@ -26,6 +26,8 @@ export type TimelineItem =
       senderId: string | undefined;
       body: string;
       createdAt: string | undefined;
+      /** What the server last said about how far others have got with it (only for the person's own Messages). */
+      status?: MessageResponse["status"];
       /** Set while the Message is not confirmed yet. */
       pending?: Pending;
       /** Written by the person looking at the view. */
@@ -58,6 +60,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       senderId: message.senderId,
       body: message.body ?? "",
       createdAt: message.createdAt,
+      status: message.status,
       pending: undefined as Pending | undefined,
     })),
     ...pending
@@ -68,6 +71,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
         senderId: myId,
         body: entry.body,
         createdAt: entry.createdAt,
+        status: undefined,
         pending: entry,
       })),
   ];
@@ -94,6 +98,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       senderId: row.senderId,
       body: row.body,
       createdAt: row.createdAt,
+      status: row.status,
       pending: row.pending,
       mine: row.senderId === myId,
       startsRun: breaks || row.senderId !== previousSender,
