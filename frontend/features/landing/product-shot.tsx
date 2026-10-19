@@ -21,7 +21,7 @@ export function ProductShot() {
   const glow = useTransform(progress, [0, 1], [reduced ? 1 : 0.3, 1]);
 
   return (
-    <div ref={ref} className="relative mx-auto max-w-6xl px-4 pb-4 sm:px-6" style={{ perspective: 1500 }}>
+    <div ref={ref} className="relative mx-auto max-w-6xl px-4 pb-14 sm:px-6 sm:pb-20" style={{ perspective: 1500 }}>
       <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-x-[8%] top-10 h-3/4 blur-3xl"
@@ -38,8 +38,10 @@ export function ProductShot() {
           scale,
           y: lift,
           transformOrigin: "50% 0%",
-          // The lower part dissolves into the page: a mask, so the glow behind it is not cut by an opaque edge.
-          maskImage: "linear-gradient(to bottom, black 60%, transparent 98%)",
+          // A whole window with a crisp edge, lifted off the page by an ink shadow (depth) and a wash of the accent
+          // (warmth). A fade would turn a dark window on light paper into mud, so there is none.
+          boxShadow:
+            "0 1px 0 0 color-mix(in oklab, var(--ink) 8%, transparent), 0 28px 56px -28px color-mix(in oklab, var(--ink) 45%, transparent), 0 60px 110px -60px color-mix(in oklab, var(--accent) 34%, transparent)",
         }}
       >
         <span
@@ -50,12 +52,12 @@ export function ProductShot() {
           }}
         />
         {/* On a phone the whole window would be too small to read, so it is shown zoomed in on the Messages. */}
-        <div className="overflow-hidden rounded-lg border border-rule max-sm:h-[19rem]">
+        <div className="overflow-hidden rounded-lg border border-rule max-sm:h-[18rem]">
           <Image
-            src="/landing/conversation.png"
+            src="/landing/conversation-window.png"
             alt="Messenger open on a Conversation: the list of Conversations on the left, and on the right a column of Messages with names on a rail and times in the margin."
             width={1559}
-            height={769}
+            height={599}
             sizes="(min-width: 1152px) 1100px, 100vw"
             loading="eager"
             fetchPriority="high"
