@@ -9,11 +9,11 @@ import { messageFor } from "@/lib/api/messages";
 import { conversationsKey } from "@/features/conversations/queries";
 import { formatClock } from "@/features/conversations/present";
 import { useFrontier } from "@/features/receipts/queries";
-import { useReceiptReporter } from "@/features/receipts/receipts-provider";
 import { statusFor, type Frontier } from "@/features/receipts/status";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
+import { useReportReading } from "./use-report-reading";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
 /** Within this many pixels of the bottom, the view follows new Messages. */
@@ -43,7 +43,6 @@ export function MessageView({ conversation, myId }: Props) {
   const history = useMessageHistory(conversationId, firstPageFor(openedAt.unread));
 
   const frontier = useFrontier(conversationId);
-  const reporter = useReceiptReporter();
 
   const [outbox] = useState(() =>
     createOutbox({
@@ -101,43 +100,7 @@ export function MessageView({ conversation, myId }: Props) {
     }
   }, [items, firstKey, openedAt.firstUnread]);
 
-  // Reading: the newest Message from someone else that has been on screen, reported while this tab is the one in use.
-  const mostSeen = useRef(0);
-  const reportSeen = useCallback(() => {
-    if (mostSeen.current > 0 && document.visibilityState === "visible" && document.hasFocus()) {
-      reporter.read(conversationId, mostSeen.current);
-    }
-  }, [reporter, conversationId]);
-
-  useEffect(() => {
-    const element = scroller.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const half = (entry.rootBounds?.height ?? 0) / 2;
-          // Half of the Message is in view, or half of the screen is taken up by it (a very long Message).
-          const seen = entry.isIntersecting && (entry.intersectionRatio >= 0.5 || entry.intersectionRect.height >= half);
-          const seq = Number((entry.target as HTMLElement).dataset.seq);
-          if (seen && seq > mostSeen.current) mostSeen.current = seq;
-        }
-        reportSeen();
-      },
-      { root: element, threshold: [0, 0.25, 0.5, 0.75, 1] },
-    );
-    element.querySelectorAll("[data-seq]").forEach((row) => observer.observe(row));
-    return () => observer.disconnect();
-  }, [items, reportSeen]);
-
-  // Coming back to this tab (or window) counts as seeing what is on screen.
-  useEffect(() => {
-    window.addEventListener("focus", reportSeen);
-    document.addEventListener("visibilitychange", reportSeen);
-    return () => {
-      window.removeEventListener("focus", reportSeen);
-      document.removeEventListener("visibilitychange", reportSeen);
-    };
-  }, [reportSeen]);
+  useReportReading(scroller, conversationId, items);
 
   const { fetchNextPage } = history;
   const olderAvailable = history.hasNextPage && !history.isFetchingNextPage;

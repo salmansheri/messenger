@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
-import { applyToHistory, applyToList } from "./apply-event";
+import { applyToHistory, applyToList, applyUnread } from "./apply-event";
 
 const ME = "me";
 
@@ -91,25 +91,6 @@ describe("applyToList", () => {
     expect(result.refetch).toBe(true);
   });
 
-  it("takes the unread count the server worked out for this person (their other tab or device may have read)", () => {
-    const result = applyToList(
-      list,
-      { type: "unread.updated", conversationId: "c1", deliveredSeq: 2, readSeq: 2, unreadCount: 0 },
-      ME,
-    );
-    expect(result.list.find((c) => c.id === "c1")?.unreadCount).toBe(0);
-    expect(result.list.map((c) => c.id), "the order does not change").toEqual(["c0", "c1"]);
-    expect(result.refetch).toBe(false);
-  });
-
-  it("does nothing about an unread count for a Conversation it does not show, and the same count twice is the same list", () => {
-    const unknown = applyToList(list, { type: "unread.updated", conversationId: "nope", deliveredSeq: 1, readSeq: 1, unreadCount: 0 }, ME);
-    expect(unknown.list).toBe(list);
-    const event = { type: "unread.updated", conversationId: "c1", deliveredSeq: 2, readSeq: 2, unreadCount: 0 } as const;
-    const once = applyToList(list, event, ME);
-    expect(applyToList(once.list, event, ME).list).toEqual(once.list);
-  });
-
   it("leaves the list alone for kinds of event it does not act on", () => {
     const result = applyToList(list, { type: "ignored" }, ME);
     expect(result.list).toBe(list);
@@ -165,5 +146,46 @@ describe("applyToHistory", () => {
       catchUp: false,
     });
     expect(applyToHistory(history, { type: "ignored" }).history).toBe(history);
+  });
+});
+
+describe("applyUnread", () => {
+  const list = [
+    conversation("c0", { lastMessage: msg(7), unreadCount: 3 }),
+    conversation("c1", { lastMessage: msg(5), unreadCount: 4 }),
+  ];
+  const report = (readSeq: number, unreadCount: number, conversationId = "c1") => ({ conversationId, readSeq, unreadCount });
+
+  it("takes the unread count the server worked out for this person (their other tab or device may have read)", () => {
+    const result = applyUnread(list, undefined, report(5, 0));
+    expect(result.list.find((c) => c.id === "c1")?.unreadCount).toBe(0);
+    expect(result.list.map((c) => c.id), "the order does not change").toEqual(["c0", "c1"]);
+    expect(result.readSeq).toBe(5);
+  });
+
+  it("does not undercount when a newer Message is already shown than the one the server counted", () => {
+    // The server says read up to 3 with 2 unread (so it knew of 5), but the list already shows Message 5... and 7 here.
+    const result = applyUnread(list, undefined, report(3, 1, "c0"));
+    expect(result.list.find((c) => c.id === "c0")?.unreadCount, "7 - 3, not the stale 1").toBe(4);
+  });
+
+  it("trusts the server's count when the list knows less than it does", () => {
+    const result = applyUnread(list, undefined, report(1, 9));
+    expect(result.list.find((c) => c.id === "c1")?.unreadCount).toBe(9);
+  });
+
+  it("ignores a report older than one already applied (out of order), and the same one twice changes nothing", () => {
+    const newer = applyUnread(list, undefined, report(5, 0));
+    const older = applyUnread(newer.list, newer.readSeq, report(2, 3));
+    expect(older.list).toBe(newer.list);
+    expect(older.readSeq).toBe(5);
+
+    const again = applyUnread(newer.list, newer.readSeq, report(5, 0));
+    expect(again.list).toEqual(newer.list);
+  });
+
+  it("does nothing about a Conversation it does not show", () => {
+    const result = applyUnread(list, undefined, report(1, 0, "nope"));
+    expect(result.list).toBe(list);
   });
 });

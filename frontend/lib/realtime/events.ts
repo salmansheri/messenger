@@ -13,6 +13,17 @@ export type RealtimeEvent =
   | { type: "unread.updated"; conversationId: string; deliveredSeq: number; readSeq: number; unreadCount: number }
   | { type: "ignored" };
 
+/** The named fields of an object as numbers, or nothing if any is missing or not a number. */
+function numbers<K extends string>(payload: Record<string, unknown>, keys: readonly K[]): Record<K, number> | undefined {
+  const found = {} as Record<K, number>;
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value !== "number") return undefined;
+    found[key] = value;
+  }
+  return found;
+}
+
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -36,27 +47,14 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
     }
     case "conversation.changed":
       return typeof conversationId === "string" ? { type: "conversation.changed", conversationId } : undefined;
-    case "receipts.updated":
-      if (typeof conversationId !== "string" || typeof payload.deliveredUpTo !== "number" || typeof payload.readUpTo !== "number") {
-        return undefined;
-      }
-      return { type: "receipts.updated", conversationId, deliveredUpTo: payload.deliveredUpTo, readUpTo: payload.readUpTo };
-    case "unread.updated":
-      if (
-        typeof conversationId !== "string" ||
-        typeof payload.deliveredSeq !== "number" ||
-        typeof payload.readSeq !== "number" ||
-        typeof payload.unreadCount !== "number"
-      ) {
-        return undefined;
-      }
-      return {
-        type: "unread.updated",
-        conversationId,
-        deliveredSeq: payload.deliveredSeq,
-        readSeq: payload.readSeq,
-        unreadCount: payload.unreadCount,
-      };
+    case "receipts.updated": {
+      const found = numbers(payload, ["deliveredUpTo", "readUpTo"]);
+      return typeof conversationId === "string" && found ? { type: "receipts.updated", conversationId, ...found } : undefined;
+    }
+    case "unread.updated": {
+      const found = numbers(payload, ["deliveredSeq", "readSeq", "unreadCount"]);
+      return typeof conversationId === "string" && found ? { type: "unread.updated", conversationId, ...found } : undefined;
+    }
     default:
       return { type: "ignored" };
   }

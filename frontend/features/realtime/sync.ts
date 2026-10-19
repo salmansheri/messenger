@@ -6,9 +6,9 @@ import { catchUpHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { meKey } from "@/features/session/use-me";
-import { mergeFrontier } from "@/features/receipts/status";
-import { receiptsKey, type Frontier } from "@/features/receipts/queries";
-import { applyToHistory, applyToList } from "./apply-event";
+import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
+import { mergeFrontier, type Frontier } from "@/features/receipts/status";
+import { applyToHistory, applyToList, applyUnread } from "./apply-event";
 
 /**
  * Whether a request for this data is under way. Its answer may have been worked out before the event happened, so
@@ -16,10 +16,31 @@ import { applyToHistory, applyToList } from "./apply-event";
  */
 const fetching = (queryClient: QueryClient, key: readonly unknown[]) => queryClient.isFetching({ queryKey: key }) > 0;
 
+/**
+ * This person's unread count after a report, from an event or from the answer to their own report. A report older than
+ * one already applied is ignored; the list is patched unless a request for it is under way (then it is asked for again).
+ */
+export function recordUnread(queryClient: QueryClient, report: { conversationId: string; readSeq: number; unreadCount: number }) {
+  const key = readPositionKey(report.conversationId);
+  const list = queryClient.getQueryData<ConversationResponse[]>(conversationsKey);
+  const result = applyUnread(list ?? [], queryClient.getQueryData<number>(key), report);
+  queryClient.setQueryData<number>(key, result.readSeq);
+  if (fetching(queryClient, conversationsKey)) {
+    void queryClient.invalidateQueries({ queryKey: conversationsKey });
+  } else if (list && result.list !== list) {
+    queryClient.setQueryData(conversationsKey, result.list);
+  }
+}
+
 /** Puts one event into what is already loaded; anything that cannot be worked out from it asks the server again. */
 export function handleEvent(queryClient: QueryClient, body: string) {
   const event = parseEvent(body);
   if (!event) return;
+
+  if (event.type === "unread.updated") {
+    recordUnread(queryClient, event);
+    return;
+  }
 
   if (fetching(queryClient, conversationsKey)) {
     void queryClient.invalidateQueries({ queryKey: conversationsKey });

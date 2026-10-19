@@ -2,10 +2,11 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { call, sdk, type ConversationResponse } from "@/lib/api";
-import { conversationsKey, useConversations } from "@/features/conversations/queries";
-import { applyToList } from "@/features/realtime/apply-event";
+import { call, sdk } from "@/lib/api";
+import { useConversations } from "@/features/conversations/queries";
+import { recordUnread } from "@/features/realtime/sync";
 import { useMe } from "@/features/session/use-me";
+import { latestFromOthers } from "./delivered";
 import { createReceiptReporter, type ReceiptReporter } from "./reporter";
 
 const ReporterContext = createContext<ReceiptReporter | null>(null);
@@ -21,15 +22,9 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     createReceiptReporter({
       send: (conversationId, body) => call(sdk.report({ path: { conversationId }, body })),
       onResult(conversationId, result) {
-        if (result.unreadCount === undefined) return;
-        const event = {
-          type: "unread.updated",
-          conversationId,
-          deliveredSeq: result.deliveredSeq ?? 0,
-          readSeq: result.readSeq ?? 0,
-          unreadCount: result.unreadCount,
-        } as const;
-        queryClient.setQueryData<ConversationResponse[]>(conversationsKey, (list) => list && applyToList(list, event, undefined).list);
+        if (result.readSeq !== undefined && result.unreadCount !== undefined) {
+          recordUnread(queryClient, { conversationId, readSeq: result.readSeq, unreadCount: result.unreadCount });
+        }
       },
     }),
   );
@@ -37,11 +32,8 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const conversations = useConversations().data;
   const myId = useMe().data?.id;
   useEffect(() => {
-    if (!conversations || !myId) return;
-    for (const conversation of conversations) {
-      const latest = conversation.lastMessage;
-      if (conversation.id && latest?.seq && latest.senderId !== myId) reporter.delivered(conversation.id, latest.seq);
-    }
+    if (!conversations) return;
+    for (const { conversationId, seq } of latestFromOthers(conversations, myId)) reporter.delivered(conversationId, seq);
   }, [conversations, myId, reporter]);
 
   return <ReporterContext value={reporter}>{children}</ReporterContext>;
