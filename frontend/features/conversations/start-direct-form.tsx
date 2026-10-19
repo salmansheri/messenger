@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -82,6 +83,12 @@ export function StartDirectForm() {
             </Button>
           </div>
         </form>
+        <p className="mt-8 text-sm text-ink-muted">
+          Want to talk to several people at once?{" "}
+          <Link href="/app/new/group" className="underline underline-offset-4 decoration-rule hover:decoration-ink">
+            Create a Group
+          </Link>
+        </p>
       </div>
     </>
   );

@@ -115,3 +115,15 @@ export async function deliveredUpToVia(token: string, conversationId: string, de
   const response = await post(`/api/v1/conversations/${conversationId}/receipts`, { deliveredSeq }, token);
   if (response.status !== 200) throw new Error(`Receipt failed: ${response.status}`);
 }
+
+/** One Conversation as the backend returns it to the caller (participants with their roles). */
+export async function conversationVia(
+  token: string,
+  conversationId: string,
+): Promise<{ name?: string; participants: { userId: string; displayName: string; role: "ADMIN" | "MEMBER" }[] }> {
+  const response = await fetch(`${BACKEND_URL}/api/v1/conversations/${conversationId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status !== 200) throw new Error(`Get conversation failed: ${response.status}`);
+  return (await response.json()) as never;
+}

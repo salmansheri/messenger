@@ -7,7 +7,7 @@ import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
-import { ParticipantList } from "@/features/presence/participant-list";
+import { GroupPanel } from "@/features/groups/group-panel";
 import { PresenceLine } from "@/features/presence/presence-line";
 import { PaneHeader } from "./pane-header";
 import { conversationTitle, otherParticipantId } from "./present";
@@ -73,7 +73,7 @@ export function ConversationPane() {
       <PaneHeader
         detail={
           conversation.type === "GROUP" ? (
-            <ParticipantList conversation={conversation} myId={list.myId} />
+            <GroupPanel conversation={conversation} myId={list.myId} />
           ) : (
             <PresenceLine conversationId={conversation.id ?? ""} userId={otherParticipantId(conversation, list.myId)} />
           )
