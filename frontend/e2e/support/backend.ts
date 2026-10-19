@@ -74,3 +74,18 @@ export async function sendMessageVia(token: string, conversationId: string, body
 export async function forgotPasswordVia(email: string): Promise<number> {
   return (await post("/api/v1/auth/forgot-password", { email })).status;
 }
+
+/** Every Message in a Conversation as the backend stores it (the newest page, up to 100). */
+export async function messagesVia(token: string, conversationId: string): Promise<{ seq: number; body: string }[]> {
+  const response = await fetch(`${BACKEND_URL}/api/v1/conversations/${conversationId}/messages?limit=100`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status !== 200) throw new Error(`History failed: ${response.status}`);
+  return ((await response.json()) as { messages: { seq: number; body: string }[] }).messages;
+}
+
+/** Reports that the caller has read up to a position (like opening the Conversation in another app would). */
+export async function readUpToVia(token: string, conversationId: string, readSeq: number) {
+  const response = await post(`/api/v1/conversations/${conversationId}/receipts`, { readSeq }, token);
+  if (response.status !== 200) throw new Error(`Receipt failed: ${response.status}`);
+}

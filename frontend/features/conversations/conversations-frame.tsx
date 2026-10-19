@@ -12,11 +12,11 @@ import { ConversationIndex } from "./conversation-index";
 export function ConversationsFrame({ children }: { children: ReactNode }) {
   const route = usePathname() === "/app" ? "index" : "detail";
   return (
-    <div data-route={route} className="group grid flex-1 md:grid-cols-[20rem_1fr]">
-      <div className="min-w-0 border-rule group-data-[route=detail]:max-md:hidden md:border-r">
+    <div data-route={route} className="group grid min-h-0 flex-1 md:grid-cols-[20rem_1fr]">
+      <div className="min-h-0 min-w-0 overflow-y-auto border-rule group-data-[route=detail]:max-md:hidden md:border-r">
         <ConversationIndex />
       </div>
-      <div className="flex min-w-0 flex-col group-data-[route=index]:max-md:hidden">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-col group-data-[route=index]:max-md:hidden">{children}</div>
     </div>
   );
 }

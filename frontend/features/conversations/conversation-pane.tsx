@@ -5,13 +5,14 @@ import { useParams } from "next/navigation";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
+import { MessageView } from "@/features/messages/message-view";
 import { PaneHeader } from "./pane-header";
 import { conversationTitle } from "./present";
 import { useConversationList } from "./queries";
 
 /**
  * One Conversation, found in the list that is already loaded (so opening it asks the server for nothing more). Its
- * Messages arrive with the next ticket. A Conversation that is not in the list is, as far as the server is concerned,
+ * Messages come from the server one page at a time (`MessageView`). A Conversation that is not in the list is, as far as the server is concerned,
  * not the person's to see, and gets the same plain answer whether it never existed or is someone else's.
  */
 export function ConversationPane() {
@@ -60,9 +61,7 @@ export function ConversationPane() {
   return (
     <>
       <PaneHeader>{conversationTitle(conversation, list.myId)}</PaneHeader>
-      <div className="px-4 py-6 text-ink-muted sm:px-8">
-        <p>Reading and sending Messages is coming next.</p>
-      </div>
+      <MessageView key={conversation.id} conversation={conversation} myId={list.myId} />
     </>
   );
 }

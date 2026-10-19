@@ -54,3 +54,29 @@ export function unreadSpeech(count: number | undefined): string | undefined {
   if (count > 99) return "More than 99 unread Messages";
   return `${count} unread Message${count === 1 ? "" : "s"}`;
 }
+
+/** The heading of a day in a Conversation: "Today", "Yesterday", then the weekday and date (the year only when it is not this year). */
+export function formatDay(iso: string | undefined, now: Date, timeZone?: string): string {
+  const date = iso ? new Date(iso) : undefined;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const daysAgo = dayNumber(calendarDay(now, timeZone)) - dayNumber(calendarDay(date, timeZone));
+  if (daysAgo <= 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  const sameYear = calendarDay(now, timeZone).slice(0, 4) === calendarDay(date, timeZone).slice(0, 4);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  })
+    .format(date)
+    .replace(",", "");
+}
+
+/** The time of day as 24-hour hours and minutes, in the viewer's zone. */
+export function formatClock(iso: string | undefined, timeZone?: string): string {
+  const date = iso ? new Date(iso) : undefined;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+}

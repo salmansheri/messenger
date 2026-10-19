@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse } from "@/lib/api";
-import { conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
+import { conversationTitle, formatClock, formatDay, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
 
 const ME = "me-id";
 
@@ -118,5 +118,26 @@ describe("unreadSpeech", () => {
     expect(unreadSpeech(2)).toBe("2 unread Messages");
     expect(unreadSpeech(99)).toBe("99 unread Messages");
     expect(unreadSpeech(100)).toBe("More than 99 unread Messages");
+  });
+});
+
+describe("formatDay", () => {
+  const now = new Date("2026-03-10T12:00:00Z");
+  it("says Today and Yesterday, then the weekday and date, with the year only when it is not this year", () => {
+    expect(formatDay("2026-03-10T00:10:00Z", now, "UTC")).toBe("Today");
+    expect(formatDay("2026-03-09T23:59:00Z", now, "UTC")).toBe("Yesterday");
+    expect(formatDay("2026-03-01T10:00:00Z", now, "UTC")).toBe("Sun 1 Mar");
+    expect(formatDay("2025-12-24T10:00:00Z", now, "UTC")).toBe("Wed 24 Dec 2025");
+  });
+  it("uses the viewer's days", () => {
+    expect(formatDay("2026-03-09T23:30:00Z", now, "Asia/Kolkata")).toBe("Today"); // 05:00 on the 10th there
+  });
+});
+
+describe("formatClock", () => {
+  it("is the 24-hour time in the viewer's zone", () => {
+    expect(formatClock("2026-03-10T09:05:00Z", "UTC")).toBe("09:05");
+    expect(formatClock("2026-03-10T09:05:00Z", "Asia/Kolkata")).toBe("14:35");
+    expect(formatClock(undefined, "UTC")).toBe("");
   });
 });
