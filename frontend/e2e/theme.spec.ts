@@ -40,7 +40,7 @@ const colourOf = async (page: Page, selector: string, property: "color" | "backg
 test.describe("theme", () => {
   test("follows the system by default, in both directions", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/");
+    await page.goto("/design");
     expect(await isDark(page)).toBe(true);
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
 
@@ -50,7 +50,7 @@ test.describe("theme", () => {
 
   test("a manual choice beats the system and survives a reload", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto("/design");
 
     await page.getByRole("button", { name: "Dark" }).click();
     await expect(page.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
@@ -66,7 +66,7 @@ test.describe("theme", () => {
 
   test("choosing System goes back to following the system", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/");
+    await page.goto("/design");
     await page.getByRole("button", { name: "Light" }).click();
     expect(await isLight(page)).toBe(true);
 
@@ -95,7 +95,7 @@ test.describe("theme", () => {
     });
     await page.route(/\/_next\/.*\.js/, (route) => route.abort()); // React never loads: only the inline script ran
 
-    await page.goto("/");
+    await page.goto("/design");
 
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await page.waitForFunction(() => "backgroundAtFirstPaint" in window);
@@ -107,13 +107,13 @@ test.describe("theme", () => {
 
   test("two people in two browser contexts keep their own theme", async ({ page, openSession }) => {
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto("/design");
     await page.getByRole("button", { name: "Dark" }).click();
     expect(await isDark(page)).toBe(true);
 
     const other = await openSession();
     await other.emulateMedia({ colorScheme: "light" });
-    await other.goto("/");
+    await other.goto("/design");
 
     expect(await isLight(other)).toBe(true);
   });
@@ -121,7 +121,7 @@ test.describe("theme", () => {
   test("every text and control pairing on the page is readable in both themes", async ({ page }) => {
     for (const scheme of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: scheme });
-      await page.goto("/");
+      await page.goto("/design");
       await page.getByRole("button", { name: "System" }).click(); // the "pressed" state is on screen too
       const paper = await token(page, "--paper");
 

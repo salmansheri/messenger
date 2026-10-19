@@ -31,17 +31,25 @@ export function AddAddressField({
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState<string>();
 
+  // `pending` is state, which a second press in the same instant has not seen yet; this is the guard that cannot be late.
+  const adding = useRef(false);
+
   async function add() {
-    if (pending) return;
+    if (pending || adding.current) return;
     const parsed = emailSchema.safeParse(value);
     if (!parsed.success) {
       setInvalid(parsed.error.issues[0].message);
       return;
     }
     setInvalid(undefined);
-    if (await onAdd(parsed.data)) {
-      setValue((current) => (current.trim().toLowerCase() === parsed.data ? "" : current));
-      input.current?.focus();
+    adding.current = true;
+    try {
+      if (await onAdd(parsed.data)) {
+        setValue((current) => (current.trim().toLowerCase() === parsed.data ? "" : current));
+        input.current?.focus();
+      }
+    } finally {
+      adding.current = false;
     }
   }
 

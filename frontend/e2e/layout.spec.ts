@@ -4,7 +4,7 @@ test.describe("layout", () => {
   test("the index and the reading column sit side by side on a desktop and stack on a phone", async ({
     page,
   }, testInfo) => {
-    await page.goto("/");
+    await page.goto("/design");
     const index = await page.getByRole("navigation", { name: "Conversations" }).boundingBox();
     const reading = await page.getByRole("region", { name: "A conversation" }).boundingBox();
     expect(index && reading).toBeTruthy();
@@ -18,7 +18,7 @@ test.describe("layout", () => {
   });
 
   test("the page never scrolls sideways", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/design");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

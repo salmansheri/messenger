@@ -39,19 +39,19 @@ export default defineConfig({
         APP_OTP_MAX_SENDS_PER_IP_PER_HOUR: "100000",
         APP_LOOKUP_MAX_PER_MINUTE: "100000",
         APP_GROUPS_MAX_CREATED_PER_HOUR: "100000",
+        // The backend answers (and accepts sockets from) the frontend the tests use.
+        APP_CORS_ALLOWED_ORIGINS: FRONTEND_URL,
       },
     },
     {
-      // A production build by default: a development server compiles each page on its first visit, which makes a test
-      // that is the first to visit one slow or flaky. E2E_DEV=1 uses the development server for quick iteration.
-      command: process.env.E2E_DEV === "1" ? "bun dev" : "bun run build && bunx next start -p 3001",
+      // The app is built and served on its own port and folder, fresh for every run, so it never depends on (or
+      // disturbs) a development server. A development server compiles each page on its first visit, which makes a test
+      // that is the first to visit one slow or flaky; E2E_DEV=1 uses one anyway for quick iteration.
+      command: process.env.E2E_DEV === "1" ? "bunx next dev -p 3002" : "bun run build && bunx next start -p 3002",
       url: FRONTEND_URL,
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 240_000,
-      env: {
-        NEXT_PUBLIC_API_URL: BACKEND_URL,
-        ...(process.env.E2E_DEV === "1" ? {} : { NEXT_DIST_DIR: ".next-e2e" }),
-      },
+      env: { NEXT_PUBLIC_API_URL: BACKEND_URL, NEXT_DIST_DIR: ".next-e2e" },
     },
   ],
 });
