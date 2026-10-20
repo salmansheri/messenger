@@ -20,7 +20,7 @@ public class CorsConfig {
 	CorsConfigurationSource corsConfigurationSource(AppProperties props) {
 		var cors = new CorsConfiguration();
 		cors.setAllowedOrigins(props.cors().allowedOrigins());
-		cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
+		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 		// A browser hides every other response header from the page; the frontend needs this one to say when to retry.
 		cors.setExposedHeaders(List.of("Retry-After"));

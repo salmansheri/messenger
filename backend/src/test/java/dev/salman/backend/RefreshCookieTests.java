@@ -136,7 +136,7 @@ class RefreshCookieTests extends IntegrationTest {
 
 	@Test
 	void theListedFrontendMayUseEveryMethodTheApiHasAfterAPreflight() throws Exception {
-		for (var method : new String[] { "GET", "POST", "PATCH", "DELETE" }) {
+		for (var method : new String[] { "GET", "POST", "PUT", "PATCH", "DELETE" }) {
 			mvc.perform(options("/api/v1/conversations/00000000-0000-0000-0000-000000000000")
 					.header("Origin", ALLOWED_ORIGIN).header("Access-Control-Request-Method", method)
 					.header("Access-Control-Request-Headers", "authorization,content-type"))
