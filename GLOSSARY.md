@@ -62,9 +62,29 @@ _Avoid_: Removed Message, recalled Message, unsent Message
 A Message that quotes one earlier Message of the same Conversation. The quote shows the quoted Message as it is now, so an edit or deletion shows through. A Message from before a Participant joined cannot be quoted by them.
 _Avoid_: Quote, thread
 
+**Attachment**:
+One image sent with a Message, shown above the Message's optional caption. A Message has at most one; several images are several Messages. Only Participants who can read the Message can see the image. It is gone when the Message is deleted for everyone, and editing the Message changes only the caption.
+_Avoid_: File, photo, upload (an upload is the step before it is sent), media
+
 **Reaction**:
 One emoji, from a fixed set, that a Participant puts on a Message. A Participant has at most one Reaction per Message: choosing another replaces it, choosing the same one removes it. Reacting changes no unread count, receipt or Conversation order.
 _Avoid_: Like, emoji reply
+
+### Profile
+
+**Display name**:
+The name other Users see for a User. A User can change it; everyone sees the current name, including on old Messages.
+_Avoid_: Username, nickname
+
+**Avatar**:
+One square image a User chooses to represent them, shown to the people who share a Conversation with them. Without one, their initials are shown.
+_Avoid_: Profile picture, photo
+
+### Search
+
+**Search**:
+Finding Messages by words in their text or caption, in the open Conversation or across all of a User's Conversations. It only finds Messages the User may read: not Deleted Messages, ones they hid, or ones from before they joined.
+_Avoid_: Filter, find
 
 ### Receipts
 
