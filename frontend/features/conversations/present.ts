@@ -15,6 +15,7 @@ export function otherParticipantId(conversation: ConversationResponse, myId: str
 /** The latest Message as one short line: who said it where that matters, and nothing if none was sent yet. */
 export function lastLine(conversation: ConversationResponse, myId: string | undefined): string {
   const message = conversation.lastMessage;
+  if (message?.deletedAt) return "This Message was deleted";
   if (!message?.body) return "No Messages yet";
   const text = message.body.replace(/\s+/g, " ").trim();
   if (message.senderId === myId) return `You: ${text}`;

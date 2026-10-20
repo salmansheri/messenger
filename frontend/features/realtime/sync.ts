@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { listQueryKey, meQueryKey, presenceQueryKey, type ConversationResponse, type PresenceView, type UserProfile } from "@/lib/api";
 import { parseEvent } from "@/lib/realtime/events";
-import { catchUpHistory } from "@/features/messages/catch-up";
+import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey } from "@/features/messages/queries";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
@@ -77,7 +77,7 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     queryClient.setQueryData<Frontier>(receiptsKey(event.conversationId), (known) => mergeFrontier(known, event));
     return;
   }
-  if (event.type !== "message.created") return;
+  if (event.type !== "message.created" && event.type !== "message.updated") return;
   const key = messagesKey(event.conversationId);
   if (fetching(queryClient, key)) {
     void queryClient.invalidateQueries({ queryKey: key });
@@ -91,8 +91,9 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
 
 /**
  * After a connection is (re)established, whatever was loaded before may have missed events: ask for the list again
- * (even a request already under way may have been answered before the subscription started) and fetch what every
- * loaded history is missing.
+ * (even a request already under way may have been answered before the subscription started) and bring every loaded
+ * history up to date. Fetching only what is newer is not enough: an edit or a deletion keeps its Sequence number, so
+ * the loaded range is fetched again and compared.
  */
 export function catchUp(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: listQueryKey() });
@@ -102,6 +103,6 @@ export function catchUp(queryClient: QueryClient) {
     .findAll({ queryKey: allMessagesKey })
     .forEach((query) => {
       const conversationId = historyConversationId(query.queryKey);
-      if (conversationId) void catchUpHistory(queryClient, conversationId);
+      if (conversationId) void refreshHistory(queryClient, conversationId);
     });
 }

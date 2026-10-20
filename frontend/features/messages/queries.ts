@@ -2,7 +2,8 @@
 
 import { useInfiniteQuery, type QueryClient } from "@tanstack/react-query";
 import { historyInfiniteOptions, historyInfiniteQueryKey, type MessagePage, type MessageResponse } from "@/lib/api";
-import { withMessage, type History } from "./history";
+import { markDeleted, removeById, withMessage, type History } from "./history";
+import { mergeVersion } from "./versions";
 
 const OLDER_PAGE = 50;
 
@@ -40,4 +41,32 @@ export function useMessageHistory(conversationId: string, firstPage: number) {
 export function addMessageToHistory(queryClient: QueryClient, message: MessageResponse) {
   if (!message.conversationId) return;
   queryClient.setQueryData<History>(messagesKey(message.conversationId), (history) => history && withMessage(history, message));
+}
+
+/** An edited Message the server just confirmed, put into the loaded history (never replacing a newer version). */
+export function updateMessageInHistory(queryClient: QueryClient, message: MessageResponse) {
+  if (!message.conversationId) return;
+  queryClient.setQueryData<History>(messagesKey(message.conversationId), (history) => {
+    if (!history) return history;
+    const known = history.pages.flatMap((page) => page.messages ?? []).find((candidate) => candidate.seq === message.seq);
+    return known ? replaceIfChanged(history, known, mergeVersion(known, message)) : withMessage(history, message);
+  });
+}
+
+function replaceIfChanged(history: History, known: MessageResponse, merged: MessageResponse): History {
+  return merged === known
+    ? history
+    : { ...history, pages: history.pages.map((page) => ({ ...page, messages: page.messages?.map((m) => (m === known ? merged : m)) })) };
+}
+
+/** A Message this person just deleted for everyone, shown as the placeholder at once (the event brings the server's time). */
+export function markDeletedInHistory(queryClient: QueryClient, conversationId: string, messageId: string) {
+  queryClient.setQueryData<History>(messagesKey(conversationId), (history) =>
+    history && markDeleted(history, messageId, new Date().toISOString()),
+  );
+}
+
+/** A Message this person just hid from their own view. */
+export function removeFromHistory(queryClient: QueryClient, conversationId: string, messageId: string) {
+  queryClient.setQueryData<History>(messagesKey(conversationId), (history) => history && removeById(history, messageId));
 }

@@ -12,6 +12,28 @@ describe("parseEvent", () => {
     });
   });
 
+  it("reads an edited or deleted Message", () => {
+    const edited = { ...message, body: "Hello", editedAt: "2026-03-10T10:05:00Z" };
+    const deleted = { ...message, body: undefined, deletedAt: "2026-03-10T10:06:00Z" };
+
+    expect(parseEvent(JSON.stringify({ type: "message.updated", conversationId: "c1", message: edited }))).toEqual({
+      type: "message.updated",
+      conversationId: "c1",
+      message: edited,
+    });
+    expect(parseEvent(JSON.stringify({ type: "message.updated", conversationId: "c1", message: deleted }))).toEqual({
+      type: "message.updated",
+      conversationId: "c1",
+      message: deleted,
+    });
+  });
+
+  it("refuses an update with no Message, no Conversation or no place in it", () => {
+    expect(parseEvent(JSON.stringify({ type: "message.updated", conversationId: "c1" }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "message.updated", message }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "message.updated", conversationId: "c1", message: { id: "m1" } }))).toBeUndefined();
+  });
+
   it("reads a change to a Conversation", () => {
     expect(parseEvent(JSON.stringify({ type: "conversation.changed", conversationId: "c1" }))).toEqual({
       type: "conversation.changed",

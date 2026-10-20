@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem, NETWORK_FAILURE } from "@/lib/api/problem";
-import { sendFailureMessage } from "./wording";
+import { changeFailureMessage, sendFailureMessage } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number) =>
   new ApiProblem(status, "Problem", undefined, {}, retryAfterSeconds);
@@ -29,5 +29,33 @@ describe("sendFailureMessage", () => {
     expect(sendFailureMessage(problem(503, 5))).toBe("The server is busy. Try again in a moment.");
     expect(sendFailureMessage(problem(NETWORK_FAILURE))).toContain("Could not reach the server");
     expect(sendFailureMessage(problem(400))).toBe("Problem");
+  });
+});
+
+describe("changeFailureMessage", () => {
+  it("passes on the server's own words when the time to edit or delete has passed, or the Message was deleted", () => {
+    const refused = new ApiProblem(409, "Conflict", "A Message can only be edited for 15 minutes after it is sent.", {}, undefined);
+
+    expect(changeFailureMessage(refused)).toBe("A Message can only be edited for 15 minutes after it is sent.");
+  });
+
+  it("does not describe a 409 as an account problem when the server gave no words", () => {
+    expect(changeFailureMessage(problem(409))).toBe("That can no longer be done.");
+  });
+
+  it("says who may change a Message and that a vanished one is gone", () => {
+    expect(changeFailureMessage(problem(403))).toBe("Only the sender can do that.");
+    expect(changeFailureMessage(problem(404))).toBe("That Message is no longer there.");
+  });
+
+  it("names the wait when changes come too often", () => {
+    expect(changeFailureMessage(problem(429, 20))).toBe("You are changing Messages too often. Try again in 20 seconds.");
+    expect(changeFailureMessage(problem(429, 120))).toBe("You are changing Messages too often. Try again in 2 minutes.");
+    expect(changeFailureMessage(problem(429))).toBe("You are changing Messages too often. Try again in a few seconds.");
+  });
+
+  it("leaves a busy server and a lost connection to the general wording", () => {
+    expect(changeFailureMessage(problem(503, 5))).toBe("The server is busy. Try again in a moment.");
+    expect(changeFailureMessage(problem(NETWORK_FAILURE))).toContain("Could not reach the server");
   });
 });

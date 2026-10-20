@@ -46,8 +46,16 @@ export type ConversationResponse = {
     participants?: Array<ParticipantSummary>;
     lastMessage?: MessageResponse;
     unreadCount?: number;
+    settings?: ConversationSettings;
     createdAt?: string;
     updatedAt?: string;
+};
+
+export type ConversationSettings = {
+    muted?: boolean;
+    mutedUntil?: string;
+    archived?: boolean;
+    pinned?: boolean;
 };
 
 export type MessageResponse = {
@@ -58,6 +66,8 @@ export type MessageResponse = {
     clientMessageId?: string;
     body?: string;
     createdAt?: string;
+    editedAt?: string;
+    deletedAt?: string;
     status?: 'SENT' | 'DELIVERED' | 'READ';
 };
 
@@ -123,6 +133,16 @@ export type LoginRequest = {
 
 export type RenameGroupRequest = {
     name?: string;
+};
+
+export type UpdateSettingsRequest = {
+    mute?: 'NONE' | 'EIGHT_HOURS' | 'ONE_WEEK' | 'ALWAYS';
+    archived?: boolean;
+    pinned?: boolean;
+};
+
+export type EditMessageRequest = {
+    body?: string;
 };
 
 export type UserProfile = {
@@ -269,6 +289,25 @@ export type SendResponses = {
 };
 
 export type SendResponse = SendResponses[keyof SendResponses];
+
+export type HideData = {
+    body?: never;
+    path: {
+        conversationId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}/hide';
+};
+
+export type HideResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type HideResponse = HideResponses[keyof HideResponses];
 
 export type LeaveData = {
     body?: never;
@@ -481,6 +520,62 @@ export type RenameResponses = {
 };
 
 export type RenameResponse = RenameResponses[keyof RenameResponses];
+
+export type UpdateSettingsData = {
+    body: UpdateSettingsRequest;
+    path: {
+        conversationId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/settings';
+};
+
+export type UpdateSettingsResponses = {
+    /**
+     * OK
+     */
+    200: ConversationResponse;
+};
+
+export type UpdateSettingsResponse = UpdateSettingsResponses[keyof UpdateSettingsResponses];
+
+export type DeleteForEveryoneData = {
+    body?: never;
+    path: {
+        conversationId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}';
+};
+
+export type DeleteForEveryoneResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteForEveryoneResponse = DeleteForEveryoneResponses[keyof DeleteForEveryoneResponses];
+
+export type EditData = {
+    body: EditMessageRequest;
+    path: {
+        conversationId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}';
+};
+
+export type EditResponses = {
+    /**
+     * OK
+     */
+    200: MessageResponse;
+};
+
+export type EditResponse = EditResponses[keyof EditResponses];
 
 export type MeData = {
     body?: never;

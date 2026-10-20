@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { sdk } from "@/lib/api";
-import { latestSeq, type History } from "./history";
+import { sdk, type MessageResponse } from "@/lib/api";
+import { latestSeq, oldestSeq, syncRange, type History } from "./history";
 import { addMessageToHistory, messagesKey } from "./queries";
 
 /**
@@ -24,4 +24,34 @@ export async function catchUpHistory(queryClient: QueryClient, conversationId: s
   } catch {
     // The next connection, or the next event that skips ahead, tries again.
   }
+}
+
+/**
+ * Brings a loaded history up to date after a connection was lost: the whole loaded range is fetched again (`afterSeq`
+ * from just before the oldest Message loaded, however many pages that takes) and compared, because an edit or a
+ * deletion keeps its Sequence number and so cannot be found by asking only for newer Messages. Nothing is changed unless
+ * the whole range was fetched; a failure is left for the next reconnection.
+ */
+export async function refreshHistory(queryClient: QueryClient, conversationId: string) {
+  const history = queryClient.getQueryData<History>(messagesKey(conversationId));
+  if (!history) return;
+  const from = oldestSeq(history);
+  if (from === undefined) return catchUpHistory(queryClient, conversationId);
+  const fresh: MessageResponse[] = [];
+  // Everything loaded now is within the range being fetched; anything that arrives live meanwhile is past it.
+  const loadedUpTo = latestSeq(history);
+  let after = from - 1;
+  try {
+    for (;;) {
+      const { data: page } = await sdk.history_({ path: { conversationId }, query: { afterSeq: after, limit: 100 } });
+      const messages = page.messages ?? [];
+      fresh.push(...messages);
+      const newest = messages.at(-1)?.seq;
+      if (!page.hasMore || newest === undefined || newest <= after) break;
+      after = newest;
+    }
+  } catch {
+    return;
+  }
+  queryClient.setQueryData<History>(messagesKey(conversationId), (current) => current && syncRange(current, fresh, from, Math.max(loadedUpTo, fresh.at(-1)?.seq ?? 0)));
 }

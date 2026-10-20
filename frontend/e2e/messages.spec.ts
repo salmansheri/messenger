@@ -266,7 +266,7 @@ test.describe("sending Messages", () => {
     await composer(page).press("Enter");
 
     await expect.poll(async () => (await messagesVia(myToken, id)).map((m) => m.body)).toEqual(["one\ntwo"]);
-    await expect(messages(page).getByText("one", { exact: false })).toContainText("two");
+    await expect(messages(page).locator("p").filter({ hasText: "one" })).toHaveText("one\ntwo", { useInnerText: true });
   });
 
   test("when the connection fails the Message says not sent, and Retry delivers exactly one copy even if the first try had reached the server", async ({

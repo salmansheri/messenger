@@ -6,6 +6,8 @@ import type { MessageResponse } from "@/lib/api";
  */
 export type RealtimeEvent =
   | { type: "message.created"; conversationId: string; message: MessageResponse }
+  /** A Message was edited or deleted for everyone (no `status`: that is the sender's own view). */
+  | { type: "message.updated"; conversationId: string; message: MessageResponse }
   | { type: "conversation.changed"; conversationId: string }
   /** How far everyone ELSE has got (the lowest of their positions), told to the sender of Messages. */
   | { type: "receipts.updated"; conversationId: string; deliveredUpTo: number; readUpTo: number }
@@ -48,6 +50,12 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
       if (typeof conversationId !== "string" || !isObject(message)) return undefined;
       if (typeof message.seq !== "number" || typeof message.id !== "string") return undefined;
       return { type: "message.created", conversationId, message: message as MessageResponse };
+    }
+    case "message.updated": {
+      const message = payload.message;
+      if (typeof conversationId !== "string" || !isObject(message)) return undefined;
+      if (typeof message.seq !== "number" || typeof message.id !== "string") return undefined;
+      return { type: "message.updated", conversationId, message: message as MessageResponse };
     }
     case "conversation.changed":
       return typeof conversationId === "string" ? { type: "conversation.changed", conversationId } : undefined;

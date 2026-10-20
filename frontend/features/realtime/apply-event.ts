@@ -1,6 +1,7 @@
 import type { ConversationResponse, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
-import { latestSeq, withMessage, type History } from "@/features/messages/history";
+import { latestSeq, replaceMessage, withMessage, type History } from "@/features/messages/history";
+import { mergeVersion } from "@/features/messages/versions";
 
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
 
@@ -16,6 +17,7 @@ export function applyToList(
   myId: string | undefined,
 ): { list: ConversationResponse[]; refetch: boolean } {
   if (event.type === "conversation.changed") return { list, refetch: true };
+  if (event.type === "message.updated") return applyUpdateToList(list, event);
   if (event.type !== "message.created") return { list, refetch: false };
 
   const known = list.find((conversation) => conversation.id === event.conversationId);
@@ -38,6 +40,25 @@ export function applyToList(
 }
 
 /**
+ * An edit or deletion only matters to the list when it is about the latest line: that line is swapped (keeping the
+ * count, the order and the sender's status). One about a newer Message than the line shows means a Message was missed.
+ */
+function applyUpdateToList(
+  list: ConversationResponse[],
+  event: Extract<RealtimeEvent, { type: "message.updated" }>,
+): { list: ConversationResponse[]; refetch: boolean } {
+  const known = list.find((conversation) => conversation.id === event.conversationId);
+  const shown = known?.lastMessage;
+  if (!known || !shown) return { list, refetch: true };
+  const seq = seqOf(event.message);
+  if (seq > seqOf(shown)) return { list, refetch: true };
+  if (seq < seqOf(shown)) return { list, refetch: false };
+  const merged = mergeVersion(shown, event.message);
+  if (merged === shown) return { list, refetch: false };
+  return { list: list.map((conversation) => (conversation === known ? { ...known, lastMessage: merged } : conversation)), refetch: false };
+}
+
+/**
  * How an event changes a Conversation's loaded history. `catchUp` says a Message skipped ahead of what is loaded, so
  * the ones in between should be fetched.
  */
@@ -45,9 +66,19 @@ export function applyToHistory(
   history: History | undefined,
   event: RealtimeEvent,
 ): { history: History | undefined; catchUp: boolean } {
-  if (!history || event.type !== "message.created") return { history, catchUp: false };
+  if (!history || (event.type !== "message.created" && event.type !== "message.updated")) return { history, catchUp: false };
   const have = latestSeq(history);
   const seq = seqOf(event.message);
+  if (event.type === "message.updated") {
+    const known = history.pages.flatMap((page) => page.messages ?? []).find((message) => message.seq === seq);
+    if (known) {
+      const merged = mergeVersion(known, event.message);
+      return { history: merged === known ? history : replaceMessage(history, merged), catchUp: false };
+    }
+    // Not loaded: older than anything shown (nothing to do), or newer than the newest (the new Message was missed).
+    if (seq < have) return { history, catchUp: false };
+    return { history: withMessage(history, event.message), catchUp: have > 0 && seq > have + 1 };
+  }
   if (history.pages.some((page) => page.messages?.some((known) => known.seq === seq))) return { history, catchUp: false };
   return { history: withMessage(history, event.message), catchUp: have > 0 && seq > have + 1 };
 }

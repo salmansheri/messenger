@@ -8,7 +8,8 @@ import {
   type ConversationResponse,
   type PresenceView,
 } from "@/lib/api";
-import { allMessagesKey } from "@/features/messages/queries";
+import type { History } from "@/features/messages/history";
+import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
 import { catchUp, handleEvent } from "./sync";
@@ -95,6 +96,74 @@ describe("handleEvent", () => {
 
     expect(client.getQueryData(listQueryKey())).toBe(before);
     expect(answers).toHaveLength(0);
+  });
+});
+
+describe("edited and deleted Messages", () => {
+  const stored = (seq: number, extra: object = {}) => ({
+    id: `m${seq}`,
+    conversationId: "c1",
+    seq,
+    senderId: "grace",
+    body: `m${seq}`,
+    createdAt: "2026-03-10T10:00:00Z",
+    ...extra,
+  });
+  const update = (message: object) => JSON.stringify({ type: "message.updated", conversationId: "c1", message });
+  const loadedHistory = (): History => ({ pages: [{ messages: [stored(1), stored(2)], hasMore: false }], pageParams: [{}] });
+
+  it("shows an edit in the history and on the list's latest line, and asks for nothing", () => {
+    const { client, answers } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+
+    handleEvent(client, update(stored(2, { body: "fixed", editedAt: "2026-03-10T10:05:00Z" })), createTypingTracker());
+
+    expect(client.getQueryData<History>(messagesKey("c1"))?.pages[0].messages?.map((m) => m.body)).toEqual(["m1", "fixed"]);
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].lastMessage?.body).toBe("fixed");
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].unreadCount, "not a new unread Message").toBe(0);
+    expect(answers).toHaveLength(0);
+  });
+
+  it("shows a deletion as a placeholder with no text", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+
+    handleEvent(client, update({ id: "m2", conversationId: "c1", seq: 2, senderId: "grace", deletedAt: "2026-03-10T10:06:00Z" }), createTypingTracker());
+
+    const message = client.getQueryData<History>(messagesKey("c1"))?.pages[0].messages?.[1];
+    expect(message?.deletedAt).toBe("2026-03-10T10:06:00Z");
+    expect(message?.body).toBeUndefined();
+  });
+
+  it("does not patch a history whose request is under way (its answer may predate the edit), but asks again", async () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+    let asked = 0;
+    stops.push(
+      new QueryObserver(client, {
+        queryKey: messagesKey("c1"),
+        staleTime: Infinity,
+        queryFn: () => (asked++, new Promise<History>(() => {})),
+      }).subscribe(() => {}),
+    );
+    void client.invalidateQueries({ queryKey: messagesKey("c1") });
+    await Promise.resolve();
+    expect(asked).toBe(1);
+
+    handleEvent(client, update(stored(2, { body: "fixed", editedAt: "2026-03-10T10:05:00Z" })), createTypingTracker());
+    await Promise.resolve();
+
+    expect(asked, "the request was restarted").toBe(2);
+    expect(client.getQueryData<History>(messagesKey("c1"))?.pages[0].messages?.[1].body, "not patched").toBe("m2");
+  });
+
+  it("asks for the list again when the edit is about a Message newer than the latest line", async () => {
+    const { client, answers } = withList([conversation(2, 0)]);
+
+    handleEvent(client, update(stored(5, { editedAt: "2026-03-10T10:05:00Z" })), createTypingTracker());
+    await Promise.resolve();
+
+    expect(answers).toHaveLength(1);
   });
 });
 

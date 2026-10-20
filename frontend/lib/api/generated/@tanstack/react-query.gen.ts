@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, create, forgotPassword, get, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unregister, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnregisterData, UnregisterResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, create, deleteForEveryone, edit, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unregister, updateSettings, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnregisterData, UnregisterResponse, UpdateSettingsData, UpdateSettingsResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
 
 export const lookupMutation = (options?: Partial<Options<LookupData>>): UseMutationOptions<LookupResponse, DefaultError, Options<LookupData>> => {
     const mutationOptions: UseMutationOptions<LookupResponse, DefaultError, Options<LookupData>> = {
@@ -194,6 +194,20 @@ export const sendMutation = (options?: Partial<Options<SendData>>): UseMutationO
     return mutationOptions;
 };
 
+export const hideMutation = (options?: Partial<Options<HideData>>): UseMutationOptions<HideResponse, DefaultError, Options<HideData>> => {
+    const mutationOptions: UseMutationOptions<HideResponse, DefaultError, Options<HideData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await hide({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const leaveMutation = (options?: Partial<Options<LeaveData>>): UseMutationOptions<LeaveResponse, DefaultError, Options<LeaveData>> => {
     const mutationOptions: UseMutationOptions<LeaveResponse, DefaultError, Options<LeaveData>> = {
         mutationFn: async (fnOptions) => {
@@ -367,6 +381,48 @@ export const renameMutation = (options?: Partial<Options<RenameData>>): UseMutat
     const mutationOptions: UseMutationOptions<RenameResponse, DefaultError, Options<RenameData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await rename({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateSettingsMutation = (options?: Partial<Options<UpdateSettingsData>>): UseMutationOptions<UpdateSettingsResponse, DefaultError, Options<UpdateSettingsData>> => {
+    const mutationOptions: UseMutationOptions<UpdateSettingsResponse, DefaultError, Options<UpdateSettingsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateSettings({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const deleteForEveryoneMutation = (options?: Partial<Options<DeleteForEveryoneData>>): UseMutationOptions<DeleteForEveryoneResponse, DefaultError, Options<DeleteForEveryoneData>> => {
+    const mutationOptions: UseMutationOptions<DeleteForEveryoneResponse, DefaultError, Options<DeleteForEveryoneData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteForEveryone({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const editMutation = (options?: Partial<Options<EditData>>): UseMutationOptions<EditResponse, DefaultError, Options<EditData>> => {
+    const mutationOptions: UseMutationOptions<EditResponse, DefaultError, Options<EditData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await edit({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

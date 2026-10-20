@@ -60,14 +60,15 @@ export async function createGroupVia(token: string, name: string, userIds: strin
   return ((await response.json()) as { id: string }).id;
 }
 
-/** Sends a Message through the backend. */
-export async function sendMessageVia(token: string, conversationId: string, body: string) {
+/** Sends a Message through the backend and returns its id. */
+export async function sendMessageVia(token: string, conversationId: string, body: string): Promise<string> {
   const response = await post(
     `/api/v1/conversations/${conversationId}/messages`,
     { clientMessageId: crypto.randomUUID(), body },
     token,
   );
   if (response.status !== 201) throw new Error(`Send failed: ${response.status}`);
+  return ((await response.json()) as { id: string }).id;
 }
 
 /** Asks the backend for a password reset code (the answer is the same whether or not the address has an account). */
@@ -76,12 +77,15 @@ export async function forgotPasswordVia(email: string): Promise<number> {
 }
 
 /** Every Message in a Conversation as the backend stores it (the newest page, up to 100). */
-export async function messagesVia(token: string, conversationId: string): Promise<{ seq: number; body: string }[]> {
+export async function messagesVia(
+  token: string,
+  conversationId: string,
+): Promise<{ id: string; seq: number; body?: string; editedAt?: string; deletedAt?: string }[]> {
   const response = await fetch(`${BACKEND_URL}/api/v1/conversations/${conversationId}/messages?limit=100`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (response.status !== 200) throw new Error(`History failed: ${response.status}`);
-  return ((await response.json()) as { messages: { seq: number; body: string }[] }).messages;
+  return ((await response.json()) as { messages: never[] }).messages;
 }
 
 /** Reports that the caller has read up to a position (like opening the Conversation in another app would). */
@@ -126,4 +130,16 @@ export async function conversationVia(
   });
   if (response.status !== 200) throw new Error(`Get conversation failed: ${response.status}`);
   return (await response.json()) as never;
+}
+
+/** Edits the caller's own Message through the backend. */
+export async function editMessageVia(token: string, conversationId: string, messageId: string, body: string) {
+  const response = await send("PATCH", `/api/v1/conversations/${conversationId}/messages/${messageId}`, token, { body });
+  if (response.status !== 200) throw new Error(`Edit failed: ${response.status}`);
+}
+
+/** Deletes the caller's own Message for everyone through the backend. */
+export async function deleteMessageVia(token: string, conversationId: string, messageId: string) {
+  const response = await send("DELETE", `/api/v1/conversations/${conversationId}/messages/${messageId}`, token);
+  if (response.status !== 204) throw new Error(`Delete failed: ${response.status}`);
 }

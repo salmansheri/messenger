@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddParticipantData, AddParticipantResponses, CreateData, CreateResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SendData, SendResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnregisterData, UnregisterResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
+import type { AddParticipantData, AddParticipantResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SendData, SendResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnregisterData, UnregisterResponses, UpdateSettingsData, UpdateSettingsResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -78,6 +78,12 @@ export const send = <ThrowOnError extends boolean = true>(options: Options<SendD
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const hide = <ThrowOnError extends boolean = true>(options: Options<HideData, ThrowOnError>): RequestResult<HideResponses, unknown, ThrowOnError> => (options.client ?? client).post<HideResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}/hide',
+    ...options
 });
 
 export const leave = <ThrowOnError extends boolean = true>(options: Options<LeaveData, ThrowOnError>): RequestResult<LeaveResponses, unknown, ThrowOnError> => (options.client ?? client).post<LeaveResponses, unknown, ThrowOnError>({
@@ -191,6 +197,32 @@ export const get = <ThrowOnError extends boolean = true>(options: Options<GetDat
 export const rename = <ThrowOnError extends boolean = true>(options: Options<RenameData, ThrowOnError>): RequestResult<RenameResponses, unknown, ThrowOnError> => (options.client ?? client).patch<RenameResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const updateSettings = <ThrowOnError extends boolean = true>(options: Options<UpdateSettingsData, ThrowOnError>): RequestResult<UpdateSettingsResponses, unknown, ThrowOnError> => (options.client ?? client).patch<UpdateSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversations/{conversationId}/settings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteForEveryone = <ThrowOnError extends boolean = true>(options: Options<DeleteForEveryoneData, ThrowOnError>): RequestResult<DeleteForEveryoneResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteForEveryoneResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}',
+    ...options
+});
+
+export const edit = <ThrowOnError extends boolean = true>(options: Options<EditData, ThrowOnError>): RequestResult<EditResponses, unknown, ThrowOnError> => (options.client ?? client).patch<EditResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

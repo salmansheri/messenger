@@ -105,3 +105,25 @@ describe("buildTimeline", () => {
     expect(messages.map((i) => i.mine)).toEqual([false, true, true, true]);
   });
 });
+
+describe("edited and deleted Messages in the timeline", () => {
+  it("carries the id and whether a Message was edited or deleted, and shows a deleted one with no text", () => {
+    const edited: MessageResponse = { ...msg(1, "a", "2026-03-10T10:00:00Z", "fixed"), editedAt: "2026-03-10T10:05:00Z" };
+    const deleted: MessageResponse = { id: "id2", seq: 2, senderId: "a", createdAt: "2026-03-10T10:01:00Z", deletedAt: "2026-03-10T10:06:00Z" };
+
+    const items = build({ confirmed: [edited, deleted, msg(3, "a", "2026-03-10T10:02:00Z")], myId: "a" });
+    const messages = items.filter((item) => item.kind === "message");
+
+    expect(messages.map((m) => [m.messageId, m.edited, m.deleted, m.body])).toEqual([
+      ["id1", true, false, "fixed"],
+      ["id2", false, true, ""],
+      ["id3", false, false, "m3"],
+    ]);
+  });
+
+  it("has no id, and is neither edited nor deleted, while a Message is still being sent", () => {
+    const [message] = build({ pending: [pending("x", "Sending now")], myId: "a" }).filter((item) => item.kind === "message");
+
+    expect([message.messageId, message.edited, message.deleted]).toEqual([undefined, false, false]);
+  });
+});

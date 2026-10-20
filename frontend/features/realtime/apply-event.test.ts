@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
+import type { History } from "@/features/messages/history";
 import { applyToHistory, applyToList, applyUnread } from "./apply-event";
 
 const ME = "me";
@@ -146,6 +147,89 @@ describe("applyToHistory", () => {
       catchUp: false,
     });
     expect(applyToHistory(history, { type: "ignored" }).history).toBe(history);
+  });
+});
+
+const updated = (message: MessageResponse, conversationId = "c1"): RealtimeEvent => ({
+  type: "message.updated",
+  conversationId,
+  message,
+});
+
+describe("applyToList for an edited or deleted Message", () => {
+  const list = [conversation("c1", { lastMessage: { ...msg(3, ME), status: "DELIVERED" }, unreadCount: 2, updatedAt: "2026-03-10T09:00:00Z" })];
+
+  it("shows the new text on the latest line without touching the count or the order", () => {
+    const result = applyToList(list, updated({ ...msg(3, ME), body: "fixed", editedAt: "2026-03-10T10:05:00Z" }), ME);
+
+    expect(result.refetch).toBe(false);
+    expect(result.list[0].lastMessage?.body).toBe("fixed");
+    expect(result.list[0].lastMessage?.status, "the sender's own status is kept").toBe("DELIVERED");
+    expect(result.list[0].unreadCount).toBe(2);
+    expect(result.list[0].updatedAt).toBe("2026-03-10T09:00:00Z");
+  });
+
+  it("shows a deleted latest Message as deleted", () => {
+    const result = applyToList(list, updated({ id: "id3", conversationId: "c1", seq: 3, senderId: ME, deletedAt: "2026-03-10T10:06:00Z" }), ME);
+
+    expect(result.list[0].lastMessage?.deletedAt).toBe("2026-03-10T10:06:00Z");
+    expect(result.list[0].lastMessage?.body).toBeUndefined();
+  });
+
+  it("changes nothing for a Message that is not the latest line", () => {
+    const result = applyToList(list, updated({ ...msg(2), body: "older, edited", editedAt: "2026-03-10T10:05:00Z" }), ME);
+
+    expect(result).toEqual({ list, refetch: false });
+  });
+
+  it("changes nothing when it is an older version than the one shown", () => {
+    const shown = [conversation("c1", { lastMessage: { ...msg(3), body: "two", editedAt: "2026-03-10T10:05:00Z" } })];
+
+    const result = applyToList(shown, updated({ ...msg(3), body: "one", editedAt: "2026-03-10T10:00:00Z" }), ME);
+
+    expect(result.list).toBe(shown);
+  });
+
+  it("asks again when the Conversation is unknown or the Message is newer than the latest line (one was missed)", () => {
+    expect(applyToList(list, updated(msg(3), "other"), ME).refetch).toBe(true);
+    expect(applyToList(list, updated({ ...msg(5), editedAt: "2026-03-10T10:05:00Z" }), ME).refetch).toBe(true);
+  });
+});
+
+describe("applyToHistory for an edited or deleted Message", () => {
+  const loaded = (): History => ({ pages: [{ messages: [msg(2), { ...msg(3, ME), status: "READ" }], hasMore: false }], pageParams: [{}] });
+
+  it("replaces the Message in place and keeps the sender's status", () => {
+    const result = applyToHistory(loaded(), updated({ ...msg(3, ME), body: "fixed", editedAt: "2026-03-10T10:05:00Z" }));
+
+    expect(result.catchUp).toBe(false);
+    expect(result.history?.pages[0].messages?.map((m) => m.body)).toEqual(["m2", "fixed"]);
+    expect(result.history?.pages[0].messages?.[1].status).toBe("READ");
+  });
+
+  it("never brings back the text of a Message already deleted, however late the edit arrives", () => {
+    const deletedAlready: History = { pages: [{ messages: [msg(2), { id: "id3", conversationId: "c1", seq: 3, senderId: ME, deletedAt: "2026-03-10T10:06:00Z" }], hasMore: false }], pageParams: [{}] };
+
+    const result = applyToHistory(deletedAlready, updated({ ...msg(3, ME), body: "fixed", editedAt: "2026-03-10T10:09:00Z" }));
+
+    expect(result.history).toBe(deletedAlready);
+  });
+
+  it("ignores an update to a Message older than anything loaded", () => {
+    const history = loaded();
+
+    expect(applyToHistory(history, updated({ ...msg(1), editedAt: "2026-03-10T10:05:00Z" }))).toEqual({ history, catchUp: false });
+  });
+
+  it("takes a Message newer than the newest as if it had just arrived, and asks to catch up over a gap", () => {
+    const result = applyToHistory(loaded(), updated({ ...msg(5), editedAt: "2026-03-10T10:05:00Z" }));
+
+    expect(result.history?.pages[0].messages?.map((m) => m.seq)).toEqual([2, 3, 5]);
+    expect(result.catchUp).toBe(true);
+  });
+
+  it("does nothing when no history is loaded", () => {
+    expect(applyToHistory(undefined, updated(msg(3)))).toEqual({ history: undefined, catchUp: false });
   });
 });
 

@@ -56,6 +56,12 @@ describe("lastLine", () => {
     expect(lastLine(c, ME)).toBe("See you at nine");
   });
 
+  it("says a deleted Message was deleted, whoever sent it, rather than that nothing was sent", () => {
+    const deletedAt = "2026-03-10T10:06:00Z";
+    expect(lastLine(direct({ lastMessage: { senderId: ME, deletedAt } }), ME)).toBe("This Message was deleted");
+    expect(lastLine(direct({ lastMessage: { senderId: "grace-id", deletedAt } }), ME)).toBe("This Message was deleted");
+  });
+
   it("marks the viewer's own Message", () => {
     const c = direct({ lastMessage: { senderId: ME, body: "On my way" } });
     expect(lastLine(c, ME)).toBe("You: On my way");

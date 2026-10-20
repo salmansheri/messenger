@@ -35,6 +35,12 @@ export type TimelineItem =
       /** The first of a run from the same sender: the one that carries the name. */
       startsRun: boolean;
       seq?: number;
+      /** The server's id of a confirmed Message (what edit and delete are asked about); none while it is being sent. */
+      messageId?: string;
+      /** The sender changed the text after sending it. */
+      edited: boolean;
+      /** Deleted for everyone: only a placeholder is left. */
+      deleted: boolean;
     };
 
 type Input = {
@@ -56,6 +62,9 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
   const rows = [
     ...confirmed.map((message) => ({
       key: `seq-${message.seq}`,
+      messageId: message.id,
+      edited: Boolean(message.editedAt) && !message.deletedAt,
+      deleted: Boolean(message.deletedAt),
       seq: message.seq,
       senderId: message.senderId,
       body: message.body ?? "",
@@ -67,6 +76,9 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       .filter((entry) => !stored.has(entry.clientMessageId))
       .map((entry) => ({
         key: `pending-${entry.clientMessageId}`,
+        messageId: undefined,
+        edited: false,
+        deleted: false,
         seq: undefined,
         senderId: myId,
         body: entry.body,
@@ -95,6 +107,9 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       kind: "message",
       key: row.key,
       seq: row.seq,
+      messageId: row.messageId,
+      edited: row.edited,
+      deleted: row.deleted,
       senderId: row.senderId,
       body: row.body,
       createdAt: row.createdAt,

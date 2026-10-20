@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { listQueryKey, sdk, toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
-import { formatClock } from "@/features/conversations/present";
 import { useFrontier } from "@/features/receipts/queries";
-import { statusFor, type Frontier } from "@/features/receipts/status";
+import type { Frontier } from "@/features/receipts/status";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
@@ -16,8 +15,8 @@ import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
 import { useAnnouncements } from "./use-announcements";
+import { MessageRow } from "./message-row";
 import { useReportReading } from "./use-report-reading";
-import { sendFailureMessage } from "./wording";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
 /** Within this many pixels of the bottom, the view follows new Messages. */
@@ -201,7 +200,7 @@ export function MessageView({ conversation, myId }: Props) {
           ) : (
             <ol aria-label="Messages">
               {items.map((item) => (
-                <Row key={item.key} item={item} names={names} frontier={frontier} onRetry={outbox.retry} />
+                <Row key={item.key} item={item} conversationId={conversationId} names={names} frontier={frontier} onRetry={outbox.retry} />
               ))}
             </ol>
           )}
@@ -214,7 +213,7 @@ export function MessageView({ conversation, myId }: Props) {
       </div>
       <div role="log" aria-label="New Messages" className="sr-only">
         {spoken.map((line) => (
-          <p key={line.seq}>{line.text}</p>
+          <p key={`${line.seq}-${line.change ?? "new"}`}>{line.text}</p>
         ))}
       </div>
       <TypingLine conversationId={conversationId} names={names} />
@@ -231,11 +230,13 @@ export function MessageView({ conversation, myId }: Props) {
 
 function Row({
   item,
+  conversationId,
   names,
   frontier,
   onRetry,
 }: {
   item: TimelineItem;
+  conversationId: string;
   names: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
@@ -254,50 +255,5 @@ function Row({
       </li>
     );
   }
-  const { mine, pending } = item;
-  const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
-  return (
-    <li
-      data-seq={!mine && item.seq !== undefined ? item.seq : undefined}
-      className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}
-    >
-      <div className="flex flex-col items-start gap-0.5 pt-1">
-        <time dateTime={item.createdAt} className="font-mono text-xs text-ink-muted">
-          {formatClock(item.createdAt)}
-        </time>
-        {mine && !pending && item.seq !== undefined && <ReceiptMark status={statusFor({ seq: item.seq, status: item.status }, frontier)} />}
-      </div>
-      <div className={`min-w-0 border-l-2 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
-        {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
-        <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
-        {pending?.status === "sending" && <p className="text-xs text-ink-muted">Sending…</p>}
-        {pending?.status === "failed" && (
-          <p className="flex flex-wrap items-center gap-x-3 text-sm">
-            <span className="text-accent">
-              Not sent. {pending.error ? sendFailureMessage(toProblem(pending.error)) : ""}
-            </span>
-            <Button variant="quiet" onClick={() => onRetry(pending.clientMessageId)}>
-              Retry
-            </Button>
-          </p>
-        )}
-      </div>
-    </li>
-  );
-}
-
-const STATUS_WORDS = { SENT: "Sent", DELIVERED: "Delivered", READ: "Read" } as const;
-
-/** How far a Message of the person's own has got, as dots: one for sent, two for delivered, two in the accent for read. */
-function ReceiptMark({ status }: { status: keyof typeof STATUS_WORDS }) {
-  return (
-    <span
-      role="img"
-      aria-label={STATUS_WORDS[status]}
-      title={STATUS_WORDS[status]}
-      className={`font-mono text-xs leading-none tracking-tighter ${status === "READ" ? "text-accent" : "text-ink-muted"}`}
-    >
-      {status === "SENT" ? "•" : "••"}
-    </span>
-  );
+  return <MessageRow item={item} conversationId={conversationId} names={names} frontier={frontier} onRetry={onRetry} />;
 }
