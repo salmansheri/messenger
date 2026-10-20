@@ -51,6 +51,10 @@ public class Message {
 	@Column(name = "deleted_at")
 	private Instant deletedAt;
 
+	/** The Message this one answers (always in the same Conversation), or null. */
+	@Column(name = "reply_to_id")
+	private UUID replyToId;
+
 	public boolean isDeleted() {
 		return deletedAt != null;
 	}

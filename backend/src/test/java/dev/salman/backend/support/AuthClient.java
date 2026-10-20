@@ -195,6 +195,13 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Sends a new message that quotes another one of the same conversation. */
+	public ResultActions sendReply(String accessToken, String conversationId, Object clientMessageId, String body,
+			Object replyToMessageId) throws Exception {
+		return sendBody(accessToken, conversationId,
+				Map.of("clientMessageId", clientMessageId, "body", body, "replyToMessageId", replyToMessageId));
+	}
+
 	/** Changes the caller's own mute, archive and pin settings for a Conversation; absent keys stay as they are. */
 	public ResultActions updateSettings(String accessToken, String conversationId, Map<String, Object> settings)
 			throws Exception {

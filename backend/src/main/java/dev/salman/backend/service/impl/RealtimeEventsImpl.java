@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.RealtimeEvent;
+import dev.salman.backend.dto.ReplyQuote;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.entity.Message;
@@ -31,14 +33,12 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 
 	private final ParticipantRepository participants;
 	private final MessageHiddenRepository hidden;
+	private final QuoteResolver quotes;
 	private final RealtimePublisher publisher;
 
 	@Override
 	public void messageCreated(Message message) {
-		var members = participants.findByConversationId(message.getConversationId());
-		// No status in the pushed copy: it is the sender's own view and changes as receipts arrive.
-		publish(userIds(members), event("message.created", message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null))));
+		publishMessage("message.created", message, participants.findByConversationId(message.getConversationId()));
 	}
 
 	@Override
@@ -46,10 +46,25 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		// Only people who can still read it: not someone who joined after it, nor who hid it for themselves.
 		var members = participants.findByConversationId(message.getConversationId()).stream()
 				.filter(m -> m.canRead(message.getSeq())).toList();
-		var recipients = userIds(members);
-		recipients.removeAll(hidden.findUserIdsWhoHid(message.getId()));
-		publish(recipients, event("message.updated", message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null))));
+		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
+		publishMessage("message.updated", message, members.stream().filter(m -> !hiders.contains(m.getUserId())).toList());
+	}
+
+	/**
+	 * Tells these Participants about the Message. No status in the pushed copy: it is the sender's own view and changes
+	 * as receipts arrive. A reply carries a quote of the Message it answers, which differs by who reads it (someone who
+	 * joined after the quoted Message must not get its text), so recipients with the same quote share one event.
+	 */
+	private void publishMessage(String type, Message message, Collection<Participant> recipients) {
+		var answered = quotes.quotedBy(message);
+		var hid = answered.map(quotes::hiddenBy).orElse(Set.of());
+		Map<Optional<ReplyQuote>, Set<UUID>> audiences = new LinkedHashMap<>();
+		for (var member : recipients) {
+			var quote = answered.map(original -> QuoteResolver.quoteFor(original, member, hid.contains(member.getUserId())));
+			audiences.computeIfAbsent(quote, q -> new LinkedHashSet<>()).add(member.getUserId());
+		}
+		audiences.forEach((quote, audience) -> publish(audience, event(type, message.getConversationId(),
+				Map.of("message", MessageResponse.from(message, null, quote.orElse(null))))));
 	}
 
 	@Override

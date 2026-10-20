@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.data.domain.Limit;
@@ -41,6 +42,7 @@ public class MessageServiceImpl implements MessageService {
 	private final ParticipantRepository participants;
 	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
+	private final QuoteResolver quotes;
 	private final RealtimeEvents events;
 	private final PushService push;
 	private final MessageThrottle throttle;
@@ -54,7 +56,8 @@ public class MessageServiceImpl implements MessageService {
 	 */
 	@Override
 	@Transactional
-	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body) {
+	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body,
+			UUID replyToMessageId) {
 		requireParticipant(callerId, conversationId);
 		// Before the lock, so a User over the limit never queues behind (or in front of) other people's sends. A
 		// retry the server already stored is answered below without counting; two retries racing here at worst
@@ -64,17 +67,31 @@ public class MessageServiceImpl implements MessageService {
 			throttle.send(callerId);
 		}
 		var conversation = conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
-		requireParticipant(callerId, conversationId); // again, under the lock: a removal may have just committed
+		// Again, under the lock: a removal may have just committed. Only the join point is read here, not the
+		// Participant: see ParticipantRepository.findJoinedAfterSeq.
+		var joinedAfter = participants.findJoinedAfterSeq(conversationId, callerId).orElseThrow(MessageServiceImpl::notFound);
 
 		var existing = messages.findByConversationIdAndSenderIdAndClientMessageId(conversationId, callerId,
 				clientMessageId);
 		if (existing.isPresent()) {
 			// Once edited or deleted there is no original text left to compare with: the retry is the same Message.
 			var stored = existing.get();
-			if (!stored.isDeleted() && stored.getEditedAt() == null && !stored.getBody().equals(body)) {
+			if ((!stored.isDeleted() && stored.getEditedAt() == null && !stored.getBody().equals(body))
+					|| !Objects.equals(stored.getReplyToId(), replyToMessageId)) {
 				throw new ConflictException("This client message ID was already used for a different message.");
 			}
-			return new SentMessage(MessageResponse.from(existing.get(), statusFor(existing.get(), callerId)), false);
+			return new SentMessage(responseFor(stored, statusFor(stored, callerId), viewer(conversationId, callerId)), false);
+		}
+
+		if (replyToMessageId != null) {
+			// Only what the replier may read can be answered; anything else looks like it does not exist.
+			var answered = messages.findByIdAndConversationId(replyToMessageId, conversationId)
+					.filter(candidate -> candidate.getSeq() > joinedAfter)
+					.filter(candidate -> hidden.findHiddenAmong(callerId, List.of(candidate.getId())).isEmpty())
+					.orElseThrow(() -> new NotFoundException("Message not found."));
+			if (answered.isDeleted()) {
+				throw new ConflictException("You cannot reply to a deleted Message.");
+			}
 		}
 
 		var now = clock.instant();
@@ -86,6 +103,7 @@ public class MessageServiceImpl implements MessageService {
 		message.setSenderId(callerId);
 		message.setClientMessageId(clientMessageId);
 		message.setBody(body);
+		message.setReplyToId(replyToMessageId);
 		message.setCreatedAt(now);
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
@@ -101,7 +119,7 @@ public class MessageServiceImpl implements MessageService {
 					new ReceiptResponse(message.getSeq(), message.getSeq(), 0));
 		}
 		// Nobody can report a position that did not exist before this send, so a new Message is always still SENT.
-		return new SentMessage(MessageResponse.from(message, MessageStatus.SENT), true);
+		return new SentMessage(responseFor(message, MessageStatus.SENT, viewer(conversationId, callerId)), true);
 	}
 
 	@Override
@@ -124,7 +142,17 @@ public class MessageServiceImpl implements MessageService {
 			messages.save(message);
 			events.messageUpdated(message);
 		}
-		return MessageResponse.from(message, statusFor(message, callerId));
+		return responseFor(message, statusFor(message, callerId), viewer(conversationId, callerId));
+	}
+
+	/** The caller as a Participant, for working out what they may see of a quote. */
+	private Participant viewer(UUID conversationId, UUID callerId) {
+		return participants.findByConversationIdAndUserId(conversationId, callerId).orElseThrow(MessageServiceImpl::notFound);
+	}
+
+	/** The Message as {@code viewer} sees it, with the quote if it answers another one. */
+	private MessageResponse responseFor(Message message, MessageStatus status, Participant viewer) {
+		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()));
 	}
 
 	@Override
@@ -201,9 +229,10 @@ public class MessageServiceImpl implements MessageService {
 		}
 		var members = page.stream().anyMatch(m -> m.getSenderId().equals(callerId))
 				? participants.findByConversationId(conversationId) : List.<Participant>of();
-		return new MessagePage(
-				page.stream().map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members))).toList(),
-				hasMore);
+		var quoted = quotes.resolve(page, conversation -> reader);
+		return new MessagePage(page.stream()
+				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId())))
+				.toList(), hasMore);
 	}
 
 	private MessageStatus statusFor(Message message, UUID callerId) {

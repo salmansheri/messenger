@@ -56,6 +56,14 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
 			""", nativeQuery = true)
 	int advanceReceipts(UUID conversationId, UUID userId, long delivered, long read);
 
+	/**
+	 * Where the Participant's readable history starts, read without loading the Participant. Loading the entity early
+	 * in a send would leave a stale copy in the persistence context, and the receipt events worked out after the
+	 * positions move would read that copy instead of the new positions.
+	 */
+	@Query("select p.joinedAfterSeq from Participant p where p.conversationId = :conversationId and p.userId = :userId")
+	Optional<Long> findJoinedAfterSeq(UUID conversationId, UUID userId);
+
 	/** How many Conversations the User has pinned. */
 	long countByUserIdAndPinnedTrue(UUID userId);
 

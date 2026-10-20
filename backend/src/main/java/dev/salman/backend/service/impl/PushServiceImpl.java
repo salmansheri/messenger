@@ -17,6 +17,7 @@ import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.lib.AfterCommit;
+import dev.salman.backend.lib.Previews;
 import dev.salman.backend.lib.NotificationSender;
 import dev.salman.backend.lib.PushPublisher;
 import dev.salman.backend.lib.PushResult;
@@ -151,10 +152,7 @@ public class PushServiceImpl implements PushService {
 	}
 
 	private static String preview(String body) {
-		if (body.codePointCount(0, body.length()) <= PREVIEW_CHARACTERS) {
-			return body;
-		}
-		return body.substring(0, body.offsetByCodePoints(0, PREVIEW_CHARACTERS)) + "\u2026";
+		return Previews.firstCharacters(body, PREVIEW_CHARACTERS);
 	}
 
 }
