@@ -187,6 +187,26 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	public ResultActions editMessage(String accessToken, String conversationId, String messageId, String body)
+			throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.patch("/api/v1/conversations/{id}/messages/{messageId}",
+				conversationId, messageId).contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("body", body)))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	/** Deletes the Message for everyone. */
+	public ResultActions deleteMessage(String accessToken, String conversationId, String messageId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/conversations/{id}/messages/{messageId}",
+				conversationId, messageId).header("Authorization", "Bearer " + accessToken));
+	}
+
+	/** Hides the Message from the caller's own view only. */
+	public ResultActions hideMessage(String accessToken, String conversationId, String messageId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/conversations/{id}/messages/{messageId}/hide",
+				conversationId, messageId).header("Authorization", "Bearer " + accessToken));
+	}
+
 	/** Sends a new message with a fresh client message id and returns the stored message. */
 	public JsonNode sendNew(String accessToken, String conversationId, String body)
 			throws Exception {

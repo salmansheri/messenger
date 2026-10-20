@@ -39,10 +39,20 @@ public class Message {
 	@Column(name = "client_message_id", nullable = false)
 	private UUID clientMessageId;
 
-	@Column(nullable = false)
+	/** Null once the Message is deleted for everyone. */
 	private String body;
 
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
+
+	@Column(name = "edited_at")
+	private Instant editedAt;
+
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
+
+	public boolean isDeleted() {
+		return deletedAt != null;
+	}
 
 }

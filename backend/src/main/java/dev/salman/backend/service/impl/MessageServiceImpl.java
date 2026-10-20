@@ -20,8 +20,11 @@ import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.ConflictException;
+import dev.salman.backend.exception.ForbiddenException;
 import dev.salman.backend.exception.NotFoundException;
+import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.repository.ConversationRepository;
+import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.MessageService;
@@ -37,9 +40,11 @@ public class MessageServiceImpl implements MessageService {
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
 	private final MessageRepository messages;
+	private final MessageHiddenRepository hidden;
 	private final RealtimeEvents events;
 	private final PushService push;
 	private final MessageThrottle throttle;
+	private final AppProperties props;
 	private final Clock clock;
 
 	/**
@@ -64,7 +69,9 @@ public class MessageServiceImpl implements MessageService {
 		var existing = messages.findByConversationIdAndSenderIdAndClientMessageId(conversationId, callerId,
 				clientMessageId);
 		if (existing.isPresent()) {
-			if (!existing.get().getBody().equals(body)) {
+			// Once edited or deleted there is no original text left to compare with: the retry is the same Message.
+			var stored = existing.get();
+			if (!stored.isDeleted() && stored.getEditedAt() == null && !stored.getBody().equals(body)) {
 				throw new ConflictException("This client message ID was already used for a different message.");
 			}
 			return new SentMessage(MessageResponse.from(existing.get(), statusFor(existing.get(), callerId)), false);
@@ -98,6 +105,77 @@ public class MessageServiceImpl implements MessageService {
 	}
 
 	@Override
+	@Transactional
+	public MessageResponse edit(UUID callerId, UUID conversationId, UUID messageId, String body) {
+		requireParticipant(callerId, conversationId);
+		throttle.change(callerId); // before the lock, like sending
+		conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
+		var message = ownMessage(callerId, conversationId, messageId);
+		if (message.isDeleted()) {
+			throw new ConflictException("This Message was deleted.");
+		}
+		if (clock.instant().isAfter(message.getCreatedAt().plus(props.messages().editWindow()))) {
+			throw new ConflictException("A Message can only be edited for "
+					+ props.messages().editWindow().toMinutes() + " minutes after it is sent.");
+		}
+		if (!message.getBody().equals(body)) {
+			message.setBody(body);
+			message.setEditedAt(clock.instant());
+			messages.save(message);
+			events.messageUpdated(message);
+		}
+		return MessageResponse.from(message, statusFor(message, callerId));
+	}
+
+	@Override
+	@Transactional
+	public void deleteForEveryone(UUID callerId, UUID conversationId, UUID messageId) {
+		requireParticipant(callerId, conversationId);
+		throttle.change(callerId);
+		conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
+		var message = ownMessage(callerId, conversationId, messageId);
+		if (message.isDeleted()) {
+			return;
+		}
+		var now = clock.instant();
+		if (now.isAfter(message.getCreatedAt().plus(props.messages().deleteWindow()))) {
+			throw new ConflictException("A Message can only be deleted for everyone for "
+					+ props.messages().deleteWindow().toMinutes() + " minutes after it is sent.");
+		}
+		message.setBody(null);
+		message.setDeletedAt(now);
+		messages.save(message);
+		events.messageUpdated(message);
+	}
+
+	@Override
+	@Transactional
+	public void hideForCaller(UUID callerId, UUID conversationId, UUID messageId) {
+		var member = participants.findByConversationIdAndUserId(conversationId, callerId)
+				.orElseThrow(MessageServiceImpl::notFound);
+		throttle.change(callerId);
+		messages.findByIdAndConversationId(messageId, conversationId).filter(m -> member.canRead(m.getSeq()))
+				.orElseThrow(() -> new NotFoundException("Message not found."));
+		hidden.hide(callerId, messageId, conversationId, clock.instant());
+	}
+
+	/**
+	 * The caller's own Message in this Conversation, under the lock. One that is not in the Conversation, or is from
+	 * before the caller joined, looks the same as one that does not exist.
+	 */
+	private Message ownMessage(UUID callerId, UUID conversationId, UUID messageId) {
+		var member = participants.findByConversationIdAndUserId(conversationId, callerId)
+				.orElseThrow(MessageServiceImpl::notFound); // again, under the lock: a removal may have just committed
+		var message = messages.findByIdAndConversationId(messageId, conversationId)
+				.filter(m -> member.canRead(m.getSeq()))
+				.orElseThrow(() -> new NotFoundException("Message not found."));
+		if (!message.getSenderId().equals(callerId)) {
+			throw new ForbiddenException("Only the sender can do that.");
+		}
+		return message;
+	}
+
+	@Override
 	@Transactional(readOnly = true)
 	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit) {
 		var reader = participants.findByConversationIdAndUserId(conversationId, callerId)
@@ -109,15 +187,12 @@ public class MessageServiceImpl implements MessageService {
 		var fetch = Limit.of(limit + 1);
 		List<Message> found;
 		if (afterSeq != null) {
-			found = messages.findByConversationIdAndSeqGreaterThanOrderBySeqAsc(conversationId,
-					reader.readableAfter(afterSeq), fetch);
+			found = messages.findVisibleAfter(conversationId, callerId, reader.readableAfter(afterSeq), fetch);
 		}
 		else {
 			found = new ArrayList<>(beforeSeq != null
-					? messages.findByConversationIdAndSeqGreaterThanAndSeqLessThanOrderBySeqDesc(conversationId,
-							reader.readableAfter(0), beforeSeq, fetch)
-					: messages.findByConversationIdAndSeqGreaterThanOrderBySeqDesc(conversationId,
-							reader.readableAfter(0), fetch));
+					? messages.findVisibleBefore(conversationId, callerId, reader.readableAfter(0), beforeSeq, fetch)
+					: messages.findVisibleNewest(conversationId, callerId, reader.readableAfter(0), fetch));
 		}
 		var hasMore = found.size() > limit;
 		var page = new ArrayList<>(hasMore ? found.subList(0, limit) : found);

@@ -19,6 +19,7 @@ import dev.salman.backend.entity.Participant;
 import dev.salman.backend.lib.AfterCommit;
 import dev.salman.backend.lib.RealtimeListener;
 import dev.salman.backend.lib.RealtimePublisher;
+import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class RealtimeEventsImpl implements RealtimeEvents {
 
 	private final ParticipantRepository participants;
+	private final MessageHiddenRepository hidden;
 	private final RealtimePublisher publisher;
 
 	@Override
@@ -35,6 +37,17 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var members = participants.findByConversationId(message.getConversationId());
 		// No status in the pushed copy: it is the sender's own view and changes as receipts arrive.
 		publish(userIds(members), event("message.created", message.getConversationId(),
+				Map.of("message", MessageResponse.from(message, null))));
+	}
+
+	@Override
+	public void messageUpdated(Message message) {
+		// Only people who can still read it: not someone who joined after it, nor who hid it for themselves.
+		var members = participants.findByConversationId(message.getConversationId()).stream()
+				.filter(m -> m.canRead(message.getSeq())).toList();
+		var recipients = userIds(members);
+		recipients.removeAll(hidden.findUserIdsWhoHid(message.getId()));
+		publish(recipients, event("message.updated", message.getConversationId(),
 				Map.of("message", MessageResponse.from(message, null))));
 	}
 

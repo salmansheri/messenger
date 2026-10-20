@@ -30,6 +30,8 @@ app:
   messages:
     max-sends-per-minute: 60
     max-changes-per-minute: 120
+    edit-window: 15m
+    delete-window: 1h
   push:
     max-devices-per-user: 10
     retry-delay: 30s

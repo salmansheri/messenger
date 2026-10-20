@@ -17,6 +17,8 @@ import dev.salman.backend.entity.Message;
  * <p>Event types, each a JSON object with {@code type} and {@code conversationId}:
  * <ul>
  * <li>{@code message.created}: a new Message ({@code message}), to every Participant;</li>
+ * <li>{@code message.updated}: a Message was edited ({@code message}, with its new text and {@code editedAt}), to
+ * every Participant;</li>
  * <li>{@code receipts.updated}: {@code deliveredUpTo} and {@code readUpTo}, the point everyone else has reached,
  * worked out separately for each recipient and sent only to those for whom it moved;</li>
  * <li>{@code unread.updated}: the reporter's own {@code deliveredSeq}, {@code readSeq} and {@code unreadCount}, to
@@ -36,6 +38,13 @@ import dev.salman.backend.entity.Message;
 public interface RealtimeEvents {
 
 	void messageCreated(Message message);
+
+	/**
+	 * A Message's text changed or it was deleted for everyone; the pushed copy has no status, like
+	 * {@code message.created}. Heard only by current Participants who can read it (joined before it) and have not hidden
+	 * it for themselves.
+	 */
+	void messageUpdated(Message message);
 
 	/**
 	 * The reporter's positions moved from {@code before} to {@code after}. Everyone whose view of how far the others

@@ -16,15 +16,34 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 	Optional<Message> findByConversationIdAndSenderIdAndClientMessageId(UUID conversationId, UUID senderId,
 			UUID clientMessageId);
 
-	/** The newest messages after {@code minSeq} (the Participant's join point), newest first. */
-	List<Message> findByConversationIdAndSeqGreaterThanOrderBySeqDesc(UUID conversationId, long minSeq, Limit limit);
+	Optional<Message> findByIdAndConversationId(UUID id, UUID conversationId);
 
-	/** Messages between {@code minSeq} and {@code beforeSeq} (both exclusive), newest first. */
-	List<Message> findByConversationIdAndSeqGreaterThanAndSeqLessThanOrderBySeqDesc(UUID conversationId, long minSeq,
-			long beforeSeq, Limit limit);
+	/**
+	 * The newest Messages after {@code minSeq} (the Participant's join point) that the viewer has not hidden, newest
+	 * first.
+	 */
+	@Query("""
+			select m from Message m where m.conversationId = :conversationId and m.seq > :minSeq
+			and not exists (select 1 from MessageHidden h where h.messageId = m.id and h.userId = :viewerId)
+			order by m.seq desc
+			""")
+	List<Message> findVisibleNewest(UUID conversationId, UUID viewerId, long minSeq, Limit limit);
 
-	/** Messages newer than {@code seq}, oldest first. */
-	List<Message> findByConversationIdAndSeqGreaterThanOrderBySeqAsc(UUID conversationId, long seq, Limit limit);
+	/** Messages between {@code minSeq} and {@code beforeSeq} (both exclusive) the viewer has not hidden, newest first. */
+	@Query("""
+			select m from Message m where m.conversationId = :conversationId and m.seq > :minSeq and m.seq < :beforeSeq
+			and not exists (select 1 from MessageHidden h where h.messageId = m.id and h.userId = :viewerId)
+			order by m.seq desc
+			""")
+	List<Message> findVisibleBefore(UUID conversationId, UUID viewerId, long minSeq, long beforeSeq, Limit limit);
+
+	/** Messages newer than {@code seq} that the viewer has not hidden, oldest first. */
+	@Query("""
+			select m from Message m where m.conversationId = :conversationId and m.seq > :seq
+			and not exists (select 1 from MessageHidden h where h.messageId = m.id and h.userId = :viewerId)
+			order by m.seq asc
+			""")
+	List<Message> findVisibleAfter(UUID conversationId, UUID viewerId, long seq, Limit limit);
 
 	/** The latest Message of each given Conversation that has one, in a single query. */
 	@Query("""

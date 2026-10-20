@@ -82,6 +82,9 @@ public class PushServiceImpl implements PushService {
 		if (message == null) {
 			return; // deleted with its conversation in the meantime
 		}
+		if (message.isDeleted()) {
+			return; // taken back before anyone was told: there is nothing left to show
+		}
 		var recipients = new HashSet<UUID>();
 		participants.findByConversationId(message.getConversationId()).stream().map(Participant::getUserId)
 				.filter(id -> !id.equals(message.getSenderId())).forEach(recipients::add);

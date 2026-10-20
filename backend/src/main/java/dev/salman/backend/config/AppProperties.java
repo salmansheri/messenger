@@ -34,9 +34,10 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	/**
 	 * Per-User limits on Message writes, each counted over a minute. {@code maxSendsPerMinute}: new Messages across all
 	 * Conversations. {@code maxChangesPerMinute}: edits, deletions and reactions together, which are cheaper to do and
-	 * so get a looser limit.
+	 * so get a looser limit. {@code editWindow} and {@code deleteWindow}: how long after sending the sender may still
+	 * change the text, or delete the Message for everyone.
 	 */
-	public record Messages(int maxSendsPerMinute, int maxChangesPerMinute) {
+	public record Messages(int maxSendsPerMinute, int maxChangesPerMinute, Duration editWindow, Duration deleteWindow) {
 	}
 
 	/**
