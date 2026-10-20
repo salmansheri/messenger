@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { toProblem } from "@/lib/api";
 import { formatClock } from "@/features/conversations/present";
 import { statusFor, type Frontier } from "@/features/receipts/status";
+import { nextMenuIndex } from "./menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
@@ -25,11 +26,11 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const [editing, setEditing] = useState(false);
-  // After editing ends, focus goes back to where the person started it: this Message's actions.
-  const summary = useRef<HTMLElement>(null);
+  // After editing ends, focus goes back to where the person started it: this Message's menu button.
+  const trigger = useRef<HTMLButtonElement>(null);
   const wasEditing = useRef(false);
   useEffect(() => {
-    if (wasEditing.current && !editing) summary.current?.focus();
+    if (wasEditing.current && !editing) trigger.current?.focus();
     wasEditing.current = editing;
   }, [editing]);
 
@@ -45,7 +46,7 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
         {item.edited && <span className="font-mono text-xs text-ink-muted">edited</span>}
         {mine && !pending && item.seq !== undefined && <ReceiptMark status={statusFor({ seq: item.seq, status: item.status }, frontier)} />}
       </div>
-      <div className={`min-w-0 border-l-2 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
+      <div className={`relative min-w-0 border-l-2 pr-10 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
         {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
         {editing && item.messageId && !item.deleted ? (
           <MessageEditor
@@ -71,13 +72,13 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
           </p>
         )}
         {item.messageId && !pending && !editing && (
-          <MessageActions
+          <MessageMenu
             conversationId={conversationId}
             messageId={item.messageId}
             own={mine && !item.deleted}
             whose={mine ? "your" : `${sender}'s`}
             when={formatClock(item.createdAt)}
-            summaryRef={summary}
+            triggerRef={trigger}
             onEdit={() => setEditing(true)}
           />
         )}
@@ -87,17 +88,18 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
 }
 
 /**
- * What can be done to a confirmed Message, behind one "Actions" control so a long history has one tab stop per
- * Message. The sender can edit it or delete it for everyone (the server says when the time has passed, and the
- * reason is shown as it gives it); anyone can delete it for themselves. Deleting for everyone asks first.
+ * What can be done to a confirmed Message, behind a three-dot button that opens a menu (a long history has one tab stop
+ * per Message). The sender can edit it or delete it for everyone (the server says when the time has passed, and the
+ * reason is shown as it gives it); anyone can delete it for themselves. Deleting for everyone asks first. Arrow keys
+ * move through the items, Escape closes the menu and gives focus back to the button, and so does a click elsewhere.
  */
-function MessageActions({
+function MessageMenu({
   conversationId,
   messageId,
   own,
   whose,
   when,
-  summaryRef,
+  triggerRef,
   onEdit,
 }: {
   conversationId: string;
@@ -105,14 +107,52 @@ function MessageActions({
   own: boolean;
   whose: string;
   when: string;
-  summaryRef: React.RefObject<HTMLElement | null>;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
   onEdit: () => void;
 }) {
-  const details = useRef<HTMLDetailsElement>(null);
+  const menuId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const remove = useDeleteForEveryone();
   const hide = useHideMessage();
+  const [open, setOpen] = useState(false);
   const [asking, setAsking] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const [upward, setUpward] = useState(false);
+
+  const items = () => [...(panel.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+  const close = useCallback(
+    (giveFocusBack: boolean) => {
+      setOpen(false);
+      setAsking(false);
+      setProblem(undefined);
+      if (giveFocusBack) triggerRef.current?.focus();
+    },
+    [triggerRef],
+  );
+
+  // A click or touch anywhere else closes it.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) close(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open, close]);
+
+  // Opens upward when there is no room below inside the scrolling history (the last Messages), and puts focus on the first item.
+  useLayoutEffect(() => {
+    if (!open || !panel.current || !triggerRef.current) return;
+    const history = triggerRef.current.closest<HTMLElement>('[role="region"]')?.getBoundingClientRect();
+    const room = (history?.bottom ?? window.innerHeight) - triggerRef.current.getBoundingClientRect().bottom;
+    setUpward(room < panel.current.offsetHeight + 8);
+  }, [open, asking, triggerRef]);
+  // Only when it opens: closing the question must not pull focus away from where it was sent back to.
+  useEffect(() => {
+    if (open) panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [open]);
+
   // Focus follows the question: onto the safe choice when it opens, back to "Delete for everyone" when it is cancelled.
   const focusCancel = useCallback((element: HTMLElement | null) => element?.focus(), []);
   const returnToAsk = useRef(false);
@@ -123,100 +163,155 @@ function MessageActions({
     }
   }, []);
 
-  const fail = (error: unknown) => setProblem(changeFailureMessage(toProblem(error)));
-  const finish = () => {
-    if (details.current) details.current.open = false;
-    summaryRef.current?.focus();
-  };
   // A hidden Message leaves the history, so focus moves to a neighbour before its row goes (not to the page body).
-  const finishHidden = () => {
-    const row = details.current?.closest("li");
+  const focusNeighbour = () => {
+    const row = root.current?.closest("li");
     const neighbour = [row?.nextElementSibling, row?.previousElementSibling]
-      .map((sibling) => sibling?.querySelector<HTMLElement>("summary"))
+      .map((sibling) => sibling?.querySelector<HTMLElement>("button[aria-haspopup]"))
       .find(Boolean);
     (neighbour ?? row?.closest<HTMLElement>('[role="region"]'))?.focus();
   };
+
+  const fail = (error: unknown) => setProblem(changeFailureMessage(toProblem(error)));
   const working = remove.isPending || hide.isPending;
 
+  function keyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+      return;
+    }
+    if (asking) return;
+    const list = items();
+    const next = nextMenuIndex(list.length, list.indexOf(document.activeElement as HTMLElement), event.key);
+    if (next !== undefined) {
+      event.preventDefault();
+      list[next]?.focus();
+    }
+  }
+
   return (
-    <details
-      ref={details}
-      className="mt-0.5 text-sm"
-      onToggle={() => {
-        setAsking(false);
-        setProblem(undefined);
-      }}
-    >
-      <summary
-        ref={summaryRef}
-        className="inline-block cursor-pointer rounded-sm px-1 py-1 text-xs text-ink-muted underline decoration-rule underline-offset-4 hover:decoration-ink"
+    <div ref={root} className="absolute top-0 right-0" onKeyDown={keyDown}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={`Options for ${whose} Message at ${when}`}
+        onClick={() => (open ? close(true) : setOpen(true))}
+        className="flex size-9 items-center justify-center rounded-sm text-ink-muted hover:text-ink"
       >
-        Actions<span className="sr-only"> for {whose} Message at {when}</span>
-      </summary>
-      <div className="mt-1 flex flex-col gap-2">
-        {asking ? (
-          <div className="flex flex-col gap-2">
-            <p>Delete this Message for everyone?</p>
-            <div className="flex gap-4">
-              <Button
-                busy={remove.isPending}
-                onClick={() => {
-                  setProblem(undefined);
-                  remove.mutate({ path: { conversationId, messageId } }, { onSuccess: finish, onError: fail });
-                }}
-              >
-                Delete
-              </Button>
-              <Button
-                ref={focusCancel}
-                variant="quiet"
-                onClick={() => {
-                  returnToAsk.current = true;
-                  setAsking(false);
-                  setProblem(undefined);
-                }}
-              >
-                Cancel
-              </Button>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="3" cy="8" r="1.4" />
+          <circle cx="8" cy="8" r="1.4" />
+          <circle cx="13" cy="8" r="1.4" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          id={menuId}
+          ref={panel}
+          className={`absolute right-0 z-10 w-56 rounded-sm border border-rule bg-paper p-1 shadow-sm ${upward ? "bottom-full mb-1" : "top-full mt-1"}`}
+        >
+          {asking ? (
+            <div className="flex flex-col gap-2 p-2">
+              <p>Delete this Message for everyone?</p>
+              <div className="flex gap-4">
+                <Button
+                  busy={remove.isPending}
+                  onClick={() => {
+                    setProblem(undefined);
+                    remove.mutate({ path: { conversationId, messageId } }, { onSuccess: () => close(true), onError: fail });
+                  }}
+                >
+                  Delete
+                </Button>
+                <Button
+                  ref={focusCancel}
+                  variant="quiet"
+                  onClick={() => {
+                    returnToAsk.current = true;
+                    setAsking(false);
+                    setProblem(undefined);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {own && (
-              <Button
-                variant="quiet"
-                onClick={() => {
-                  if (details.current) details.current.open = false;
-                  onEdit();
+          ) : (
+            <div role="menu" aria-label={`Options for ${whose} Message at ${when}`} className="flex flex-col">
+              {own && (
+                <MenuItem
+                  onSelect={() => {
+                    close(false);
+                    onEdit();
+                  }}
+                >
+                  Edit
+                </MenuItem>
+              )}
+              {own && (
+                <MenuItem ref={focusAsk} onSelect={() => setAsking(true)}>
+                  Delete for everyone
+                </MenuItem>
+              )}
+              <MenuItem
+                busy={hide.isPending}
+                onSelect={() => {
+                  setProblem(undefined);
+                  hide.mutate(
+                    { path: { conversationId, messageId } },
+                    {
+                      onSuccess: () => {
+                        focusNeighbour();
+                        close(false);
+                      },
+                      onError: fail,
+                    },
+                  );
                 }}
               >
-                Edit
-              </Button>
-            )}
-            {own && (
-              <Button ref={focusAsk} variant="quiet" onClick={() => setAsking(true)}>
-                Delete for everyone
-              </Button>
-            )}
-            <Button
-              variant="quiet"
-              busy={hide.isPending}
-              onClick={() => {
-                setProblem(undefined);
-                hide.mutate({ path: { conversationId, messageId } }, { onSuccess: finishHidden, onError: fail });
-              }}
-            >
-              Delete for me
-            </Button>
-          </div>
-        )}
-        {problem && !working && (
-          <p role="alert" className="text-sm text-accent">
-            {problem}
-          </p>
-        )}
-      </div>
-    </details>
+                Delete for me
+              </MenuItem>
+            </div>
+          )}
+          {problem && !working && (
+            <p role="alert" className="px-3 py-2 text-sm text-accent">
+              {problem}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onSelect,
+  busy,
+  ref,
+}: {
+  children: React.ReactNode;
+  onSelect: () => void;
+  busy?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="menuitem"
+      tabIndex={-1}
+      aria-disabled={busy || undefined}
+      onClick={() => !busy && onSelect()}
+      className="rounded-sm px-3 py-2 text-left text-base text-ink hover:bg-band focus:bg-band aria-disabled:opacity-60"
+    >
+      {children}
+    </button>
   );
 }
 

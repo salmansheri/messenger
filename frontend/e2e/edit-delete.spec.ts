@@ -34,10 +34,16 @@ async function openAs(page: Page, account: Account, id: string) {
   await live(page);
 }
 
-/** Opens a Message's actions (the "Actions" control inside its row). */
+/** A Message's three-dot button (its name says whose Message and when). */
+const optionsOf = (row: ReturnType<typeof rowOf>) => row.getByRole("button", { name: /^Options for/ });
+
+/** Opens a Message's menu from its three-dot button. */
 async function openActions(row: ReturnType<typeof rowOf>) {
-  await row.locator("summary").click();
+  await optionsOf(row).click();
 }
+
+/** An item of the open menu. */
+const item = (page: Page, name: string) => page.getByRole("menuitem", { name, exact: true });
 
 /** What the backend says when a change is refused (a closed window, a throttle, a busy server), with the CORS headers it would send. */
 function refuse(route: Route, status: 409 | 429 | 503, detail?: string) {
@@ -68,7 +74,8 @@ test.describe("editing a Message", () => {
     page.on("request", (request) => request.method() === "PATCH" && request.url().includes("/messages/") && patches++);
 
     await openActions(rowOf(page, "Helo"));
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expectAccessible(page, "a Message's menu");
+    await item(page, "Edit").click();
     const editor = page.getByRole("textbox", { name: "Edit text" });
     await expect(editor).toBeFocused();
     await expect(editor).toHaveValue("Helo");
@@ -78,17 +85,17 @@ test.describe("editing a Message", () => {
     await editor.press("Escape");
     await expect(editor).toHaveCount(0);
     await expect(rowOf(page, "Helo")).toBeVisible();
-    await expect(rowOf(page, "Helo").locator("summary"), "focus goes back to the Message's actions").toBeFocused();
+    await expect(optionsOf(rowOf(page, "Helo")), "focus goes back to the Message's menu button").toBeFocused();
 
     await openActions(rowOf(page, "Helo"));
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await item(page, "Edit").click();
     await page.getByRole("textbox", { name: "Edit text" }).press("Enter");
     await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
     expect(patches, "saving the same text asks the server for nothing").toBe(0);
     await expect(rowOf(page, "Helo").getByText("edited")).toHaveCount(0);
 
     await openActions(rowOf(page, "Helo"));
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await item(page, "Edit").click();
     await page.getByRole("textbox", { name: "Edit text" }).fill("Hello");
     await page.getByRole("textbox", { name: "Edit text" }).press("Enter");
 
@@ -112,7 +119,7 @@ test.describe("editing a Message", () => {
     await openAs(page, me, id);
 
     await openActions(rowOf(page, "About to vanish"));
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await item(page, "Edit").click();
     await expect(page.getByRole("textbox", { name: "Edit text" })).toBeFocused();
     await deleteMessageVia(myToken, id, message); // from another tab or device
 
@@ -132,7 +139,7 @@ test.describe("editing a Message", () => {
     );
 
     await openActions(rowOf(page, "Too old to change"));
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await item(page, "Edit").click();
     const editor = page.getByRole("textbox", { name: "Edit text" });
     await editor.fill("   ");
     await editor.press("Enter");
@@ -165,16 +172,16 @@ test.describe("deleting a Message", () => {
     await openAs(other, grace, id);
 
     await openActions(rowOf(page, "Secret plans"));
-    await page.getByRole("button", { name: "Delete for everyone" }).click();
+    await item(page, "Delete for everyone").click();
     await expect(page.getByText("Delete this Message for everyone?")).toBeVisible();
     await expect(page.getByRole("button", { name: "Cancel" }), "the safe choice has focus").toBeFocused();
     await expectAccessible(page, "the question before deleting for everyone");
 
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("button", { name: "Delete for everyone" }), "focus goes back").toBeFocused();
+    await expect(item(page, "Delete for everyone"), "focus goes back").toBeFocused();
     await expect(rowOf(page, "Secret plans")).toBeVisible();
 
-    await page.getByRole("button", { name: "Delete for everyone" }).click();
+    await item(page, "Delete for everyone").click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
 
     await expect(messages(page).getByText("This Message was deleted.")).toBeVisible();
@@ -188,9 +195,9 @@ test.describe("deleting a Message", () => {
 
     const deletedRow = messages(page).getByRole("listitem").filter({ hasText: "This Message was deleted." });
     await openActions(deletedRow);
-    await expect(page.getByRole("button", { name: "Edit", exact: true }), "nothing to edit in a placeholder").toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Delete for everyone" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Delete for me" })).toBeVisible();
+    await expect(item(page, "Edit"), "nothing to edit in a placeholder").toHaveCount(0);
+    await expect(item(page, "Delete for everyone")).toHaveCount(0);
+    await expect(item(page, "Delete for me")).toBeVisible();
     await expectAccessible(page, "a deleted Message");
 
     await other.goto("/app");
@@ -208,7 +215,7 @@ test.describe("deleting a Message", () => {
     await openAs(other, grace, id);
 
     await openActions(rowOf(other, "Keep for Grace"));
-    await other.getByRole("button", { name: "Delete for me" }).click();
+    await item(other, "Delete for me").click();
     await expect
       .poll(() => other.evaluate(() => document.activeElement?.tagName), { message: "focus stays in the history, not on the page body" })
       .not.toBe("BODY");
@@ -235,7 +242,7 @@ test.describe("deleting a Message", () => {
 
     const row = rowOf(page, "Cannot be deleted for everyone any more");
     await openActions(row);
-    await page.getByRole("button", { name: "Delete for everyone" }).click();
+    await item(page, "Delete for everyone").click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "60 minutes" })).toHaveText(
       "A Message can only be deleted for everyone for 60 minutes after it is sent.",
@@ -247,6 +254,9 @@ test.describe("deleting a Message", () => {
     await expect(page.getByRole("alert").filter({ hasText: "too often" })).toHaveText(
       "You are changing Messages too often. Try again in 20 seconds.",
     );
+    // Not mid-way through the hover fade of the button the pointer is still over.
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCSS("opacity", "1");
     await expectAccessible(page, "a deletion that was throttled");
 
     refused = undefined;
@@ -315,9 +325,9 @@ test.describe("from the keyboard", () => {
     await sendMessageVia(myToken, id, "Typo here");
     await openAs(page, me, id);
 
-    await rowOf(page, "Typo here").locator("summary").focus();
+    await optionsOf(rowOf(page, "Typo here")).focus();
     await page.keyboard.press("Enter");
-    await page.keyboard.press("Tab"); // Edit
+    await expect(item(page, "Edit"), "the first item has focus when the menu opens").toBeFocused();
     await page.keyboard.press("Enter");
     const editor = page.getByRole("textbox", { name: "Edit text" });
     await expect(editor).toBeFocused();
@@ -326,6 +336,37 @@ test.describe("from the keyboard", () => {
     await page.keyboard.press("Enter");
 
     await expect(rowOf(page, "Fixed here").getByText("edited", { exact: true })).toBeVisible();
-    await expect(rowOf(page, "Fixed here").locator("summary")).toBeFocused();
+    await expect(optionsOf(rowOf(page, "Fixed here"))).toBeFocused();
+  });
+
+  test("the menu is moved through with the arrow keys, closes with Escape and gives focus back, and closes on a click elsewhere", async ({
+    page,
+  }) => {
+    const { me, myToken, id } = await twoPeople();
+    await sendMessageVia(myToken, id, "Menu practice");
+    await openAs(page, me, id);
+    const button = optionsOf(rowOf(page, "Menu practice"));
+
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("ArrowDown");
+    await expect(item(page, "Delete for everyone")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(item(page, "Delete for me")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(item(page, "Edit"), "wraps round").toBeFocused();
+    await page.keyboard.press("End");
+    await expect(item(page, "Delete for me")).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(button).toBeFocused();
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+
+    await button.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.getByRole("heading", { level: 1 }).click();
+    await expect(page.getByRole("menu")).toHaveCount(0);
   });
 });
