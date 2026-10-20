@@ -195,6 +195,21 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Sets (or replaces) the caller's reaction to a message. */
+	public ResultActions react(String accessToken, String conversationId, String messageId, String emoji)
+			throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.put("/api/v1/conversations/{id}/messages/{messageId}/reaction",
+				conversationId, messageId).contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("emoji", emoji)))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	/** Takes the caller's reaction to a message away. */
+	public ResultActions unreact(String accessToken, String conversationId, String messageId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/conversations/{id}/messages/{messageId}/reaction",
+				conversationId, messageId).header("Authorization", "Bearer " + accessToken));
+	}
+
 	/** Sends a new message that quotes another one of the same conversation. */
 	public ResultActions sendReply(String accessToken, String conversationId, Object clientMessageId, String body,
 			Object replyToMessageId) throws Exception {

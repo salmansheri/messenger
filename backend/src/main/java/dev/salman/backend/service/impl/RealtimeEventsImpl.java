@@ -4,10 +4,13 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -34,6 +37,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	private final ParticipantRepository participants;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
+	private final ReactionLoader reactionLoader;
 	private final RealtimePublisher publisher;
 
 	@Override
@@ -63,8 +67,9 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 			var quote = answered.map(original -> QuoteResolver.quoteFor(original, member, hid.contains(member.getUserId())));
 			audiences.computeIfAbsent(quote, q -> new LinkedHashSet<>()).add(member.getUserId());
 		}
+		var reacted = reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of());
 		audiences.forEach((quote, audience) -> publish(audience, event(type, message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null, quote.orElse(null))))));
+				Map.of("message", MessageResponse.from(message, null, quote.orElse(null), reacted)))));
 	}
 
 	@Override
@@ -93,6 +98,27 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.addAll(alsoNotify);
 		publish(recipients, event("conversation.changed", conversationId, Map.of()));
+	}
+
+	@Override
+	public void reactionChanged(Message message, UUID userId, String emoji, Instant at) {
+		var readers = participants.findByConversationId(message.getConversationId()).stream()
+				.filter(m -> m.canRead(message.getSeq())).collect(Collectors.toList());
+		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
+		var details = new LinkedHashMap<String, Object>();
+		details.put("messageId", message.getId());
+		details.put("seq", message.getSeq());
+		details.put("userId", userId);
+		details.put("emoji", emoji);
+		details.put("at", at);
+		publish(userIds(readers.stream().filter(m -> !hiders.contains(m.getUserId())).toList()),
+				event("reaction.changed", message.getConversationId(), details));
+	}
+
+	@Override
+	public void reactionsCleared(UUID conversationId, UUID userId) {
+		publish(userIds(participants.findByConversationId(conversationId)),
+				event("reactions.cleared", conversationId, Map.of("userId", userId)));
 	}
 
 	@Override

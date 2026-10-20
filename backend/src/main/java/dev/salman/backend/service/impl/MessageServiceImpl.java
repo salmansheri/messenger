@@ -43,6 +43,7 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
+	private final ReactionLoader reactionLoader;
 	private final RealtimeEvents events;
 	private final PushService push;
 	private final MessageThrottle throttle;
@@ -152,7 +153,8 @@ public class MessageServiceImpl implements MessageService {
 
 	/** The Message as {@code viewer} sees it, with the quote if it answers another one. */
 	private MessageResponse responseFor(Message message, MessageStatus status, Participant viewer) {
-		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()));
+		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()),
+				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()));
 	}
 
 	@Override
@@ -230,8 +232,10 @@ public class MessageServiceImpl implements MessageService {
 		var members = page.stream().anyMatch(m -> m.getSenderId().equals(callerId))
 				? participants.findByConversationId(conversationId) : List.<Participant>of();
 		var quoted = quotes.resolve(page, conversation -> reader);
+		var reacted = reactionLoader.of(page);
 		return new MessagePage(page.stream()
-				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId())))
+				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId()),
+						reacted.getOrDefault(m.getId(), List.of())))
 				.toList(), hasMore);
 	}
 

@@ -20,6 +20,11 @@ import dev.salman.backend.entity.Message;
  * <li>{@code message.created}: a new Message ({@code message}), to every Participant;</li>
  * <li>{@code message.updated}: a Message was edited ({@code message}, with its new text and {@code editedAt}), to
  * every Participant;</li>
+ * <li>{@code reaction.changed}: someone put a reaction on a Message, replaced it, or took it away ({@code messageId},
+ * {@code seq}, {@code userId}, {@code emoji} or null for none, {@code at}), to every current Participant who can read
+ * the Message and has not hidden it;</li>
+ * <li>{@code reactions.cleared}: everything {@code userId} reacted with in the Conversation is gone because they left
+ * or were removed, to the Participants who remain (sent only if they had reacted to something);</li>
  * <li>{@code receipts.updated}: {@code deliveredUpTo} and {@code readUpTo}, the point everyone else has reached,
  * worked out separately for each recipient and sent only to those for whom it moved;</li>
  * <li>{@code unread.updated}: the reporter's own {@code deliveredSeq}, {@code readSeq} and {@code unreadCount}, to
@@ -61,6 +66,12 @@ public interface RealtimeEvents {
 	default void conversationChanged(UUID conversationId) {
 		conversationChanged(conversationId, List.of());
 	}
+
+	/** {@code userId} reacted to the Message with {@code emoji}, or took their reaction away ({@code emoji} is null). */
+	void reactionChanged(Message message, UUID userId, String emoji, Instant at);
+
+	/** The reactions of {@code userId} in the Conversation were deleted (they left or were removed); heard by those who remain. */
+	void reactionsCleared(UUID conversationId, UUID userId);
 
 	/** The User changed their private settings for a Conversation; heard only by that User's sessions. */
 	void settingsChanged(UUID userId, UUID conversationId, ConversationSettings settings);

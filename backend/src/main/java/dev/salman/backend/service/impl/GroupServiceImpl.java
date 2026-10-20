@@ -25,6 +25,7 @@ import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
+import dev.salman.backend.repository.ReactionRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.GroupService;
 import dev.salman.backend.service.RateLimiter;
@@ -39,6 +40,7 @@ public class GroupServiceImpl implements GroupService {
 
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
+	private final ReactionRepository reactions;
 	private final UserRepository users;
 	private final ConversationAssembler assembler;
 	private final RealtimeEvents events;
@@ -125,8 +127,12 @@ public class GroupServiceImpl implements GroupService {
 		}
 		var target = participants.findByConversationIdAndUserId(conversationId, userId)
 				.orElseThrow(() -> new NotFoundException("No such participant."));
+		var hadReacted = reactions.deleteByConversationIdAndUserId(conversationId, userId) > 0; // nobody who is gone is counted
 		participants.delete(target);
 		events.conversationChanged(conversationId, List.of(userId)); // the removed User hears about it too
+		if (hadReacted) {
+			events.reactionsCleared(conversationId, userId);
+		}
 	}
 
 	@Override
@@ -151,7 +157,11 @@ public class GroupServiceImpl implements GroupService {
 			events.conversationChanged(conversationId, List.of(callerId));
 			return;
 		}
+		var hadReacted = reactions.deleteByConversationIdAndUserId(conversationId, callerId) > 0;
 		participants.delete(locked.caller());
+		if (hadReacted) {
+			events.reactionsCleared(conversationId, callerId);
+		}
 		var hasAdmin = remaining.stream().anyMatch(p -> p.getRole() == ParticipantRole.ADMIN);
 		if (!hasAdmin) {
 			remaining.stream()
