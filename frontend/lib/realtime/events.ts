@@ -9,6 +9,10 @@ export type RealtimeEvent =
   /** A Message was edited or deleted for everyone (no `status`: that is the sender's own view). */
   | { type: "message.updated"; conversationId: string; message: MessageResponse }
   | { type: "conversation.changed"; conversationId: string }
+  /** Someone put a reaction on a Message, replaced it (`emoji`), or took it away (`emoji` is null). */
+  | { type: "reaction.changed"; conversationId: string; messageId: string; seq: number | undefined; userId: string; emoji: string | null; at: string }
+  /** Everything one person reacted with in the Conversation is gone (they left or were removed). */
+  | { type: "reactions.cleared"; conversationId: string; userId: string }
   /** This person's own mute, archive or pin changed, from any of their tabs or devices. */
   | { type: "settings.changed"; conversationId: string; settings: ConversationSettings }
   /** How far everyone ELSE has got (the lowest of their positions), told to the sender of Messages. */
@@ -59,6 +63,22 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
       if (typeof message.seq !== "number" || typeof message.id !== "string") return undefined;
       return { type: "message.updated", conversationId, message: message as MessageResponse };
     }
+    case "reaction.changed":
+      if (typeof conversationId !== "string" || typeof payload.messageId !== "string") return undefined;
+      if (typeof payload.userId !== "string" || typeof payload.at !== "string") return undefined;
+      return {
+        type: "reaction.changed",
+        conversationId,
+        messageId: payload.messageId,
+        seq: typeof payload.seq === "number" ? payload.seq : undefined,
+        userId: payload.userId,
+        emoji: typeof payload.emoji === "string" ? payload.emoji : null,
+        at: payload.at,
+      };
+    case "reactions.cleared":
+      return typeof conversationId === "string" && typeof payload.userId === "string"
+        ? { type: "reactions.cleared", conversationId, userId: payload.userId }
+        : undefined;
     case "settings.changed":
       return typeof conversationId === "string" && isObject(payload.settings)
         ? { type: "settings.changed", conversationId, settings: payload.settings as ConversationSettings }

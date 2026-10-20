@@ -1,6 +1,7 @@
 import type { ConversationResponse, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
-import { latestSeq, replaceMessage, withMessage, type History } from "@/features/messages/history";
+import { applyReaction } from "@/features/messages/reactions";
+import { clearReactionsOf, latestSeq, replaceMessage, updateReactions, withMessage, type History } from "@/features/messages/history";
 import { mergeVersion } from "@/features/messages/versions";
 import { orderConversations, withSettings } from "@/features/conversations/settings";
 
@@ -72,6 +73,10 @@ export function applyToHistory(
   history: History | undefined,
   event: RealtimeEvent,
 ): { history: History | undefined; catchUp: boolean } {
+  if (history && event.type === "reaction.changed") {
+    return { history: updateReactions(history, event.messageId, (reactions) => applyReaction(reactions, event.userId, event.emoji)), catchUp: false };
+  }
+  if (history && event.type === "reactions.cleared") return { history: clearReactionsOf(history, event.userId), catchUp: false };
   if (!history || (event.type !== "message.created" && event.type !== "message.updated")) return { history, catchUp: false };
   const have = latestSeq(history);
   const seq = seqOf(event.message);

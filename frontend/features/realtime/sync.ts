@@ -11,7 +11,8 @@ import {
 import { parseEvent, type RealtimeEvent } from "@/lib/realtime/events";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
-import { allMessagesKey, historyConversationId, messagesKey } from "@/features/messages/queries";
+import { allMessagesKey, historyConversationId, messagesKey, reactionTimesKey } from "@/features/messages/queries";
+import { acceptReaction } from "@/features/messages/reactions";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
 import { mergeFrontier, type Frontier } from "@/features/receipts/status";
 import { applyPresence } from "@/features/presence/apply-presence";
@@ -63,6 +64,28 @@ export function recordSettings(queryClient: QueryClient, conversationId: string,
   patchList(queryClient, { type: "settings.changed", conversationId, settings });
 }
 
+/**
+ * A reaction put on a Message, or everyone's reactions of one person taken away. Reactions are only in the loaded
+ * history, never the list. A word older than one already heard for the same person and Message is ignored, and, as
+ * for other events, a history whose request is under way is asked for again instead of being patched.
+ */
+function handleReaction(queryClient: QueryClient, event: Extract<RealtimeEvent, { type: "reaction.changed" | "reactions.cleared" }>) {
+  if (event.type === "reaction.changed") {
+    const known = queryClient.getQueryData<Record<string, string>>(reactionTimesKey(event.conversationId)) ?? {};
+    const verdict = acceptReaction(known, event);
+    if (!verdict.accepted) return;
+    queryClient.setQueryData(reactionTimesKey(event.conversationId), verdict.times);
+  }
+  const key = messagesKey(event.conversationId);
+  if (fetching(queryClient, key)) {
+    void queryClient.invalidateQueries({ queryKey: key });
+    return;
+  }
+  const history = queryClient.getQueryData<History>(key);
+  const next = applyToHistory(history, event);
+  if (next.history !== history) queryClient.setQueryData(key, next.history);
+}
+
 /** Puts one event into what is already loaded; anything that cannot be worked out from it asks the server again. */
 export function handleEvent(queryClient: QueryClient, body: string, typing: TypingTracker) {
   const event = parseEvent(body);
@@ -78,6 +101,10 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
       if (query.state.fetchStatus === "fetching") void queryClient.invalidateQueries({ queryKey: query.queryKey });
       else queryClient.setQueryData<PresenceView[]>(query.queryKey, (views) => applyPresence(views, event));
     }
+    return;
+  }
+  if (event.type === "reaction.changed" || event.type === "reactions.cleared") {
+    handleReaction(queryClient, event);
     return;
   }
   if (event.type === "message.created" && event.message.senderId) typing.stopped(event.conversationId, event.message.senderId); // sending ends typing

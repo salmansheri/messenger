@@ -200,7 +200,16 @@ export function MessageView({ conversation, myId }: Props) {
           ) : (
             <ol aria-label="Messages">
               {items.map((item) => (
-                <Row key={item.key} item={item} conversationId={conversationId} names={names} frontier={frontier} onRetry={outbox.retry} />
+                <Row
+                  key={item.key}
+                  item={item}
+                  conversationId={conversationId}
+                  myId={myId}
+                  group={conversation.type === "GROUP"}
+                  names={names}
+                  frontier={frontier}
+                  onRetry={outbox.retry}
+                />
               ))}
             </ol>
           )}
@@ -231,12 +240,16 @@ export function MessageView({ conversation, myId }: Props) {
 function Row({
   item,
   conversationId,
+  myId,
+  group,
   names,
   frontier,
   onRetry,
 }: {
   item: TimelineItem;
   conversationId: string;
+  myId: string | undefined;
+  group: boolean;
   names: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
@@ -255,5 +268,5 @@ function Row({
       </li>
     );
   }
-  return <MessageRow item={item} conversationId={conversationId} names={names} frontier={frontier} onRetry={onRetry} />;
+  return <MessageRow item={item} conversationId={conversationId} myId={myId} group={group} names={names} frontier={frontier} onRetry={onRetry} />;
 }

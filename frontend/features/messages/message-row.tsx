@@ -9,6 +9,7 @@ import { statusFor, type Frontier } from "@/features/receipts/status";
 import { nextMenuIndex } from "@/components/ui/menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
+import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
 import { changeFailureMessage, sendFailureMessage } from "./wording";
 
@@ -17,13 +18,16 @@ type MessageItem = Extract<TimelineItem, { kind: "message" }>;
 type Props = {
   item: MessageItem;
   conversationId: string;
+  /** Who is looking, and whether this is a Group (where it matters who reacted). */
+  myId: string | undefined;
+  group: boolean;
   names: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, names, frontier, onRetry }: Props) {
+export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry }: Props) {
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const [editing, setEditing] = useState(false);
@@ -47,7 +51,7 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
         {item.edited && <span className="font-mono text-xs text-ink-muted">edited</span>}
         {mine && !pending && item.seq !== undefined && <ReceiptMark status={statusFor({ seq: item.seq, status: item.status }, frontier)} />}
       </div>
-      <div className={`relative min-w-0 border-l-2 pr-10 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
+      <div className={`relative min-w-0 border-l-2 pr-20 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
         {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
         {editing && item.messageId && !item.deleted ? (
           <MessageEditor
@@ -61,6 +65,15 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
         ) : (
           <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
         )}
+        {item.messageId && !pending && !item.deleted && (
+          <ReactionChips
+            target={{ conversationId, messageId: item.messageId }}
+            reactions={item.reactions}
+            myId={myId}
+            group={group}
+            nameOf={(userId) => names.get(userId) ?? "Someone who left"}
+          />
+        )}
         {pending?.status === "sending" && <p className="text-xs text-ink-muted">Sending…</p>}
         {pending?.status === "failed" && (
           <p className="flex flex-wrap items-center gap-x-3 text-sm">
@@ -73,15 +86,26 @@ export function MessageRow({ item, conversationId, names, frontier, onRetry }: P
           </p>
         )}
         {item.messageId && !pending && !editing && (
-          <MessageMenu
-            conversationId={conversationId}
-            messageId={item.messageId}
-            own={mine && !item.deleted}
-            whose={mine ? "your" : `${sender}'s`}
-            when={formatClock(item.createdAt)}
-            triggerRef={trigger}
-            onEdit={() => setEditing(true)}
-          />
+          <div className="absolute top-0 right-0 flex">
+            {!item.deleted && (
+              <ReactMenu
+                target={{ conversationId, messageId: item.messageId }}
+                whose={mine ? "your" : `${sender}'s`}
+                when={formatClock(item.createdAt)}
+                reactions={item.reactions}
+                myId={myId}
+              />
+            )}
+            <MessageMenu
+              conversationId={conversationId}
+              messageId={item.messageId}
+              own={mine && !item.deleted}
+              whose={mine ? "your" : `${sender}'s`}
+              when={formatClock(item.createdAt)}
+              triggerRef={trigger}
+              onEdit={() => setEditing(true)}
+            />
+          </div>
         )}
       </div>
     </li>
@@ -193,7 +217,7 @@ function MessageMenu({
   }
 
   return (
-    <div ref={root} className="absolute top-0 right-0" onKeyDown={keyDown}>
+    <div ref={root} className="relative" onKeyDown={keyDown}>
       <button
         ref={triggerRef}
         type="button"

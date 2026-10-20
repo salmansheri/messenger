@@ -2,13 +2,19 @@
 
 import { useInfiniteQuery, type QueryClient } from "@tanstack/react-query";
 import { historyInfiniteOptions, historyInfiniteQueryKey, type MessagePage, type MessageResponse } from "@/lib/api";
-import { markDeleted, removeById, withMessage, type History } from "./history";
+import { markDeleted, removeById, updateReactions, withMessage, type History } from "./history";
 import { mergeVersion } from "./versions";
 
 const OLDER_PAGE = 50;
 
 /** A Conversation's history as the query cache knows it (the key the generated paging options use). */
 export const messagesKey = (conversationId: string) => historyInfiniteQueryKey({ path: { conversationId } });
+
+/**
+ * When the server last said what each person reacted with to each Message (by "messageId:userId"), so a late or repeated
+ * event never undoes a newer one. Hand-keyed: it is not API data.
+ */
+export const reactionTimesKey = (conversationId: string) => ["reaction-times", conversationId] as const;
 
 /** The start of every Conversation's history key, for finding all the histories that are loaded. */
 export const allMessagesKey = [{ _id: "history", _infinite: true }];
@@ -69,4 +75,13 @@ export function markDeletedInHistory(queryClient: QueryClient, conversationId: s
 /** A Message this person just hid from their own view. */
 export function removeFromHistory(queryClient: QueryClient, conversationId: string, messageId: string) {
   queryClient.setQueryData<History>(messagesKey(conversationId), (history) => history && removeById(history, messageId));
+}
+
+/** The reactions the server just answered for a Message after the person's own change, put into the loaded history. */
+export function setReactionsInHistory(queryClient: QueryClient, message: MessageResponse) {
+  if (!message.conversationId || !message.id) return;
+  const reactions = message.reactions ?? [];
+  queryClient.setQueryData<History>(messagesKey(message.conversationId), (history) =>
+    history && updateReactions(history, message.id ?? "", () => reactions),
+  );
 }

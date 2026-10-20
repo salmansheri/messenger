@@ -1,4 +1,4 @@
-import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
+import type { ConversationResponse, MessagePage, MessageResponse, ReactionView } from "@/lib/api";
 import { formatDay } from "@/features/conversations/present";
 import type { Pending } from "./outbox";
 
@@ -41,6 +41,8 @@ export type TimelineItem =
       edited: boolean;
       /** Deleted for everyone: only a placeholder is left. */
       deleted: boolean;
+      /** Who reacted with what (none for a deleted Message, or one still being sent). */
+      reactions: ReactionView[];
     };
 
 type Input = {
@@ -65,6 +67,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       messageId: message.id,
       edited: Boolean(message.editedAt) && !message.deletedAt,
       deleted: Boolean(message.deletedAt),
+      reactions: message.deletedAt ? [] : (message.reactions ?? []),
       seq: message.seq,
       senderId: message.senderId,
       body: message.body ?? "",
@@ -79,6 +82,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
         messageId: undefined,
         edited: false,
         deleted: false,
+        reactions: [] as ReactionView[],
         seq: undefined,
         senderId: myId,
         body: entry.body,
@@ -110,6 +114,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       messageId: row.messageId,
       edited: row.edited,
       deleted: row.deleted,
+      reactions: row.reactions,
       senderId: row.senderId,
       body: row.body,
       createdAt: row.createdAt,

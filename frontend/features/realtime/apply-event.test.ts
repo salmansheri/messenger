@@ -274,6 +274,52 @@ describe("applyToList for a change to the person's own settings", () => {
   });
 });
 
+describe("applyToHistory for reactions", () => {
+  const withReactions = (): History => ({
+    pages: [{ messages: [msg(2), { ...msg(3), reactions: [{ emoji: "x", userIds: ["a"] }] }], hasMore: false }],
+    pageParams: [{}],
+  });
+  const reacted = (userId: string, emoji: string | null, messageId = "id3"): RealtimeEvent => ({
+    type: "reaction.changed",
+    conversationId: "c1",
+    messageId,
+    seq: 3,
+    userId,
+    emoji,
+    at: "2026-03-10T10:00:00Z",
+  });
+
+  it("puts a person's reaction on the Message and keeps it apart from the others", () => {
+    const result = applyToHistory(withReactions(), reacted("b", "x"));
+
+    expect(result.catchUp).toBe(false);
+    expect(result.history?.pages[0].messages?.[1].reactions).toEqual([{ emoji: "x", userIds: ["a", "b"] }]);
+    expect(result.history?.pages[0].messages?.[0].reactions).toBeUndefined();
+  });
+
+  it("moves a person who changed their mind and removes one who took it away", () => {
+    const moved = applyToHistory(withReactions(), reacted("a", "y"));
+    expect(moved.history?.pages[0].messages?.[1].reactions).toEqual([{ emoji: "y", userIds: ["a"] }]);
+
+    const removed = applyToHistory(withReactions(), reacted("a", null));
+    expect(removed.history?.pages[0].messages?.[1].reactions).toEqual([]);
+  });
+
+  it("changes nothing for a Message that is not loaded, or for a reaction already there", () => {
+    const history = withReactions();
+
+    expect(applyToHistory(history, reacted("b", "x", "unknown")).history).toBe(history);
+    expect(applyToHistory(history, reacted("a", "x")).history).toBe(history);
+    expect(applyToHistory(undefined, reacted("a", "x"))).toEqual({ history: undefined, catchUp: false });
+  });
+
+  it("takes someone out of every Message when their reactions were cleared (they left)", () => {
+    const result = applyToHistory(withReactions(), { type: "reactions.cleared", conversationId: "c1", userId: "a" });
+
+    expect(result.history?.pages[0].messages?.[1].reactions).toEqual([]);
+  });
+});
+
 describe("applyUnread", () => {
   const list = [
     conversation("c0", { lastMessage: msg(7), unreadCount: 3 }),

@@ -1,4 +1,5 @@
-import type { MessagePage, MessageResponse } from "@/lib/api";
+import type { MessagePage, MessageResponse, ReactionView } from "@/lib/api";
+import { clearUser } from "./reactions";
 import { mergeVersion } from "./versions";
 
 /** What `useInfiniteQuery` keeps for a Conversation's history: newest page first. */
@@ -68,7 +69,10 @@ export function syncRange(history: History, fresh: readonly MessageResponse[], f
       const seq = message.seq;
       if (seq === undefined || seq < from || seq > upTo) return [message];
       const now = freshBySeq.get(seq);
-      return now ? [mergeVersion(message, now)] : [];
+      if (!now) return [];
+      const merged = mergeVersion(message, now);
+      // Reactions change without a new version of the Message, so the server's are taken whatever the version says.
+      return [merged.deletedAt || !now.reactions ? merged : { ...merged, reactions: now.reactions }];
     }),
   }));
   const joining = fresh.filter((message) => !loaded.has(message.seq));
@@ -87,4 +91,35 @@ export function markDeleted(history: History, messageId: string, at: string): Hi
 export function removeById(history: History, messageId: string): History {
   const known = history.pages.flatMap((page) => page.messages ?? []).find((message) => message.id === messageId);
   return known?.seq === undefined ? history : removeMessage(history, known.seq);
+}
+
+/**
+ * The history with the reactions of the Message with this id changed by `change` (given the reactions it has, or
+ * nothing). The same history when the Message is not loaded, is deleted (it has no reactions), or they do not change.
+ */
+export function updateReactions(
+  history: History,
+  messageId: string,
+  change: (reactions: ReactionView[] | undefined) => ReactionView[] | undefined,
+): History {
+  const known = history.pages.flatMap((page) => page.messages ?? []).find((message) => message.id === messageId);
+  if (!known || known.deletedAt) return history;
+  const next = change(known.reactions);
+  const unchanged = next === known.reactions || ((next?.length ?? 0) === 0 && (known.reactions?.length ?? 0) === 0);
+  return unchanged ? history : replaceMessage(history, { ...known, reactions: next });
+}
+
+/** The history with one person taken out of the reactions of every loaded Message (the same one if they were in none). */
+export function clearReactionsOf(history: History, userId: string): History {
+  let changed = false;
+  const pages = history.pages.map((page) => ({
+    ...page,
+    messages: page.messages?.map((message) => {
+      const reactions = clearUser(message.reactions, userId);
+      if (reactions === message.reactions || (message.reactions === undefined && reactions.length === 0)) return message;
+      changed = true;
+      return { ...message, reactions };
+    }),
+  }));
+  return changed ? { ...history, pages } : history;
 }

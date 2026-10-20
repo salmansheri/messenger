@@ -4,6 +4,38 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:8080' | (string & {});
 };
 
+export type SetReactionRequest = {
+    emoji: string;
+};
+
+export type MessageResponse = {
+    id?: string;
+    conversationId?: string;
+    seq?: number;
+    senderId?: string;
+    clientMessageId?: string;
+    body?: string;
+    createdAt?: string;
+    editedAt?: string;
+    deletedAt?: string;
+    status?: 'SENT' | 'DELIVERED' | 'READ';
+    replyTo?: ReplyQuote;
+    reactions?: Array<ReactionView>;
+};
+
+export type ReactionView = {
+    emoji?: string;
+    userIds?: Array<string>;
+};
+
+export type ReplyQuote = {
+    messageId?: string;
+    senderId?: string;
+    text?: string;
+    deleted?: boolean;
+    unavailable?: boolean;
+};
+
 export type LookupRequest = {
     email: string;
 };
@@ -58,19 +90,6 @@ export type ConversationSettings = {
     pinned?: boolean;
 };
 
-export type MessageResponse = {
-    id?: string;
-    conversationId?: string;
-    seq?: number;
-    senderId?: string;
-    clientMessageId?: string;
-    body?: string;
-    createdAt?: string;
-    editedAt?: string;
-    deletedAt?: string;
-    status?: 'SENT' | 'DELIVERED' | 'READ';
-};
-
 export type ParticipantSummary = {
     userId?: string;
     displayName?: string;
@@ -80,6 +99,7 @@ export type ParticipantSummary = {
 export type SendMessageRequest = {
     clientMessageId: string;
     body?: string;
+    replyToMessageId?: string;
 };
 
 export type CreateGroupRequest = {
@@ -162,6 +182,44 @@ export type MessagePage = {
     messages?: Array<MessageResponse>;
     hasMore?: boolean;
 };
+
+export type UnreactData = {
+    body?: never;
+    path: {
+        conversationId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}/reaction';
+};
+
+export type UnreactResponses = {
+    /**
+     * OK
+     */
+    200: MessageResponse;
+};
+
+export type UnreactResponse = UnreactResponses[keyof UnreactResponses];
+
+export type ReactData = {
+    body: SetReactionRequest;
+    path: {
+        conversationId: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/api/v1/conversations/{conversationId}/messages/{messageId}/reaction';
+};
+
+export type ReactResponses = {
+    /**
+     * OK
+     */
+    200: MessageResponse;
+};
+
+export type ReactResponse = ReactResponses[keyof ReactResponses];
 
 export type LookupData = {
     body: LookupRequest;

@@ -49,6 +49,32 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "settings.changed", settings: { pinned: true } }))).toBeUndefined();
   });
 
+  it("reads someone putting a reaction on a Message, replacing it, or taking it away", () => {
+    const put = { type: "reaction.changed", conversationId: "c1", messageId: "m1", seq: 4, userId: "u2", emoji: "\uD83D\uDC4D", at: "2026-03-10T10:00:00Z" };
+
+    expect(parseEvent(JSON.stringify(put))).toEqual(put);
+    expect(parseEvent(JSON.stringify({ ...put, emoji: null }))).toEqual({ ...put, emoji: null });
+  });
+
+  it("refuses a reaction event that lacks who, which Message or when", () => {
+    const put = { type: "reaction.changed", conversationId: "c1", messageId: "m1", seq: 4, userId: "u2", emoji: "x", at: "t" };
+
+    for (const missing of ["conversationId", "messageId", "userId", "at"]) {
+      const broken: Record<string, unknown> = { ...put };
+      delete broken[missing];
+      expect(parseEvent(JSON.stringify(broken)), missing).toBeUndefined();
+    }
+  });
+
+  it("reads the reactions of someone who left being cleared", () => {
+    expect(parseEvent(JSON.stringify({ type: "reactions.cleared", conversationId: "c1", userId: "u2" }))).toEqual({
+      type: "reactions.cleared",
+      conversationId: "c1",
+      userId: "u2",
+    });
+    expect(parseEvent(JSON.stringify({ type: "reactions.cleared", conversationId: "c1" }))).toBeUndefined();
+  });
+
   it("reads a change to a Conversation", () => {
     expect(parseEvent(JSON.stringify({ type: "conversation.changed", conversationId: "c1" }))).toEqual({
       type: "conversation.changed",

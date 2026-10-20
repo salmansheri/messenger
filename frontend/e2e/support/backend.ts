@@ -153,3 +153,23 @@ export async function updateSettingsVia(
   const response = await send("PATCH", `/api/v1/conversations/${conversationId}/settings`, token, settings);
   if (response.status !== 200) throw new Error(`Settings failed: ${response.status}`);
 }
+
+async function put(path: string, token: string, body: unknown) {
+  return fetch(`${BACKEND_URL}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Puts the caller's reaction on a Message through the backend (replacing any other they had there). */
+export async function reactVia(token: string, conversationId: string, messageId: string, emoji: string) {
+  const response = await put(`/api/v1/conversations/${conversationId}/messages/${messageId}/reaction`, token, { emoji });
+  if (response.status !== 200) throw new Error(`React failed: ${response.status}`);
+}
+
+/** Takes the caller's reaction to a Message away through the backend. */
+export async function unreactVia(token: string, conversationId: string, messageId: string) {
+  const response = await send("DELETE", `/api/v1/conversations/${conversationId}/messages/${messageId}/reaction`, token);
+  if (response.status !== 200) throw new Error(`Unreact failed: ${response.status}`);
+}

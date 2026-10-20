@@ -127,3 +127,23 @@ describe("edited and deleted Messages in the timeline", () => {
     expect([message.messageId, message.edited, message.deleted]).toEqual([undefined, false, false]);
   });
 });
+
+describe("reactions in the timeline", () => {
+  it("carries a Message's reactions, none for one still being sent, and none for a deleted one", () => {
+    const reacted: MessageResponse = { ...msg(1, "a", "2026-03-10T10:00:00Z"), reactions: [{ emoji: "x", userIds: ["b"] }] };
+    const deleted: MessageResponse = {
+      id: "id2",
+      seq: 2,
+      senderId: "a",
+      createdAt: "2026-03-10T10:01:00Z",
+      deletedAt: "2026-03-10T10:06:00Z",
+      reactions: [{ emoji: "x", userIds: ["b"] }],
+    };
+
+    const messages = build({ confirmed: [reacted, deleted], pending: [pending("p", "Sending")], myId: "a" }).filter(
+      (item) => item.kind === "message",
+    );
+
+    expect(messages.map((m) => m.reactions)).toEqual([[{ emoji: "x", userIds: ["b"] }], [], []]);
+  });
+});

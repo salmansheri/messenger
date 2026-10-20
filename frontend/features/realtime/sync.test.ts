@@ -167,6 +167,79 @@ describe("edited and deleted Messages", () => {
   });
 });
 
+describe("reaction events", () => {
+  const THUMBS_UP = "\uD83D\uDC4D";
+  const stored = (seq: number, extra: object = {}) => ({ id: `m${seq}`, conversationId: "c1", seq, senderId: "grace", body: `m${seq}`, ...extra });
+  const reaction = (emoji: string | null, at: string, userId = "ada", messageId = "m2") =>
+    JSON.stringify({ type: "reaction.changed", conversationId: "c1", messageId, seq: 2, userId, emoji, at });
+  const loadedHistory = (): History => ({ pages: [{ messages: [stored(1), stored(2)], hasMore: false }], pageParams: [{}] });
+  const reactionsOf = (client: QueryClient) => client.getQueryData<History>(messagesKey("c1"))?.pages[0].messages?.[1].reactions;
+
+  it("puts a live reaction on the Message in the history on screen, and asks for nothing", () => {
+    const { client, answers } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+
+    handleEvent(client, reaction(THUMBS_UP, "2026-03-10T10:00:00Z"), createTypingTracker());
+
+    expect(reactionsOf(client)).toEqual([{ emoji: THUMBS_UP, userIds: ["ada"] }]);
+    expect(answers, "the list is not reloaded for a reaction").toHaveLength(0);
+  });
+
+  it("follows a person changing their mind and taking the reaction away, in the order they happened", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+
+    handleEvent(client, reaction(THUMBS_UP, "2026-03-10T10:00:00Z"), createTypingTracker());
+    handleEvent(client, reaction("\u2764\uFE0F", "2026-03-10T10:01:00Z"), createTypingTracker());
+    expect(reactionsOf(client)).toEqual([{ emoji: "\u2764\uFE0F", userIds: ["ada"] }]);
+
+    handleEvent(client, reaction(null, "2026-03-10T10:02:00Z"), createTypingTracker());
+    expect(reactionsOf(client)).toEqual([]);
+  });
+
+  it("ignores a word about a reaction that is older than one already heard, however late it arrives", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+    handleEvent(client, reaction(null, "2026-03-10T10:05:00Z"), createTypingTracker());
+
+    handleEvent(client, reaction(THUMBS_UP, "2026-03-10T10:00:00Z"), createTypingTracker());
+
+    expect(reactionsOf(client) ?? [], "the earlier reaction does not come back").toEqual([]);
+  });
+
+  it("takes someone out of every reaction when they left", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+    handleEvent(client, reaction(THUMBS_UP, "2026-03-10T10:00:00Z"), createTypingTracker());
+
+    handleEvent(client, JSON.stringify({ type: "reactions.cleared", conversationId: "c1", userId: "ada" }), createTypingTracker());
+
+    expect(reactionsOf(client)).toEqual([]);
+  });
+
+  it("does not patch a history whose request is under way (its answer may predate the reaction), but asks again", async () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(messagesKey("c1"), loadedHistory());
+    let asked = 0;
+    stops.push(
+      new QueryObserver(client, {
+        queryKey: messagesKey("c1"),
+        staleTime: Infinity,
+        queryFn: () => (asked++, new Promise<History>(() => {})),
+      }).subscribe(() => {}),
+    );
+    void client.invalidateQueries({ queryKey: messagesKey("c1") });
+    await Promise.resolve();
+    expect(asked).toBe(1);
+
+    handleEvent(client, reaction(THUMBS_UP, "2026-03-10T10:00:00Z"), createTypingTracker());
+    await Promise.resolve();
+
+    expect(asked, "the request was restarted").toBe(2);
+    expect(reactionsOf(client), "not patched").toBeUndefined();
+  });
+});
+
 describe("settings events", () => {
   const settingsEvent = (settings: object) => JSON.stringify({ type: "settings.changed", conversationId: "c1", settings });
 

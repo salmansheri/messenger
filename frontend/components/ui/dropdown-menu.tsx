@@ -1,6 +1,18 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { nextMenuIndex } from "./menu-keys";
 
 const CloseMenu = createContext<(giveFocusBack?: boolean) => void>(() => {});
@@ -60,6 +72,7 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [upward, setUpward] = useState(false);
 
   const close = useCallback(
     (giveFocusBack = false) => {
@@ -78,6 +91,14 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
   }, [open, close]);
+
+  // Opens upward when there is no room below inside the scrolling area it sits in (the last Messages of a history).
+  useLayoutEffect(() => {
+    if (!open || !panel.current || !trigger.current) return;
+    const area = trigger.current.closest<HTMLElement>('[role="region"]')?.getBoundingClientRect();
+    const room = (area?.bottom ?? window.innerHeight) - trigger.current.getBoundingClientRect().bottom;
+    setUpward(room < panel.current.offsetHeight + 8);
+  }, [open]);
 
   useEffect(() => {
     if (open) panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -116,7 +137,7 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
         <div
           id={menuId}
           ref={panel}
-          className="absolute right-0 top-full z-10 mt-1 w-64 rounded-sm border border-rule bg-paper p-1 shadow-sm"
+          className={`absolute right-0 z-10 w-64 rounded-sm border border-rule bg-paper p-1 shadow-sm ${upward ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           <CloseMenu.Provider value={close}>
             <div role="menu" aria-label={label} className="flex flex-col">

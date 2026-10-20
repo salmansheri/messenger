@@ -3,8 +3,36 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, create, deleteForEveryone, edit, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unregister, updateSettings, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnregisterData, UnregisterResponse, UpdateSettingsData, UpdateSettingsResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, create, deleteForEveryone, edit, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unreact, unregister, updateSettings, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateSettingsData, UpdateSettingsResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+
+export const unreactMutation = (options?: Partial<Options<UnreactData>>): UseMutationOptions<UnreactResponse, DefaultError, Options<UnreactData>> => {
+    const mutationOptions: UseMutationOptions<UnreactResponse, DefaultError, Options<UnreactData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await unreact({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reactMutation = (options?: Partial<Options<ReactData>>): UseMutationOptions<ReactResponse, DefaultError, Options<ReactData>> => {
+    const mutationOptions: UseMutationOptions<ReactResponse, DefaultError, Options<ReactData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await react({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const lookupMutation = (options?: Partial<Options<LookupData>>): UseMutationOptions<LookupResponse, DefaultError, Options<LookupData>> => {
     const mutationOptions: UseMutationOptions<LookupResponse, DefaultError, Options<LookupData>> = {

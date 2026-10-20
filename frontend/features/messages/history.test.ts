@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { MessagePage, MessageResponse } from "@/lib/api";
-import { markDeleted, oldestSeq, removeById, removeMessage, replaceMessage, syncRange, type History } from "./history";
+import {
+  clearReactionsOf,
+  markDeleted,
+  oldestSeq,
+  removeById,
+  removeMessage,
+  replaceMessage,
+  syncRange,
+  updateReactions,
+  type History,
+} from "./history";
 
 const msg = (seq: number, overrides: Partial<MessageResponse> = {}): MessageResponse => ({
   id: `id${seq}`,
@@ -114,5 +124,74 @@ describe("removeById", () => {
   it("returns the same history when it is not there", () => {
     const before = history(page(5));
     expect(removeById(before, "nope")).toBe(before);
+  });
+});
+
+describe("updateReactions", () => {
+  const reacted = (seq: number) => msg(seq, { reactions: [{ emoji: "x", userIds: ["a"] }] });
+
+  it("changes the reactions of the Message with this id and nothing else", () => {
+    const before = history({ messages: [msg(5), reacted(6)], hasMore: false });
+
+    const after = updateReactions(before, "id5", () => [{ emoji: "y", userIds: ["b"] }]);
+
+    expect(after.pages[0].messages?.[0].reactions).toEqual([{ emoji: "y", userIds: ["b"] }]);
+    expect(after.pages[0].messages?.[1]).toBe(before.pages[0].messages?.[1]);
+  });
+
+  it("treats no reactions and an empty list of them as the same, so taking away what was never there changes nothing", () => {
+    const before = history({ messages: [msg(5)], hasMore: false });
+
+    expect(updateReactions(before, "id5", () => [])).toBe(before);
+  });
+
+  it("returns the same history when the Message is not loaded, is deleted, or the reactions do not change", () => {
+    const deleted = msg(7, { body: undefined, deletedAt: "2026-03-10T10:00:00Z" });
+    const before = history({ messages: [reacted(6), deleted], hasMore: false });
+    const same = before.pages[0].messages?.[0].reactions;
+
+    expect(updateReactions(before, "nope", () => [])).toBe(before);
+    expect(updateReactions(before, "id7", () => [{ emoji: "y", userIds: ["b"] }])).toBe(before);
+    expect(updateReactions(before, "id6", () => same)).toBe(before);
+  });
+});
+
+describe("clearReactionsOf", () => {
+  it("takes a person out of the reactions of every loaded Message", () => {
+    const before = history(
+      { messages: [msg(5, { reactions: [{ emoji: "x", userIds: ["gone", "a"] }] })], hasMore: false },
+      { messages: [msg(3, { reactions: [{ emoji: "y", userIds: ["gone"] }] })], hasMore: false },
+    );
+
+    const after = clearReactionsOf(before, "gone");
+
+    expect(after.pages[0].messages?.[0].reactions).toEqual([{ emoji: "x", userIds: ["a"] }]);
+    expect(after.pages[1].messages?.[0].reactions).toEqual([]);
+  });
+
+  it("returns the same history when they had reacted to nothing loaded", () => {
+    const before = history({ messages: [msg(5)], hasMore: false });
+
+    expect(clearReactionsOf(before, "gone")).toBe(before);
+  });
+});
+
+describe("syncRange and reactions", () => {
+  it("takes the server's reactions for a Message even when nothing else about it changed", () => {
+    const before = history({ messages: [msg(5, { reactions: [{ emoji: "x", userIds: ["a"] }] })], hasMore: false });
+
+    const after = syncRange(before, [msg(5, { reactions: [{ emoji: "y", userIds: ["b"] }] })], 5, 5);
+
+    expect(after.pages[0].messages?.[0].reactions).toEqual([{ emoji: "y", userIds: ["b"] }]);
+  });
+
+  it("does not give a deleted Message its reactions back", () => {
+    const deleted = msg(5, { body: undefined, deletedAt: "2026-03-10T10:00:00Z", reactions: [] });
+    const before = history({ messages: [deleted], hasMore: false });
+
+    const after = syncRange(before, [msg(5, { reactions: [{ emoji: "y", userIds: ["b"] }] })], 5, 5);
+
+    expect(after.pages[0].messages?.[0].deletedAt).toBe("2026-03-10T10:00:00Z");
+    expect(after.pages[0].messages?.[0].reactions).toEqual([]);
   });
 });
