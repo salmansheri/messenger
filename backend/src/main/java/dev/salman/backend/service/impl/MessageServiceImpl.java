@@ -25,6 +25,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.MessageService;
+import dev.salman.backend.service.MessageThrottle;
 import dev.salman.backend.service.PushService;
 import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageRepository messages;
 	private final RealtimeEvents events;
 	private final PushService push;
+	private final MessageThrottle throttle;
 	private final Clock clock;
 
 	/**
@@ -49,6 +51,13 @@ public class MessageServiceImpl implements MessageService {
 	@Transactional
 	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body) {
 		requireParticipant(callerId, conversationId);
+		// Before the lock, so a User over the limit never queues behind (or in front of) other people's sends. A
+		// retry the server already stored is answered below without counting; two retries racing here at worst
+		// count twice.
+		if (messages.findByConversationIdAndSenderIdAndClientMessageId(conversationId, callerId, clientMessageId)
+				.isEmpty()) {
+			throttle.send(callerId);
+		}
 		var conversation = conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
 		requireParticipant(callerId, conversationId); // again, under the lock: a removal may have just committed
 

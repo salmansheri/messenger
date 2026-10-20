@@ -34,7 +34,7 @@ class JwtConfigTests {
 		return new AppProperties("no-reply@example.com",
 				new AppProperties.Jwt("test-issuer", Duration.ofMinutes(15), Duration.ofDays(30), privateKey, publicKey),
 				new AppProperties.Otp("secret", Duration.ofMinutes(10), 5, 5, 20),
-				new AppProperties.RefreshCookie(true), new AppProperties.Cors(java.util.List.of()), new AppProperties.Lookup(30), new AppProperties.Groups(20),
+				new AppProperties.RefreshCookie(true), new AppProperties.Cors(java.util.List.of()), new AppProperties.Lookup(30), new AppProperties.Groups(20), new AppProperties.Messages(60, 120),
 				new AppProperties.Presence(Duration.ofSeconds(30), Duration.ofSeconds(5), Duration.ofSeconds(2)),
 				new AppProperties.Push(10, Duration.ofSeconds(30), 5));
 	}

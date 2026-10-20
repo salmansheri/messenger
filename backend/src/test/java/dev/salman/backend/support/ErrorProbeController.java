@@ -1,9 +1,12 @@
 package dev.salman.backend.support;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import dev.salman.backend.service.MessageThrottle;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -24,6 +28,12 @@ import jakarta.validation.constraints.Size;
 @RestController
 @RequestMapping("/api/v1/auth/_probe")
 class ErrorProbeController {
+
+	private final MessageThrottle messageThrottle;
+
+	ErrorProbeController(MessageThrottle messageThrottle) {
+		this.messageThrottle = messageThrottle;
+	}
 
 	record ProbeBody(@NotBlank String email, @Size(min = 8) String password) {
 	}
@@ -40,6 +50,13 @@ class ErrorProbeController {
 	@PostMapping("/boom")
 	void boom() {
 		throw new IllegalStateException("secret internal detail");
+	}
+
+	/** Counts one edit, deletion or reaction for the User, until those endpoints exist to do it for real. */
+	@PostMapping("/message-change/{userId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void messageChange(@PathVariable UUID userId) {
+		messageThrottle.change(userId);
 	}
 
 	@PostMapping("/validate")

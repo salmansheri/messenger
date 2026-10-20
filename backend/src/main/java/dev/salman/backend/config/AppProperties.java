@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Presence presence, Push push) {
+public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push) {
 
 	public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String privateKey,
 			String publicKey) {
@@ -29,6 +29,14 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 
 	/** Limit on how many Groups one User may create per hour (failed attempts count). */
 	public record Groups(int maxCreatedPerHour) {
+	}
+
+	/**
+	 * Per-User limits on Message writes, each counted over a minute. {@code maxSendsPerMinute}: new Messages across all
+	 * Conversations. {@code maxChangesPerMinute}: edits, deletions and reactions together, which are cheaper to do and
+	 * so get a looser limit.
+	 */
+	public record Messages(int maxSendsPerMinute, int maxChangesPerMinute) {
 	}
 
 	/**

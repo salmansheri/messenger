@@ -27,6 +27,9 @@ app:
     max-per-minute: 30
   groups:
     max-created-per-hour: 20
+  messages:
+    max-sends-per-minute: 60
+    max-changes-per-minute: 120
   push:
     max-devices-per-user: 10
     retry-delay: 30s
