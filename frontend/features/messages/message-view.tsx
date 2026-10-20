@@ -17,6 +17,7 @@ import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
 import { useAnnouncements } from "./use-announcements";
 import { useReportReading } from "./use-report-reading";
+import { sendFailureMessage } from "./wording";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
 /** Within this many pixels of the bottom, the view follows new Messages. */
@@ -273,7 +274,7 @@ function Row({
         {pending?.status === "failed" && (
           <p className="flex flex-wrap items-center gap-x-3 text-sm">
             <span className="text-accent">
-              Not sent. {pending.error ? messageFor(toProblem(pending.error)) : ""}
+              Not sent. {pending.error ? sendFailureMessage(toProblem(pending.error)) : ""}
             </span>
             <Button variant="quiet" onClick={() => onRetry(pending.clientMessageId)}>
               Retry

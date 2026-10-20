@@ -7,7 +7,7 @@ export function describeWait(seconds: number): string {
   return plural(Math.ceil(seconds / 3600), "hour");
 }
 
-const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
+export const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
 
 /** "in 5 minutes", or "later" when the server did not say how long. */
 export const whenToRetry = (problem: ApiProblem) =>

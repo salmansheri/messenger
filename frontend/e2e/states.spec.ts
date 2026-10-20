@@ -2,7 +2,7 @@ import type { Page, Route } from "@playwright/test";
 import { FRONTEND_URL } from "./playwright-urls";
 import { expect, test } from "./support/fixtures";
 import { expectAccessible } from "./support/a11y";
-import { createVerifiedAccount, sendMessageVia, signIn, startDirectVia } from "./support/backend";
+import { createVerifiedAccount, messagesVia, sendMessageVia, signIn, startDirectVia } from "./support/backend";
 import { fillSignUp, newAccount, problem as notice, signInThroughTheForm, waitForForm } from "./support/auth-screens";
 
 /** What the backend says when it is busy (503) or when someone is going too fast (429 with how long to wait). */
@@ -175,5 +175,47 @@ test.describe("calm states", () => {
     await expect(page.getByRole("status").filter({ hasText: "Loading your Conversations…" })).toBeVisible();
     release();
     await expect(page.getByText("You have no Conversations yet.")).toBeVisible();
+  });
+
+  test("a Message the server throttles says how many seconds to wait, and Retry delivers it once with the same Client message ID", async ({
+    page,
+  }) => {
+    const [me, grace] = await Promise.all([createVerifiedAccount("Me Myself"), createVerifiedAccount("Grace Hopper")]);
+    const myToken = await signIn(me.email);
+    const id = await startDirectVia(myToken, grace.id);
+    await signInThroughTheForm(page, me);
+    await page.goto(`/app/c/${id}`);
+    const composer = page.getByRole("textbox", { name: "Message" });
+    await expect(composer).toBeVisible();
+
+    // The real throttle is 60 a minute, which a test cannot spend cheaply: answer the first try as the backend would.
+    const sent: string[] = [];
+    let throttled = true;
+    await page.route(`**/conversations/${id}/messages`, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      sent.push(JSON.parse(route.request().postData() ?? "{}").clientMessageId);
+      return throttled ? problem(route, 429, 12) : route.fallback();
+    });
+
+    await composer.fill("Too fast");
+    await composer.press("Enter");
+
+    const row = page.getByRole("list", { name: "Messages" }).getByRole("listitem").filter({ hasText: "Too fast" });
+    await expect(row.getByText("Not sent. You are sending Messages too often. Try again in 12 seconds.")).toBeVisible();
+    expect(await messagesVia(myToken, id), "the refused Message was not stored").toEqual([]);
+    await expectAccessible(page, "a Message that was not sent because sending is throttled");
+
+    throttled = false;
+    await row.getByRole("button", { name: "Retry" }).click();
+
+    await expect(row.getByText("Not sent.")).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Messages" }).getByText("Too fast")).toHaveCount(1);
+    await expect
+      .poll(async () => (await messagesVia(myToken, id)).filter((m) => m.body === "Too fast").length, { message: "one copy on the server" })
+      .toBe(1);
+    await expect(row.getByText("Sending…"), "the Message is confirmed, not still pending").toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Messages" }).getByText("Too fast")).toHaveCount(1);
+    expect(sent, "the retry reuses the Client message ID").toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
   });
 });

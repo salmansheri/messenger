@@ -39,6 +39,9 @@ export default defineConfig({
         APP_OTP_MAX_SENDS_PER_IP_PER_HOUR: "100000",
         APP_LOOKUP_MAX_PER_MINUTE: "100000",
         APP_GROUPS_MAX_CREATED_PER_HOUR: "100000",
+        // Tests seed long histories through the backend as one User; the throttle itself is shown with an injected 429.
+        APP_MESSAGES_MAX_SENDS_PER_MINUTE: "100000",
+        APP_MESSAGES_MAX_CHANGES_PER_MINUTE: "100000",
         // The backend answers (and accepts sockets from) the frontend the tests use.
         APP_CORS_ALLOWED_ORIGINS: FRONTEND_URL,
       },
