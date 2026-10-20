@@ -50,6 +50,22 @@ _Avoid_: Idempotency key, request ID
 The position of a Message within its Conversation, assigned by the server. It defines the canonical order of Messages and is how clients resume after being offline.
 _Avoid_: Timestamp order, message index
 
+**Edited Message**:
+A Message whose sender changed its text within a short time after sending. It keeps its place and Sequence number, is shown as edited, and earlier versions are not kept.
+_Avoid_: Modified, updated Message
+
+**Deleted Message**:
+A Message its sender removed for everyone within a time limit. It stays in the Conversation as a placeholder in the same position, with its text gone. Deleting a Message only for yourself hides it from your view alone.
+_Avoid_: Removed Message, recalled Message, unsent Message
+
+**Reply**:
+A Message that quotes one earlier Message of the same Conversation. The quote shows the quoted Message as it is now, so an edit or deletion shows through. A Message from before a Participant joined cannot be quoted by them.
+_Avoid_: Quote, thread
+
+**Reaction**:
+One emoji, from a fixed set, that a Participant puts on a Message. A Participant has at most one Reaction per Message: choosing another replaces it, choosing the same one removes it. Reacting changes no unread count, receipt or Conversation order.
+_Avoid_: Like, emoji reply
+
 ### Receipts
 
 **Delivered position**:
@@ -67,6 +83,22 @@ _Avoid_: Badge, pending
 **Message status**:
 How far a Message has got, shown only to its sender: sent, delivered once every other Participant's Delivered position has reached it, read once every other Participant's Read position has.
 _Avoid_: Receipt state, tick
+
+### Conversation settings
+
+These belong to a Participant and are private to them; nobody else sees them.
+
+**Mute**:
+A Participant silences Push notifications from a Conversation for a set time or indefinitely. Unread counts and live updates carry on as normal.
+_Avoid_: Silence, do not disturb
+
+**Archive**:
+A Participant moves a Conversation out of their main list into a separate Archived view. New Messages do not bring it back; only the Participant does.
+_Avoid_: Hide, close
+
+**Pin**:
+A Participant keeps a Conversation at the top of their list, up to three at a time. An archived Conversation cannot be pinned.
+_Avoid_: Favourite, star
 
 ### Presence
 
