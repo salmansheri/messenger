@@ -34,6 +34,21 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "message.updated", conversationId: "c1", message: { id: "m1" } }))).toBeUndefined();
   });
 
+  it("reads a change to the person's own settings for a Conversation", () => {
+    const settings = { muted: true, mutedUntil: "2026-03-10T20:00:00Z", archived: false, pinned: true };
+
+    expect(parseEvent(JSON.stringify({ type: "settings.changed", conversationId: "c1", settings }))).toEqual({
+      type: "settings.changed",
+      conversationId: "c1",
+      settings,
+    });
+  });
+
+  it("refuses a settings change with no settings or no Conversation", () => {
+    expect(parseEvent(JSON.stringify({ type: "settings.changed", conversationId: "c1" }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "settings.changed", settings: { pinned: true } }))).toBeUndefined();
+  });
+
   it("reads a change to a Conversation", () => {
     expect(parseEvent(JSON.stringify({ type: "conversation.changed", conversationId: "c1" }))).toEqual({
       type: "conversation.changed",

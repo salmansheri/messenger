@@ -12,7 +12,7 @@ import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
-import { catchUp, handleEvent } from "./sync";
+import { catchUp, handleEvent, recordSettings } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
   id: "c1",
@@ -164,6 +164,42 @@ describe("edited and deleted Messages", () => {
     await Promise.resolve();
 
     expect(answers).toHaveLength(1);
+  });
+});
+
+describe("settings events", () => {
+  const settingsEvent = (settings: object) => JSON.stringify({ type: "settings.changed", conversationId: "c1", settings });
+
+  it("shows a change made in another tab: the list is patched and reordered, and nothing is asked for", () => {
+    const other: ConversationResponse = { ...conversation(1, 0), id: "c0", updatedAt: "2026-03-10T10:00:00Z" };
+    const { client, answers } = withList([other, conversation(2, 0)]);
+
+    handleEvent(client, settingsEvent({ muted: true, archived: false, pinned: true }), createTypingTracker());
+
+    const list = client.getQueryData<ConversationResponse[]>(listQueryKey());
+    expect(list?.map((c) => c.id)).toEqual(["c1", "c0"]);
+    expect(list?.[0].settings).toEqual({ muted: true, archived: false, pinned: true });
+    expect(answers).toHaveLength(0);
+  });
+
+  it("does not patch a list whose request is under way, but asks again", async () => {
+    const { client, answers } = withList([conversation(2, 0)]);
+    void client.invalidateQueries({ queryKey: listQueryKey() });
+    await Promise.resolve();
+
+    handleEvent(client, settingsEvent({ muted: false, archived: true, pinned: false }), createTypingTracker());
+    await Promise.resolve();
+
+    expect(answers, "the request was restarted").toHaveLength(2);
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].settings, "not patched").toBeUndefined();
+  });
+
+  it("records the answer to the person's own change the same way", () => {
+    const { client } = withList([conversation(2, 0)]);
+
+    recordSettings(client, "c1", { muted: false, archived: false, pinned: true });
+
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].settings?.pinned).toBe(true);
   });
 });
 

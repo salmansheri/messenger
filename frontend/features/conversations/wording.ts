@@ -1,4 +1,4 @@
-import { toProblem } from "@/lib/api";
+import { toProblem, type ApiProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 
 /** The address typed is the signed-in person's own: noticed here, before asking the server to start anything. */
@@ -21,4 +21,14 @@ export function startDirectOutcome(error: unknown): StartDirectOutcome {
   if (problem.status === 400) return { message: YOURSELF, about: "address" };
   if (problem.status === 404) return { message: NOBODY, about: "address" };
   return { message: messageFor(problem), about: "form" };
+}
+
+/**
+ * Why a mute, archive or pin was refused. A 409 is the server's own plain words ("You can pin at most 3
+ * Conversations.", "Unarchive it before pinning."), shown as they are: the general 409 wording is about accounts.
+ */
+export function settingsFailureMessage(problem: ApiProblem): string {
+  if (problem.status === 409) return problem.detail ?? "That can no longer be done.";
+  if (problem.status === 404) return "This Conversation is no longer yours.";
+  return messageFor(problem);
 }

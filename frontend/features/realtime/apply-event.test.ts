@@ -233,6 +233,47 @@ describe("applyToHistory for an edited or deleted Message", () => {
   });
 });
 
+describe("applyToList for a change to the person's own settings", () => {
+  const changed = (settings: ConversationResponse["settings"], conversationId = "c1"): RealtimeEvent => ({
+    type: "settings.changed",
+    conversationId,
+    settings: settings ?? {},
+  });
+  const list = [
+    conversation("c0", { updatedAt: "2026-03-10T11:00:00Z", settings: { muted: false, archived: false, pinned: false } }),
+    conversation("c1", { updatedAt: "2026-03-10T09:00:00Z", settings: { muted: false, archived: false, pinned: false } }),
+  ];
+
+  it("takes the new settings and moves a newly pinned Conversation to the top", () => {
+    const result = applyToList(list, changed({ muted: false, archived: false, pinned: true }), ME);
+
+    expect(result.refetch).toBe(false);
+    expect(result.list.map((c) => c.id)).toEqual(["c1", "c0"]);
+    expect(result.list[0].settings?.pinned).toBe(true);
+  });
+
+  it("changes nothing when the settings are the same as the ones shown", () => {
+    const result = applyToList(list, changed({ muted: false, archived: false, pinned: false }), ME);
+
+    expect(result.list).toBe(list);
+  });
+
+  it("asks for the list again for a Conversation it does not know", () => {
+    expect(applyToList(list, changed({ pinned: true }, "other"), ME).refetch).toBe(true);
+  });
+
+  it("keeps pinned Conversations above a Conversation that just got a new Message", () => {
+    const pinned = [
+      conversation("p", { updatedAt: "2026-03-01T09:00:00Z", settings: { muted: false, archived: false, pinned: true } }),
+      conversation("c1", { updatedAt: "2026-03-10T09:00:00Z", lastMessage: msg(2), settings: { muted: false, archived: false, pinned: false } }),
+    ];
+
+    const result = applyToList(pinned, created(msg(3)), ME);
+
+    expect(result.list.map((c) => c.id)).toEqual(["p", "c1"]);
+  });
+});
+
 describe("applyUnread", () => {
   const list = [
     conversation("c0", { lastMessage: msg(7), unreadCount: 3 }),

@@ -1,4 +1,4 @@
-import type { MessageResponse } from "@/lib/api";
+import type { ConversationSettings, MessageResponse } from "@/lib/api";
 
 /**
  * What the app acts on. `ignored` is any other well-formed event (a kind that does not exist yet): it is known to be
@@ -9,6 +9,8 @@ export type RealtimeEvent =
   /** A Message was edited or deleted for everyone (no `status`: that is the sender's own view). */
   | { type: "message.updated"; conversationId: string; message: MessageResponse }
   | { type: "conversation.changed"; conversationId: string }
+  /** This person's own mute, archive or pin changed, from any of their tabs or devices. */
+  | { type: "settings.changed"; conversationId: string; settings: ConversationSettings }
   /** How far everyone ELSE has got (the lowest of their positions), told to the sender of Messages. */
   | { type: "receipts.updated"; conversationId: string; deliveredUpTo: number; readUpTo: number }
   /** This person's own positions and unread count after a report (from any of their tabs or devices). */
@@ -57,6 +59,10 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
       if (typeof message.seq !== "number" || typeof message.id !== "string") return undefined;
       return { type: "message.updated", conversationId, message: message as MessageResponse };
     }
+    case "settings.changed":
+      return typeof conversationId === "string" && isObject(payload.settings)
+        ? { type: "settings.changed", conversationId, settings: payload.settings as ConversationSettings }
+        : undefined;
     case "conversation.changed":
       return typeof conversationId === "string" ? { type: "conversation.changed", conversationId } : undefined;
     case "receipts.updated": {

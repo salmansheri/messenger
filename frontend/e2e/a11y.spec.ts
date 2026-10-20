@@ -130,6 +130,7 @@ test.describe("accessibility and wording, on every screen (the project decides t
 
     await page.goto("/app/new/group");
     await expect(page.getByRole("heading", { level: 1, name: "New Group" })).toBeVisible();
+    await waitForForm(page); // pressing before React has taken over would submit the form natively
     await page.getByRole("button", { name: "Create Group" }).click();
     await page.getByLabel("Add a person by email").fill("nobody-at-all@example.com");
     await page.getByRole("button", { name: "Add", exact: true }).click();

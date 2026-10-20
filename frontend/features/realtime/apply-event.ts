@@ -2,6 +2,7 @@ import type { ConversationResponse, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 import { latestSeq, replaceMessage, withMessage, type History } from "@/features/messages/history";
 import { mergeVersion } from "@/features/messages/versions";
+import { orderConversations, withSettings } from "@/features/conversations/settings";
 
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
 
@@ -18,6 +19,10 @@ export function applyToList(
 ): { list: ConversationResponse[]; refetch: boolean } {
   if (event.type === "conversation.changed") return { list, refetch: true };
   if (event.type === "message.updated") return applyUpdateToList(list, event);
+  if (event.type === "settings.changed") {
+    const next = withSettings(list, event.conversationId, event.settings);
+    return next ? { list: next, refetch: false } : { list, refetch: true };
+  }
   if (event.type !== "message.created") return { list, refetch: false };
 
   const known = list.find((conversation) => conversation.id === event.conversationId);
@@ -36,7 +41,8 @@ export function applyToList(
     updatedAt: message.createdAt ?? known.updatedAt,
   };
   const skippedAhead = shown !== undefined && seqOf(message) > shown + 1;
-  return { list: [updated, ...list.filter((conversation) => conversation !== known)], refetch: skippedAhead };
+  // Most recent first, but not above the pinned ones.
+  return { list: orderConversations([updated, ...list.filter((conversation) => conversation !== known)]), refetch: skippedAhead };
 }
 
 /**

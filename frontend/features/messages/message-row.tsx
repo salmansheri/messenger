@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { MenuItem } from "@/components/ui/dropdown-menu";
 import { toProblem } from "@/lib/api";
 import { formatClock } from "@/features/conversations/present";
 import { statusFor, type Frontier } from "@/features/receipts/status";
-import { nextMenuIndex } from "./menu-keys";
+import { nextMenuIndex } from "@/components/ui/menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
@@ -286,32 +287,6 @@ function MessageMenu({
         </div>
       )}
     </div>
-  );
-}
-
-function MenuItem({
-  children,
-  onSelect,
-  busy,
-  ref,
-}: {
-  children: React.ReactNode;
-  onSelect: () => void;
-  busy?: boolean;
-  ref?: React.Ref<HTMLButtonElement>;
-}) {
-  return (
-    <button
-      ref={ref}
-      type="button"
-      role="menuitem"
-      tabIndex={-1}
-      aria-disabled={busy || undefined}
-      onClick={() => !busy && onSelect()}
-      className="rounded-sm px-3 py-2 text-left text-base text-ink hover:bg-band focus:bg-band aria-disabled:opacity-60"
-    >
-      {children}
-    </button>
   );
 }
 

@@ -7,6 +7,7 @@ import {
   formatWhen,
   lastLine,
   otherParticipantId,
+  settingsLine,
   unreadLabel,
   unreadSpeech,
 } from "./present";
@@ -165,5 +166,32 @@ describe("formatClock", () => {
     expect(formatClock("2026-03-10T09:05:00Z", "UTC")).toBe("09:05");
     expect(formatClock("2026-03-10T09:05:00Z", "Asia/Kolkata")).toBe("14:35");
     expect(formatClock(undefined, "UTC")).toBe("");
+  });
+});
+
+describe("settingsLine", () => {
+  const NOW = new Date("2026-03-10T12:00:00Z");
+  const line = (settings: Parameters<typeof settingsLine>[0]) => settingsLine(settings, NOW, "UTC");
+
+  it("says nothing when nothing is set", () => {
+    expect(line({ muted: false, archived: false, pinned: false })).toBe("");
+    expect(line(undefined)).toBe("");
+  });
+
+  it("says muted for ever, or until when", () => {
+    expect(line({ muted: true })).toBe("Muted");
+    expect(line({ muted: true, mutedUntil: "2026-03-10T20:00:00Z" })).toBe("Muted until 20:00");
+    expect(line({ muted: true, mutedUntil: "2026-03-11T08:30:00Z" })).toBe("Muted until tomorrow 08:30");
+    expect(line({ muted: true, mutedUntil: "2026-03-17T08:30:00Z" })).toBe("Muted until Tue 17 Mar, 08:30");
+  });
+
+  it("leaves a mute that has run out unsaid", () => {
+    expect(line({ muted: true, mutedUntil: "2026-03-10T11:00:00Z" })).toBe("");
+  });
+
+  it("joins what is set, naming pinned and archived", () => {
+    expect(line({ muted: true, archived: true })).toBe("Muted · Archived");
+    expect(line({ muted: false, pinned: true })).toBe("Pinned");
+    expect(line({ muted: true, mutedUntil: "2026-03-10T20:00:00Z", pinned: true })).toBe("Pinned · Muted until 20:00");
   });
 });

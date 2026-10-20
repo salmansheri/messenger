@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api";
-import { SelfConversationError, startDirectOutcome } from "./wording";
+import { SelfConversationError, settingsFailureMessage, startDirectOutcome } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number) =>
   new ApiProblem(status, "x", undefined, {}, retryAfterSeconds);
@@ -35,5 +35,25 @@ describe("startDirectOutcome", () => {
       message: "Something went wrong on our side. Try again in a moment.",
       about: "form",
     });
+  });
+});
+
+describe("settingsFailureMessage", () => {
+  const problem = (status: number, detail?: string, retryAfterSeconds?: number) =>
+    new ApiProblem(status, "Problem", detail, {}, retryAfterSeconds);
+
+  it("passes on the server's own plain words for a refused pin", () => {
+    expect(settingsFailureMessage(problem(409, "You can pin at most 3 Conversations."))).toBe("You can pin at most 3 Conversations.");
+    expect(settingsFailureMessage(problem(409, "Unarchive it before pinning."))).toBe("Unarchive it before pinning.");
+  });
+
+  it("does not describe a 409 as an account problem when the server gave no words", () => {
+    expect(settingsFailureMessage(problem(409))).toBe("That can no longer be done.");
+  });
+
+  it("says a Conversation that is gone is gone, and leaves the rest to the general wording", () => {
+    expect(settingsFailureMessage(problem(404))).toBe("This Conversation is no longer yours.");
+    expect(settingsFailureMessage(problem(503, undefined, 5))).toBe("The server is busy. Try again in a moment.");
+    expect(settingsFailureMessage(problem(429, undefined, 300))).toBe("You are doing that too often. Try again in 5 minutes.");
   });
 });

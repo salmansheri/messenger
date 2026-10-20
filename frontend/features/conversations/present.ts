@@ -1,4 +1,5 @@
-import type { ConversationResponse } from "@/lib/api";
+import type { ConversationResponse, ConversationSettings } from "@/lib/api";
+import { isMuted } from "./settings";
 
 /** What a Conversation is called: the other person in a Direct conversation, the name of a Group. */
 export function conversationTitle(conversation: ConversationResponse, myId: string | undefined): string {
@@ -85,4 +86,28 @@ export function formatClock(iso: string | undefined, timeZone?: string): string 
   const date = iso ? new Date(iso) : undefined;
   if (!date || Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+}
+
+/** When a mute ends, in words that fit after "Muted until": the time today, "tomorrow 08:30", then weekday and date. */
+function formatUntil(iso: string, now: Date, timeZone?: string): string {
+  const date = new Date(iso);
+  const ahead = dayNumber(calendarDay(date, timeZone)) - dayNumber(calendarDay(now, timeZone));
+  const clock = formatClock(iso, timeZone);
+  if (ahead <= 0) return clock;
+  if (ahead === 1) return `tomorrow ${clock}`;
+  const day = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short", day: "numeric", month: "short" })
+    .format(date)
+    .replace(",", "");
+  return `${day}, ${clock}`;
+}
+
+/** What is set for a Conversation, on one line: "Pinned · Muted until 20:00 · Archived"; nothing when nothing is. */
+export function settingsLine(settings: ConversationSettings | undefined, now: Date, timeZone?: string): string {
+  const parts: string[] = [];
+  if (settings?.pinned) parts.push("Pinned");
+  if (settings && isMuted(settings, now)) {
+    parts.push(settings.mutedUntil ? `Muted until ${formatUntil(settings.mutedUntil, now, timeZone)}` : "Muted");
+  }
+  if (settings?.archived) parts.push("Archived");
+  return parts.join(" \u00b7 ");
 }

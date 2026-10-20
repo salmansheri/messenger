@@ -1,6 +1,14 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { listQueryKey, meQueryKey, presenceQueryKey, type ConversationResponse, type PresenceView, type UserProfile } from "@/lib/api";
-import { parseEvent } from "@/lib/realtime/events";
+import {
+  listQueryKey,
+  meQueryKey,
+  presenceQueryKey,
+  type ConversationResponse,
+  type ConversationSettings,
+  type PresenceView,
+  type UserProfile,
+} from "@/lib/api";
+import { parseEvent, type RealtimeEvent } from "@/lib/realtime/events";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey } from "@/features/messages/queries";
@@ -33,6 +41,28 @@ export function recordUnread(queryClient: QueryClient, report: { conversationId:
   }
 }
 
+/** Puts an event into the Conversation list that is loaded, or asks for the list again (see `fetching`). */
+function patchList(queryClient: QueryClient, event: RealtimeEvent) {
+  if (fetching(queryClient, listQueryKey())) {
+    void queryClient.invalidateQueries({ queryKey: listQueryKey() });
+    return;
+  }
+  const list = queryClient.getQueryData<ConversationResponse[]>(listQueryKey());
+  if (!list) return;
+  const myId = queryClient.getQueryData<UserProfile>(meQueryKey())?.id;
+  const next = applyToList(list, event, myId);
+  if (next.list !== list) queryClient.setQueryData(listQueryKey(), next.list);
+  if (next.refetch) void queryClient.invalidateQueries({ queryKey: listQueryKey() });
+}
+
+/**
+ * The person's own mute, archive or pin as the server just answered it to their own change: put into the list the same
+ * way as the event for it, which also arrives (and finds it done).
+ */
+export function recordSettings(queryClient: QueryClient, conversationId: string, settings: ConversationSettings) {
+  patchList(queryClient, { type: "settings.changed", conversationId, settings });
+}
+
 /** Puts one event into what is already loaded; anything that cannot be worked out from it asks the server again. */
 export function handleEvent(queryClient: QueryClient, body: string, typing: TypingTracker) {
   const event = parseEvent(body);
@@ -61,17 +91,7 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     return;
   }
 
-  if (fetching(queryClient, listQueryKey())) {
-    void queryClient.invalidateQueries({ queryKey: listQueryKey() });
-  } else {
-    const list = queryClient.getQueryData<ConversationResponse[]>(listQueryKey());
-    if (list) {
-      const myId = queryClient.getQueryData<UserProfile>(meQueryKey())?.id;
-      const next = applyToList(list, event, myId);
-      if (next.list !== list) queryClient.setQueryData(listQueryKey(), next.list);
-      if (next.refetch) void queryClient.invalidateQueries({ queryKey: listQueryKey() });
-    }
-  }
+  patchList(queryClient, event);
 
   if (event.type === "receipts.updated") {
     queryClient.setQueryData<Frontier>(receiptsKey(event.conversationId), (known) => mergeFrontier(known, event));

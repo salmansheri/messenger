@@ -5,13 +5,14 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { toProblem } from "@/lib/api";
+import { toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
 import { GroupPanel } from "@/features/groups/group-panel";
 import { PresenceLine } from "@/features/presence/presence-line";
+import { ConversationMenu } from "./conversation-menu";
 import { PaneHeader } from "./pane-header";
-import { conversationTitle, otherParticipantId } from "./present";
+import { conversationTitle, otherParticipantId, settingsLine } from "./present";
 import { useConversationList } from "./queries";
 
 /**
@@ -77,12 +78,16 @@ export function ConversationPane() {
   return (
     <>
       <PaneHeader
+        actions={<ConversationMenu conversation={conversation} />}
         detail={
-          conversation.type === "GROUP" ? (
-            <GroupPanel conversation={conversation} myId={list.myId} />
-          ) : (
-            <PresenceLine conversationId={conversation.id ?? ""} userId={otherParticipantId(conversation, list.myId)} />
-          )
+          <>
+            {conversation.type === "GROUP" ? (
+              <GroupPanel conversation={conversation} myId={list.myId} />
+            ) : (
+              <PresenceLine conversationId={conversation.id ?? ""} userId={otherParticipantId(conversation, list.myId)} />
+            )}
+            <SettingsLine settings={conversation.settings} />
+          </>
         }
       >
         {conversationTitle(conversation, list.myId)}
@@ -90,4 +95,10 @@ export function ConversationPane() {
       <MessageView key={conversation.id} conversation={conversation} myId={list.myId} />
     </>
   );
+}
+
+/** What the person has set for this Conversation (pinned, muted until when, archived), under its name; nothing if nothing is set. */
+function SettingsLine({ settings }: { settings: ConversationResponse["settings"] }) {
+  const line = settingsLine(settings, new Date());
+  return line ? <p className="font-mono text-xs text-ink-muted">{line}</p> : null;
 }

@@ -143,3 +143,13 @@ export async function deleteMessageVia(token: string, conversationId: string, me
   const response = await send("DELETE", `/api/v1/conversations/${conversationId}/messages/${messageId}`, token);
   if (response.status !== 204) throw new Error(`Delete failed: ${response.status}`);
 }
+
+/** Changes the caller's own mute, archive and pin for a Conversation through the backend. */
+export async function updateSettingsVia(
+  token: string,
+  conversationId: string,
+  settings: { mute?: "NONE" | "EIGHT_HOURS" | "ONE_WEEK" | "ALWAYS"; archived?: boolean; pinned?: boolean },
+) {
+  const response = await send("PATCH", `/api/v1/conversations/${conversationId}/settings`, token, settings);
+  if (response.status !== 200) throw new Error(`Settings failed: ${response.status}`);
+}
