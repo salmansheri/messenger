@@ -62,6 +62,19 @@ public class Participant {
 	@Column(name = "last_read_seq", nullable = false)
 	private long lastReadSeq;
 
+	/** Push notifications from this Conversation are silenced until this time (unless muted for ever). */
+	@Column(name = "muted_until")
+	private Instant mutedUntil;
+
+	@Column(name = "muted_forever", nullable = false)
+	private boolean mutedForever;
+
+	@Column(nullable = false)
+	private boolean archived;
+
+	@Column(nullable = false)
+	private boolean pinned;
+
 	public static Participant joining(UUID conversationId, UUID userId, ParticipantRole role, Instant joinedAt,
 			long joinedAfterSeq) {
 		var participant = new Participant();
@@ -74,6 +87,11 @@ public class Participant {
 		participant.setLastDeliveredSeq(joinedAfterSeq);
 		participant.setLastReadSeq(joinedAfterSeq);
 		return participant;
+	}
+
+	/** Whether push notifications are silenced at {@code now}; a mute with an end time lapses on its own. */
+	public boolean isMuted(Instant now) {
+		return mutedForever || (mutedUntil != null && mutedUntil.isAfter(now));
 	}
 
 	/** Whether a Message with this Sequence number was sent after the Participant joined, so they may read it. */

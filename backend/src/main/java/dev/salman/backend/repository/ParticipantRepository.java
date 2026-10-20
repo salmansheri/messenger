@@ -56,4 +56,12 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
 			""", nativeQuery = true)
 	int advanceReceipts(UUID conversationId, UUID userId, long delivered, long read);
 
+	/** How many Conversations the User has pinned. */
+	long countByUserIdAndPinnedTrue(UUID userId);
+
+	/** Serialises one User's settings changes for this transaction, so concurrent pins cannot slip past the limit. */
+	@Query(value = "select count(*) from (select pg_advisory_xact_lock(hashtextextended(:key, 0))) locked",
+			nativeQuery = true)
+	long lockPinsOf(String key);
+
 }

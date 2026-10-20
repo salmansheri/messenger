@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,8 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import dev.salman.backend.dto.ConversationResponse;
 import dev.salman.backend.dto.StartDirectConversationRequest;
+import dev.salman.backend.dto.UpdateSettingsRequest;
 import dev.salman.backend.lib.Principals;
 import dev.salman.backend.service.ConversationService;
+import dev.salman.backend.service.ConversationSettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class ConversationController {
 
 	private final ConversationService conversations;
+	private final ConversationSettingsService settings;
 
 	/** 201 when the Direct conversation was created, 200 when it already existed. */
 	@PostMapping("/direct")
@@ -45,6 +49,13 @@ public class ConversationController {
 	@GetMapping("/{conversationId}")
 	ConversationResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId) {
 		return conversations.get(Principals.userId(jwt), conversationId);
+	}
+
+	/** The caller's own mute, archive and pin; what is not in the request stays as it was. */
+	@PatchMapping("/{conversationId}/settings")
+	ConversationResponse updateSettings(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId,
+			@RequestBody UpdateSettingsRequest request) {
+		return settings.update(Principals.userId(jwt), conversationId, request);
 	}
 
 }

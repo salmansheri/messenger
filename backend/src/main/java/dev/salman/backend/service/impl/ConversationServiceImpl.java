@@ -1,6 +1,7 @@
 package dev.salman.backend.service.impl;
 
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -69,7 +70,9 @@ public class ConversationServiceImpl implements ConversationService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<ConversationResponse> listFor(UUID callerId) {
-		return assembler.assemble(conversations.findAllForUser(callerId), callerId);
+		// Already most recently active first; pinned ones move to the front, keeping that order among themselves.
+		return assembler.assemble(conversations.findAllForUser(callerId), callerId).stream()
+				.sorted(Comparator.comparing((ConversationResponse c) -> !c.settings().pinned())).toList();
 	}
 
 	@Override

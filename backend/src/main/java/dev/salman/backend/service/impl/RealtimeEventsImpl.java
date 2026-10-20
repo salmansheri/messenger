@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.RealtimeEvent;
 import dev.salman.backend.dto.ReceiptPositions;
@@ -77,6 +78,11 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.addAll(alsoNotify);
 		publish(recipients, event("conversation.changed", conversationId, Map.of()));
+	}
+
+	@Override
+	public void settingsChanged(UUID userId, UUID conversationId, ConversationSettings settings) {
+		publish(Set.of(userId), event("settings.changed", conversationId, Map.of("settings", settings)));
 	}
 
 	@Override

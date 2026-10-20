@@ -195,6 +195,14 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Changes the caller's own mute, archive and pin settings for a Conversation; absent keys stay as they are. */
+	public ResultActions updateSettings(String accessToken, String conversationId, Map<String, Object> settings)
+			throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.patch("/api/v1/conversations/{id}/settings", conversationId)
+				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(settings))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	/** Deletes the Message for everyone. */
 	public ResultActions deleteMessage(String accessToken, String conversationId, String messageId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/conversations/{id}/messages/{messageId}",

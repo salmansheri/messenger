@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.entity.Message;
@@ -23,6 +24,8 @@ import dev.salman.backend.entity.Message;
  * worked out separately for each recipient and sent only to those for whom it moved;</li>
  * <li>{@code unread.updated}: the reporter's own {@code deliveredSeq}, {@code readSeq} and {@code unreadCount}, to
  * the reporter only;</li>
+ * <li>{@code settings.changed}: the owner's own mute, archive or pin changed ({@code settings}), to that User's
+ * sessions only, so their tabs and devices agree; nobody else ever hears about it;</li>
  * <li>{@code conversation.changed}: the Conversation or who is in it changed; clients should fetch it again;</li>
  * <li>{@code typing.changed}: a Participant started or stopped typing ({@code userId}, {@code typing}); never stored,
  * so clients should treat a "started" as stale after a few seconds without a repeat;</li>
@@ -58,6 +61,9 @@ public interface RealtimeEvents {
 	default void conversationChanged(UUID conversationId) {
 		conversationChanged(conversationId, List.of());
 	}
+
+	/** The User changed their private settings for a Conversation; heard only by that User's sessions. */
+	void settingsChanged(UUID userId, UUID conversationId, ConversationSettings settings);
 
 	/** A Participant started or stopped typing; heard by the other current Participants. */
 	void typingChanged(UUID conversationId, UUID typistId, boolean typing);

@@ -1,5 +1,6 @@
 package dev.salman.backend.service.impl;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public class PushServiceImpl implements PushService {
 	private final PresenceService presence;
 	private final StringRedisTemplate redis;
 	private final AppProperties props;
+	private final Clock clock;
 
 	@Override
 	public void messageStored(Message message) {
@@ -86,8 +88,11 @@ public class PushServiceImpl implements PushService {
 			return; // taken back before anyone was told: there is nothing left to show
 		}
 		var recipients = new HashSet<UUID>();
-		participants.findByConversationId(message.getConversationId()).stream().map(Participant::getUserId)
-				.filter(id -> !id.equals(message.getSenderId())).forEach(recipients::add);
+		var now = clock.instant();
+		participants.findByConversationId(message.getConversationId()).stream()
+				.filter(p -> !p.getUserId().equals(message.getSenderId()))
+				.filter(p -> !p.isMuted(now)) // a muted Conversation stays quiet; unread and live events carry on
+				.map(Participant::getUserId).forEach(recipients::add);
 		recipients.removeAll(presence.onlineAmong(recipients));
 		if (recipients.isEmpty()) {
 			return;

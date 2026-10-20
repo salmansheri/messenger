@@ -1,5 +1,7 @@
 package dev.salman.backend.service.impl;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 import dev.salman.backend.dto.ConversationResponse;
+import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.ParticipantSummary;
 import dev.salman.backend.entity.Conversation;
@@ -35,6 +38,7 @@ class ConversationAssembler {
 	private final UserRepository users;
 	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
+	private final Clock clock;
 
 	List<ConversationResponse> assemble(List<Conversation> found, UUID viewerId) {
 		if (found.isEmpty()) {
@@ -45,9 +49,10 @@ class ConversationAssembler {
 				.collect(Collectors.toMap(User::getId, u -> u));
 		var membersByConversation = members.stream().collect(Collectors.groupingBy(Participant::getConversationId));
 		var latestByConversation = latestVisible(found, members, viewerId);
+		var now = clock.instant();
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
-						latestByConversation.get(c.getId())))
+						latestByConversation.get(c.getId()), now))
 				.toList();
 	}
 
@@ -74,7 +79,7 @@ class ConversationAssembler {
 	}
 
 	private static ConversationResponse toResponse(Conversation conversation, UUID viewerId,
-			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage) {
+			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage, Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
@@ -88,7 +93,8 @@ class ConversationAssembler {
 		return new ConversationResponse(conversation.getId(), conversation.getType(), conversation.getName(),
 				summaries,
 				latest == null ? null : MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members)),
-				unread, conversation.getCreatedAt(), conversation.getUpdatedAt());
+				unread, viewer.map(v -> ConversationSettings.of(v, now)).orElse(new ConversationSettings(false, null, false, false)),
+				conversation.getCreatedAt(), conversation.getUpdatedAt());
 	}
 
 }
