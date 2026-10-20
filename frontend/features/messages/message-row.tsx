@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/dropdown-menu";
-import { toProblem } from "@/lib/api";
+import { toProblem, type MessageResponse } from "@/lib/api";
 import { formatClock } from "@/features/conversations/present";
 import { statusFor, type Frontier } from "@/features/receipts/status";
 import { nextMenuIndex } from "@/components/ui/menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
+import { QuoteBlock } from "./quote-block";
+import { quoteView } from "./quote";
 import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
 import { changeFailureMessage, sendFailureMessage } from "./wording";
@@ -24,10 +26,14 @@ type Props = {
   names: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
+  /** A loaded Message by its id: a quote takes its text from it, so an edit or deletion shows through. */
+  loaded: (messageId: string | undefined) => MessageResponse | undefined;
+  onReply: (messageId: string) => void;
+  onJump: (messageId: string) => void;
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry }: Props) {
+export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry, loaded, onReply, onJump }: Props) {
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const [editing, setEditing] = useState(false);
@@ -42,6 +48,8 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
   return (
     <li
       data-seq={!mine && item.seq !== undefined ? item.seq : undefined}
+      data-message-id={item.messageId}
+      tabIndex={item.messageId ? -1 : undefined}
       className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}
     >
       <div className="flex flex-col items-start gap-0.5 pt-1">
@@ -53,6 +61,12 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
       </div>
       <div className={`relative min-w-0 border-l-2 pr-20 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
         {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
+        {item.replyTo && !item.deleted && (
+          <QuoteBlock
+            view={quoteView(item.replyTo, loaded, (id) => (id === myId ? "You" : (names.get(id) ?? "Someone who left")))}
+            onJump={item.replyTo.messageId && loaded(item.replyTo.messageId) ? () => onJump(item.replyTo?.messageId ?? "") : undefined}
+          />
+        )}
         {editing && item.messageId && !item.deleted ? (
           <MessageEditor
             conversationId={conversationId}
@@ -78,7 +92,7 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
         {pending?.status === "failed" && (
           <p className="flex flex-wrap items-center gap-x-3 text-sm">
             <span className="text-accent">
-              Not sent. {pending.error ? sendFailureMessage(toProblem(pending.error)) : ""}
+              Not sent. {pending.error ? sendFailureMessage(toProblem(pending.error), Boolean(pending.replyTo)) : ""}
             </span>
             <Button variant="quiet" onClick={() => onRetry(pending.clientMessageId)}>
               Retry
@@ -104,6 +118,7 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
               when={formatClock(item.createdAt)}
               triggerRef={trigger}
               onEdit={() => setEditing(true)}
+              onReply={item.deleted ? undefined : () => onReply(item.messageId ?? "")}
             />
           </div>
         )}
@@ -126,6 +141,7 @@ function MessageMenu({
   when,
   triggerRef,
   onEdit,
+  onReply,
 }: {
   conversationId: string;
   messageId: string;
@@ -134,6 +150,8 @@ function MessageMenu({
   when: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   onEdit: () => void;
+  /** Answer this Message; not offered for a deleted one. */
+  onReply?: () => void;
 }) {
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -268,6 +286,16 @@ function MessageMenu({
             </div>
           ) : (
             <div role="menu" aria-label={`Options for ${whose} Message at ${when}`} className="flex flex-col">
+              {onReply && (
+                <MenuItem
+                  onSelect={() => {
+                    close(false);
+                    onReply();
+                  }}
+                >
+                  Reply
+                </MenuItem>
+              )}
               {own && (
                 <MenuItem
                   onSelect={() => {

@@ -11,12 +11,18 @@ function waitWords(problem: ApiProblem): string {
 
 /**
  * Why a Message was not sent. Sending is throttled for at most a minute at a time, and "a moment" would not tell
- * someone who is waiting to press Retry how long to wait, so a short wait is counted in seconds; every other failure
- * keeps the general wording.
+ * someone who is waiting to press Retry how long to wait, so a short wait is counted in seconds; a refused reply says why
+ * in the server's words; every other failure keeps the general wording.
  */
-export function sendFailureMessage(problem: ApiProblem): string {
-  if (problem.status !== 429) return messageFor(problem);
-  return `You are sending Messages too often. Try again in ${waitWords(problem)}.`;
+export function sendFailureMessage(problem: ApiProblem, wasReply = false): string {
+  if (problem.status === 429) return `You are sending Messages too often. Try again in ${waitWords(problem)}.`;
+  // A reply can be refused in the server's own words (the Message was deleted), or the Message it answers is gone; for
+  // a plain send a 404 means the Conversation itself is no longer the person's.
+  if (problem.status === 409) return problem.detail ?? "That can no longer be done.";
+  if (problem.status === 404) {
+    return wasReply ? "The Message you were replying to is no longer there." : "This Conversation is no longer yours.";
+  }
+  return messageFor(problem);
 }
 
 /**

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { listQueryKey, sdk, toProblem, type ConversationResponse } from "@/lib/api";
+import { listQueryKey, sdk, toProblem, type ConversationResponse, type MessageResponse, type ReplyQuote } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { useFrontier } from "@/features/receipts/queries";
 import type { Frontier } from "@/features/receipts/status";
@@ -16,6 +16,7 @@ import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
 import { useAnnouncements } from "./use-announcements";
 import { MessageRow } from "./message-row";
+import { quoteView, replyDraft, replyTarget } from "./quote";
 import { useReportReading } from "./use-report-reading";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
 
@@ -54,7 +55,8 @@ export function MessageView({ conversation, myId }: Props) {
 
   const [outbox] = useState(() =>
     createOutbox({
-      send: async (clientMessageId, body) => (await sdk.send({ path: { conversationId }, body: { clientMessageId, body } })).data,
+      send: async (clientMessageId, body, replyToMessageId) =>
+        (await sdk.send({ path: { conversationId }, body: { clientMessageId, body, replyToMessageId } })).data,
       onSent: (message) => {
         addMessageToHistory(queryClient, message);
         void queryClient.invalidateQueries({ queryKey: listQueryKey() });
@@ -83,11 +85,41 @@ export function MessageView({ conversation, myId }: Props) {
 
   const spoken = useAnnouncements(confirmed, history.data !== undefined, myId, (id) => names.get(id) ?? "Someone");
 
+  // Replying: the Message the person chose to answer, shown above the box. It is dropped if that Message is deleted
+  // meanwhile (the server would refuse the reply), and sent along with the next Message otherwise.
+  const byId = useMemo(() => new Map(confirmed.map((message) => [message.id, message])), [confirmed]);
+  const loaded = useCallback((messageId: string | undefined) => (messageId ? byId.get(messageId) : undefined), [byId]);
+  const [chosen, setChosen] = useState<ReplyQuote>();
+  const reply = replyTarget(chosen, loaded);
+  const composer = useRef<HTMLTextAreaElement>(null);
+  const nameOf = useCallback((id: string | undefined) => (id === myId ? "You" : (names.get(id) ?? "Someone who left")), [myId, names]);
+  const replyStrip = (() => {
+    if (!reply) return undefined;
+    const view = quoteView(reply, loaded, nameOf);
+    return view.kind === "text" ? { sender: view.sender, text: view.text } : undefined;
+  })();
+
   const scroller = useRef<HTMLDivElement>(null);
   const positioned = useRef(false);
   const keepAtBottom = useRef(true);
   const anchor = useRef<{ height: number; firstKey: string | undefined } | null>(null);
   const [away, setAway] = useState(false);
+
+  /** Goes to a loaded Message (a quote's button), leaving the view where it lands rather than snapping back to the bottom. */
+  const jumpTo = useCallback((messageId: string) => {
+    const target = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (!target) return;
+    keepAtBottom.current = false;
+    target.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    target.focus({ preventScroll: true });
+  }, []);
+
+  function startReply(messageId: string) {
+    const message = loaded(messageId);
+    if (!message || message.deletedAt) return;
+    setChosen(replyDraft(message));
+    composer.current?.focus();
+  }
 
   const firstKey = items.find((item) => item.kind === "message")?.key;
 
@@ -209,6 +241,9 @@ export function MessageView({ conversation, myId }: Props) {
                   names={names}
                   frontier={frontier}
                   onRetry={outbox.retry}
+                  loaded={loaded}
+                  onReply={startReply}
+                  onJump={jumpTo}
                 />
               ))}
             </ol>
@@ -227,10 +262,17 @@ export function MessageView({ conversation, myId }: Props) {
       </div>
       <TypingLine conversationId={conversationId} names={names} />
       <Composer
+        textareaRef={composer}
+        reply={replyStrip}
+        onCancelReply={() => {
+          setChosen(undefined);
+          composer.current?.focus();
+        }}
         onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
         onSend={(body) => {
           keepAtBottom.current = true;
-          outbox.submit(body);
+          outbox.submit(body, reply);
+          setChosen(undefined);
         }}
       />
     </>
@@ -245,6 +287,9 @@ function Row({
   names,
   frontier,
   onRetry,
+  loaded,
+  onReply,
+  onJump,
 }: {
   item: TimelineItem;
   conversationId: string;
@@ -253,6 +298,9 @@ function Row({
   names: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
+  loaded: (messageId: string | undefined) => MessageResponse | undefined;
+  onReply: (messageId: string) => void;
+  onJump: (messageId: string) => void;
 }) {
   if (item.kind === "day") {
     return (
@@ -268,5 +316,18 @@ function Row({
       </li>
     );
   }
-  return <MessageRow item={item} conversationId={conversationId} myId={myId} group={group} names={names} frontier={frontier} onRetry={onRetry} />;
+  return (
+    <MessageRow
+      item={item}
+      conversationId={conversationId}
+      myId={myId}
+      group={group}
+      names={names}
+      frontier={frontier}
+      onRetry={onRetry}
+      loaded={loaded}
+      onReply={onReply}
+      onJump={onJump}
+    />
+  );
 }

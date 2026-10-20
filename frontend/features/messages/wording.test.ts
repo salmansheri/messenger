@@ -5,6 +5,8 @@ import { changeFailureMessage, sendFailureMessage } from "./wording";
 const problem = (status: number, retryAfterSeconds?: number) =>
   new ApiProblem(status, "Problem", undefined, {}, retryAfterSeconds);
 
+const problem409 = (detail: string) => new ApiProblem(409, "Conflict", detail, {}, undefined);
+
 describe("sendFailureMessage", () => {
   it("names the seconds to wait when the server throttles sending", () => {
     expect(sendFailureMessage(problem(429, 12))).toBe("You are sending Messages too often. Try again in 12 seconds.");
@@ -23,6 +25,16 @@ describe("sendFailureMessage", () => {
 
   it("says a few seconds when the server did not say how long", () => {
     expect(sendFailureMessage(problem(429))).toBe("You are sending Messages too often. Try again in a few seconds.");
+  });
+
+  it("passes on the server's words when a reply is refused, and does not call it an account problem", () => {
+    expect(sendFailureMessage(problem409("You cannot reply to a deleted Message."), true)).toBe("You cannot reply to a deleted Message.");
+    expect(sendFailureMessage(problem(409), true)).toBe("That can no longer be done.");
+  });
+
+  it("says the Message being answered is gone only when the send was a reply", () => {
+    expect(sendFailureMessage(problem(404), true)).toBe("The Message you were replying to is no longer there.");
+    expect(sendFailureMessage(problem(404), false)).toBe("This Conversation is no longer yours.");
   });
 
   it("leaves every other failure to the general wording", () => {

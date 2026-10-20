@@ -12,14 +12,14 @@ const stored = (clientMessageId: string, body: string, seq: number): MessageResp
 
 /** An outbox whose sends are decided by the test: each call to `send` takes the next scripted outcome. */
 function setup(outcomes: ("ok" | "fail" | "duplicate")[]) {
-  const calls: { clientMessageId: string; body: string }[] = [];
+  const calls: { clientMessageId: string; body: string; replyToMessageId?: string }[] = [];
   const confirmed: MessageResponse[] = [];
   let ids = 0;
   const outbox = createOutbox({
     newId: () => `client-${++ids}`,
     now: () => "2026-01-01T10:00:00.000Z",
-    send: async (clientMessageId, body) => {
-      calls.push({ clientMessageId, body });
+    send: async (clientMessageId, body, replyToMessageId) => {
+      calls.push({ clientMessageId, body, replyToMessageId });
       const outcome = outcomes.shift() ?? "ok";
       if (outcome === "fail") throw new Error("network");
       return stored(clientMessageId, body, calls.length);
@@ -147,5 +147,29 @@ describe("the outbox", () => {
     outbox.submit("again");
 
     expect(changes).toBe(2); // queued, then confirmed
+  });
+
+  it("sends a reply with the Message it answers, shows the quote while it is sending, and reuses the target on every retry", async () => {
+    const { outbox, calls } = setup(["fail", "ok"]);
+    const answering = { messageId: "q1", senderId: "ada", text: "Are you free?", deleted: false, unavailable: false };
+
+    const id = outbox.submit("Yes", answering);
+    expect(outbox.getSnapshot()[0].replyTo).toEqual(answering);
+    await outbox.settled();
+    expect(outbox.getSnapshot()[0]).toMatchObject({ status: "failed", replyTo: answering });
+
+    outbox.retry(id);
+    await outbox.settled();
+
+    expect(calls.map((c) => [c.clientMessageId, c.replyToMessageId])).toEqual([[id, "q1"], [id, "q1"]]);
+  });
+
+  it("sends a Message that answers nothing without a target", async () => {
+    const { outbox, calls } = setup(["ok"]);
+
+    outbox.submit("Hello");
+    await outbox.settled();
+
+    expect(calls[0].replyToMessageId).toBeUndefined();
   });
 });

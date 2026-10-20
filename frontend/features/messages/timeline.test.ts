@@ -147,3 +147,27 @@ describe("reactions in the timeline", () => {
     expect(messages.map((m) => m.reactions)).toEqual([[{ emoji: "x", userIds: ["b"] }], [], []]);
   });
 });
+
+describe("replies in the timeline", () => {
+  const quote = { messageId: "q1", senderId: "a", text: "Are you free?", deleted: false, unavailable: false };
+
+  it("carries the quote of a reply, of one still being sent, and none for a Message that answers nothing or was deleted", () => {
+    const reply: MessageResponse = { ...msg(1, "a", "2026-03-10T10:00:00Z"), replyTo: quote };
+    const plain = msg(2, "a", "2026-03-10T10:01:00Z");
+    const deletedReply: MessageResponse = {
+      id: "id3",
+      seq: 3,
+      senderId: "a",
+      createdAt: "2026-03-10T10:02:00Z",
+      deletedAt: "2026-03-10T10:06:00Z",
+      replyTo: quote,
+    };
+    const sending: Pending = { ...pending("p", "On its way"), replyTo: quote };
+
+    const messages = build({ confirmed: [reply, plain, deletedReply], pending: [sending], myId: "a" }).filter(
+      (item) => item.kind === "message",
+    );
+
+    expect(messages.map((m) => m.replyTo)).toEqual([quote, undefined, undefined, quote]);
+  });
+});

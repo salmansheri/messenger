@@ -1,4 +1,4 @@
-import type { MessageResponse } from "@/lib/api";
+import type { MessageResponse, ReplyQuote } from "@/lib/api";
 
 /** A Message the person has written that the server has not confirmed yet. */
 export type Pending = {
@@ -7,12 +7,14 @@ export type Pending = {
   body: string;
   status: "sending" | "failed";
   createdAt: string;
+  /** The Message this one answers; every retry sends the same one. */
+  replyTo?: ReplyQuote;
   /** Why the last attempt failed. */
   error?: unknown;
 };
 
 type Options = {
-  send: (clientMessageId: string, body: string) => Promise<MessageResponse>;
+  send: (clientMessageId: string, body: string, replyToMessageId: string | undefined) => Promise<MessageResponse>;
   /** Called with the stored Message once the server confirms it (a repeat's 200 counts like a first 201). */
   onSent: (message: MessageResponse) => void;
   newId?: () => string;
@@ -49,7 +51,7 @@ export function createOutbox({
     if (!entry) return;
     let message: MessageResponse;
     try {
-      message = await send(clientMessageId, entry.body);
+      message = await send(clientMessageId, entry.body, entry.replyTo?.messageId);
     } catch (error) {
       update(clientMessageId, (current) => ({ ...current, status: "failed", error }));
       return;
@@ -69,10 +71,10 @@ export function createOutbox({
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
-    /** Shows the Message as sending and queues it; returns its client Message ID. */
-    submit(body: string): string {
+    /** Shows the Message as sending and queues it, answering `replyTo` if given; returns its client Message ID. */
+    submit(body: string, replyTo?: ReplyQuote): string {
       const clientMessageId = newId();
-      set([...entries, { clientMessageId, body, status: "sending", createdAt: now() }]);
+      set([...entries, { clientMessageId, body, status: "sending", createdAt: now(), ...(replyTo ? { replyTo } : {}) }]);
       enqueue(clientMessageId);
       return clientMessageId;
     },
