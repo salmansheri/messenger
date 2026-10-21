@@ -13,6 +13,10 @@
   --accent: #bf3f1a;
   --on-accent: #ffffff;
   --band: #f3e2d6;
+  /* The dark glass behind a picture shown full size, and the light ink on it; the same in every theme, because a
+     picture is looked at against dark whatever the page around it is. */
+  --scrim: #0c0b09;
+  --on-scrim: #f6f1e6;
   color-scheme: light;
 }
 
@@ -51,6 +55,8 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-band: var(--band);
+  --color-scrim: var(--scrim);
+  --color-on-scrim: var(--on-scrim);
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
@@ -71,6 +77,22 @@ body {
    shows no ring. */
 h1[tabindex="-1"]:focus {
   outline: none;
+}
+
+/* A picture opening full size: the glass fades in and the picture settles into place. */
+@keyframes viewer-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.viewer-in {
+  animation: viewer-in 180ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -74,6 +74,7 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
           <MessageImage
             image={item.image}
             label={imageLabel(sender, formatClock(item.createdAt), item.body)}
+            caption={item.body}
             refresh={pending ? undefined : onImageExpired}
           />
         )}

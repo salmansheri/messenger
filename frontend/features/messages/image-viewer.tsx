@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { useImageRecovery } from "./use-image-recovery";
 
 /**
  * The picture at full size over the page, in the browser's own modal dialog: it keeps focus inside, closes on Escape
- * and gives focus back to what opened it. A click outside the picture, or the Close button, closes it too.
+ * and gives focus back to what opened it. Dark glass fills the screen (blurred, in every theme), the picture sits in
+ * the middle with its caption beneath, and a round Close button is in the corner. A click anywhere outside the
+ * picture closes it too.
  */
 export function ImageViewer({
   src,
   label,
+  caption,
   onClose,
   refresh,
 }: {
   src: string;
   label: string;
+  /** The Message's own text, shown under the picture. */
+  caption?: string;
   onClose: () => void;
   refresh?: () => Promise<void>;
 }) {
@@ -35,38 +39,58 @@ export function ImageViewer({
       ref={dialog}
       aria-label={label}
       onClose={onClose}
-      onClick={(event) => event.target === event.currentTarget && onClose()}
-      className="m-auto max-h-dvh max-w-dvw bg-transparent p-4 backdrop:bg-ink/80"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-transparent p-0 text-on-scrim backdrop:bg-scrim/90 backdrop:backdrop-blur-md"
     >
-      <div className="flex flex-col items-end gap-2">
-        <Button ref={closeButton} autoFocus onClick={onClose}>
-          Close
-        </Button>
-        {picture.status === "failed" ? (
-          <div role="status" className="flex min-h-40 min-w-60 flex-col items-center justify-center gap-2 bg-paper p-6 text-center text-ink">
-            <p>Couldn&apos;t load image.</p>
-            <Button
-              variant="quiet"
-              onClick={() => {
-                picture.retry();
-                closeButton.current?.focus(); // the Retry button goes away; focus stays inside the dialog
-              }}
-            >
-              Retry<span className="sr-only"> loading the image</span>
-            </Button>
-          </div>
-        ) : (
-          // The dialog already carries the name; the picture itself adds nothing for a screen reader.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={picture.attempt}
-            src={src}
-            alt=""
-            onLoad={picture.onLoad}
-            onError={picture.onError}
-            className="max-h-[80dvh] max-w-full bg-paper object-contain"
-          />
-        )}
+      <div
+        onClick={(event) => event.target === event.currentTarget && onClose()}
+        className="viewer-in relative flex h-full w-full items-center justify-center p-4 sm:p-10"
+      >
+        <button
+          ref={closeButton}
+          type="button"
+          autoFocus
+          aria-label="Close"
+          title="Close"
+          onClick={onClose}
+          className="absolute top-4 right-4 flex size-11 items-center justify-center rounded-full bg-on-scrim/15 text-on-scrim transition-colors hover:bg-on-scrim/25 sm:top-6 sm:right-6"
+        >
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <figure className="flex max-h-full max-w-full flex-col items-center gap-4">
+          {picture.status === "failed" ? (
+            <div role="status" className="flex min-h-40 min-w-64 flex-col items-center justify-center gap-3 rounded-xl bg-on-scrim/10 p-8 text-center">
+              <p>Couldn&apos;t load image.</p>
+              <button
+                type="button"
+                className="rounded-full bg-on-scrim px-5 py-2 text-sm font-medium text-scrim hover:opacity-90"
+                onClick={() => {
+                  picture.retry();
+                  closeButton.current?.focus(); // the Retry button goes away; focus stays inside the dialog
+                }}
+              >
+                Retry<span className="sr-only"> loading the image</span>
+              </button>
+            </div>
+          ) : (
+            // The dialog already carries the name; the picture itself adds nothing for a screen reader.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={picture.attempt}
+              src={src}
+              alt=""
+              onLoad={picture.onLoad}
+              onError={picture.onError}
+              className="max-h-[78dvh] max-w-full rounded-xl object-contain shadow-2xl ring-1 ring-on-scrim/10"
+            />
+          )}
+          {caption && picture.status !== "failed" && (
+            <figcaption className="max-w-prose text-center text-sm leading-relaxed break-words whitespace-pre-wrap text-on-scrim/85 [overflow-wrap:anywhere]">
+              {caption}
+            </figcaption>
+          )}
+        </figure>
       </div>
     </dialog>
   );

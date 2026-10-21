@@ -18,10 +18,13 @@ const MAX_WIDTH = "20rem";
 export function MessageImage({
   image,
   label,
+  caption,
   refresh,
 }: {
   image: TimelineImage;
   label: string;
+  /** The Message's own text, shown under the picture when it is opened full size. */
+  caption?: string;
   /** Fetches fresh links (not for a preview held on this device). */
   refresh?: () => Promise<void>;
 }) {
@@ -93,6 +96,7 @@ export function MessageImage({
         <ImageViewer
           src={image.fullSrc}
           label={label}
+          caption={caption}
           refresh={refresh}
           onClose={() => {
             setOpen(false);
