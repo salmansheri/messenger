@@ -30,9 +30,10 @@ export async function catchUpHistory(queryClient: QueryClient, conversationId: s
  * Brings a loaded history up to date after a connection was lost: the whole loaded range is fetched again (`afterSeq`
  * from just before the oldest Message loaded, however many pages that takes) and compared, because an edit or a
  * deletion keeps its Sequence number and so cannot be found by asking only for newer Messages. Nothing is changed unless
- * the whole range was fetched; a failure is left for the next reconnection.
+ * the whole range was fetched; a failure is left for the next reconnection. `replaceLinks` takes the server's image
+ * links even where the ones held look valid (an image failed to load, so they cannot be trusted).
  */
-export async function refreshHistory(queryClient: QueryClient, conversationId: string) {
+export async function refreshHistory(queryClient: QueryClient, conversationId: string, { replaceLinks = false } = {}) {
   const history = queryClient.getQueryData<History>(messagesKey(conversationId));
   if (!history) return;
   const from = oldestSeq(history);
@@ -53,5 +54,5 @@ export async function refreshHistory(queryClient: QueryClient, conversationId: s
   } catch {
     return;
   }
-  queryClient.setQueryData<History>(messagesKey(conversationId), (current) => current && syncRange(current, fresh, from, Math.max(loadedUpTo, fresh.at(-1)?.seq ?? 0)));
+  queryClient.setQueryData<History>(messagesKey(conversationId), (current) => current && syncRange(current, fresh, from, Math.max(loadedUpTo, fresh.at(-1)?.seq ?? 0), { replaceLinks }));
 }

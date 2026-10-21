@@ -7,6 +7,7 @@ import {
   removeById,
   removeMessage,
   replaceMessage,
+  linksLapsed,
   syncRange,
   updateReactions,
   type History,
@@ -97,6 +98,54 @@ describe("syncRange", () => {
     expect(after.pages[0].messages?.[0].body).toBe("newest text");
     expect(after.pages[0].messages?.[1].deletedAt).toBe("2026-03-10T10:06:00Z");
     expect(after.pages[0].messages?.[1].body).toBeUndefined();
+  });
+
+  const NOW = Date.parse("2026-03-10T10:00:00Z");
+  const link = (name: string, expiresInSeconds: number) => ({
+    id: "a1",
+    width: 4,
+    height: 3,
+    url: `https://files/${name}?expires=${NOW / 1000 + expiresInSeconds}&signature=x`,
+    thumbnailUrl: `https://files/${name}-thumb?expires=${NOW / 1000 + expiresInSeconds}&signature=x`,
+  });
+
+  it("takes the fresh links of an image whose held links have run out, though the Message has not changed", () => {
+    const before = history({ messages: [msg(5, { attachment: link("old", -30) })], hasMore: false });
+
+    const after = syncRange(before, [msg(5, { attachment: link("new", 900) })], 5, 5, { now: NOW });
+
+    expect(after.pages[0].messages?.[0].attachment?.url).toContain("/new?");
+  });
+
+  it("keeps links that are still good, so a reconnect does not reload every picture", () => {
+    const held = link("old", 600);
+    const after = syncRange(history({ messages: [msg(5, { attachment: held })], hasMore: false }), [msg(5, { attachment: link("new", 900) })], 5, 5, { now: NOW });
+
+    expect(after.pages[0].messages?.[0].attachment).toBe(held);
+  });
+
+  it("takes the fresh links whatever the held ones say when asked to (a picture failed to load)", () => {
+    const before = history({ messages: [msg(5, { attachment: link("old", 600) })], hasMore: false });
+
+    const after = syncRange(before, [msg(5, { attachment: link("new", 900) })], 5, 5, { now: NOW, replaceLinks: true });
+
+    expect(after.pages[0].messages?.[0].attachment?.url).toContain("/new?");
+  });
+
+  it("treats links that count as run out when they are about to expire or their expiry cannot be read", () => {
+    expect(linksLapsed(link("a", 30), NOW)).toBe(true);
+    expect(linksLapsed(link("a", 600), NOW)).toBe(false);
+    expect(linksLapsed({ id: "a1", thumbnailUrl: "https://files/x" }, NOW)).toBe(true);
+    expect(linksLapsed({ id: "a1" }, NOW)).toBe(true);
+  });
+
+  it("does not bring an image back to a Message deleted meanwhile", () => {
+    const picture = { id: "a1", width: 4, height: 3, url: "fresh", thumbnailUrl: "fresh-thumb" };
+    const deleted = msg(5, { body: undefined, deletedAt: "2026-03-10T10:06:00Z" });
+
+    const after = syncRange(history({ messages: [deleted], hasMore: false }), [msg(5, { attachment: picture })], 5, 5);
+
+    expect(after.pages[0].messages?.[0].attachment).toBeUndefined();
   });
 });
 

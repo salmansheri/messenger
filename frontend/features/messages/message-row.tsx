@@ -13,7 +13,7 @@ import { QuoteBlock } from "./quote-block";
 import { quoteView } from "./quote";
 import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
-import { changeFailureMessage, sendFailureMessage, uploadFailureMessage } from "./wording";
+import { changeFailureMessage, imageLabel, sendFailureMessage, uploadFailureMessage } from "./wording";
 import { MessageImage } from "./message-image";
 
 type MessageItem = Extract<TimelineItem, { kind: "message" }>;
@@ -31,10 +31,12 @@ type Props = {
   loaded: (messageId: string | undefined) => MessageResponse | undefined;
   onReply: (messageId: string) => void;
   onJump: (messageId: string) => void;
+  /** Fetches fresh image links when one has run out. */
+  onImageExpired?: () => Promise<void>;
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry, loaded, onReply, onJump }: Props) {
+export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry, loaded, onReply, onJump, onImageExpired }: Props) {
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const [editing, setEditing] = useState(false);
@@ -69,7 +71,11 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
           />
         )}
         {item.image && !item.deleted && (
-          <MessageImage image={item.image} label={`Image from ${sender} at ${formatClock(item.createdAt)}`} />
+          <MessageImage
+            image={item.image}
+            label={imageLabel(sender, formatClock(item.createdAt), item.body)}
+            refresh={pending ? undefined : onImageExpired}
+          />
         )}
         {editing && item.messageId && !item.deleted ? (
           <MessageEditor

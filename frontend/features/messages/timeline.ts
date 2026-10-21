@@ -18,7 +18,7 @@ export function firstUnreadSeq(conversation: Pick<ConversationResponse, "unreadC
 }
 
 /** The picture on a Message: the thumbnail the server made, or for a Message still being sent the one chosen here. */
-export type TimelineImage = { src: string; width?: number; height?: number };
+export type TimelineImage = { src: string; fullSrc: string; width?: number; height?: number };
 
 export type TimelineItem =
   | { kind: "day"; key: string; label: string }
@@ -78,6 +78,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       replyTo: message.deletedAt || !message.replyTo ? undefined : message.replyTo,
       image: message.deletedAt || !message.attachment?.thumbnailUrl ? undefined : {
         src: message.attachment.thumbnailUrl,
+        fullSrc: message.attachment.url ?? message.attachment.thumbnailUrl,
         width: message.attachment.width,
         height: message.attachment.height,
       },
@@ -97,7 +98,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
         deleted: false,
         reactions: [] as ReactionView[],
         replyTo: entry.replyTo,
-        image: entry.image && { src: entry.image.previewUrl, width: entry.image.width, height: entry.image.height },
+        image: entry.image && { src: entry.image.previewUrl, fullSrc: entry.image.previewUrl, width: entry.image.width, height: entry.image.height },
         seq: undefined,
         senderId: myId,
         body: entry.body,

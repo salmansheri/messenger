@@ -11,6 +11,7 @@ import type { Frontier } from "@/features/receipts/status";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
+import { refreshHistory } from "./catch-up";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
 import { addMessageToHistory, useMessageHistory } from "./queries";
@@ -100,6 +101,15 @@ export function MessageView({ conversation, myId }: Props) {
     const view = quoteView(reply, loaded, nameOf);
     return view.kind === "text" ? { sender: view.sender, text: view.text } : undefined;
   })();
+
+  // An image whose link has run out asks for fresh ones; every image that fails at once shares one fetch of the history.
+  const refreshing = useRef<Promise<void>>(undefined);
+  const refreshLinks = useCallback(() => {
+    refreshing.current ??= refreshHistory(queryClient, conversationId, { replaceLinks: true }).finally(() => {
+      refreshing.current = undefined;
+    });
+    return refreshing.current;
+  }, [queryClient, conversationId]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const positioned = useRef(false);
@@ -246,6 +256,7 @@ export function MessageView({ conversation, myId }: Props) {
                   loaded={loaded}
                   onReply={startReply}
                   onJump={jumpTo}
+                  onImageExpired={refreshLinks}
                 />
               ))}
             </ol>
@@ -292,6 +303,7 @@ function Row({
   loaded,
   onReply,
   onJump,
+  onImageExpired,
 }: {
   item: TimelineItem;
   conversationId: string;
@@ -303,6 +315,7 @@ function Row({
   loaded: (messageId: string | undefined) => MessageResponse | undefined;
   onReply: (messageId: string) => void;
   onJump: (messageId: string) => void;
+  onImageExpired: () => Promise<void>;
 }) {
   if (item.kind === "day") {
     return (
@@ -330,6 +343,7 @@ function Row({
       loaded={loaded}
       onReply={onReply}
       onJump={onJump}
+      onImageExpired={onImageExpired}
     />
   );
 }

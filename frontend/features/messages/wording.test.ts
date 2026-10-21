@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem, NETWORK_FAILURE } from "@/lib/api/problem";
-import { changeFailureMessage, sendFailureMessage, uploadFailureMessage } from "./wording";
+import { changeFailureMessage, imageLabel, sendFailureMessage, uploadFailureMessage } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number) =>
   new ApiProblem(status, "Problem", undefined, {}, retryAfterSeconds);
@@ -95,3 +95,13 @@ describe("uploadFailureMessage", () => {
   });
 });
 
+describe("imageLabel", () => {
+  it("names a picture by who sent it and when", () => {
+    expect(imageLabel("Ada Lovelace", "14:02")).toBe("Image from Ada Lovelace at 14:02");
+  });
+
+  it("follows with the caption, on one line", () => {
+    expect(imageLabel("You", "09:15", "Lunch\n  today")).toBe("Image from You at 09:15: Lunch today");
+    expect(imageLabel("You", "09:15", "   ")).toBe("Image from You at 09:15");
+  });
+});

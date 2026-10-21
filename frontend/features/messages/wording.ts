@@ -40,6 +40,16 @@ export function uploadFailureMessage(problem: ApiProblem): string {
 }
 
 /**
+ * The name of a picture for assistive technology: who sent it and when, then its caption if it has one (the
+ * caption is also shown as text beside it, so it is read here only as part of what the picture is).
+ */
+export function imageLabel(sender: string, time: string, caption?: string): string {
+  const base = `Image from ${sender} at ${time}`;
+  const text = caption?.replace(/\s+/g, " ").trim();
+  return text ? `${base}: ${text}` : base;
+}
+
+/**
  * Why a Message could not be edited or deleted. A 409 is the server saying the time has passed (or the Message is
  * already deleted) in its own words, which are shown as they are; the general 409 wording is about accounts.
  */

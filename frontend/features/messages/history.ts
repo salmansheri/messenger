@@ -1,4 +1,4 @@
-import type { MessagePage, MessageResponse, ReactionView } from "@/lib/api";
+import type { AttachmentResponse, MessagePage, MessageResponse, ReactionView } from "@/lib/api";
 import { clearUser } from "./reactions";
 import { mergeVersion } from "./versions";
 
@@ -52,6 +52,22 @@ export function removeMessage(history: History, seq: number): History {
   };
 }
 
+/** Links held for less than this much longer count as run out, so a picture is not left to fail a moment after a refresh. */
+const LINK_MARGIN_MS = 60_000;
+
+/**
+ * Whether the signed links of an image have run out (or are about to), read from the `expires` the server put into
+ * them (seconds since 1970). A link whose expiry cannot be read counts as run out.
+ */
+export function linksLapsed(attachment: AttachmentResponse, now: number): boolean {
+  try {
+    const expires = Number(new URL(attachment.thumbnailUrl ?? "", "http://x").searchParams.get("expires"));
+    return !Number.isFinite(expires) || expires * 1000 - now < LINK_MARGIN_MS;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Makes the loaded Messages from `from` up to `upTo` match `fresh`, what the server says now for that range, in one
  * pass: its Messages replace or join the loaded ones, and loaded Messages in the range that it no longer shows (hidden
@@ -59,7 +75,13 @@ export function removeMessage(history: History, seq: number): History {
  * range was being fetched), and a loaded version that is newer than the fetched one stays (an edit or deletion heard
  * live meanwhile must not be undone by an older answer). Only call it with a range that was fetched completely.
  */
-export function syncRange(history: History, fresh: readonly MessageResponse[], from: number, upTo: number): History {
+export function syncRange(
+  history: History,
+  fresh: readonly MessageResponse[],
+  from: number,
+  upTo: number,
+  { replaceLinks = false, now: nowMs = Date.now() }: { replaceLinks?: boolean; now?: number } = {},
+): History {
   const freshBySeq = new Map(fresh.map((message) => [message.seq, message] as const));
   const loaded = new Set<number | undefined>();
   const pages = history.pages.map((page) => ({
@@ -72,7 +94,12 @@ export function syncRange(history: History, fresh: readonly MessageResponse[], f
       if (!now) return [];
       const merged = mergeVersion(message, now);
       // Reactions change without a new version of the Message, so the server's are taken whatever the version says.
-      return [merged.deletedAt || !now.reactions ? merged : { ...merged, reactions: now.reactions }];
+      if (merged.deletedAt) return [merged];
+      const refreshed = now.reactions ? { ...merged, reactions: now.reactions } : merged;
+      // An image's links are signed afresh on every answer; the ones held are kept (the browser has the picture under
+      // that address) unless they have run out, or the caller found them dead and wants new ones whatever they say.
+      const swap = now.attachment && (replaceLinks || !refreshed.attachment || linksLapsed(refreshed.attachment, nowMs));
+      return [swap ? { ...refreshed, attachment: now.attachment } : refreshed];
     }),
   }));
   const joining = fresh.filter((message) => !loaded.has(message.seq));

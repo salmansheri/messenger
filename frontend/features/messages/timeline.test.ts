@@ -179,7 +179,7 @@ describe("images in the timeline", () => {
     const items = build({ confirmed: [{ ...msg(1, "a", "2026-03-10T10:00:00Z"), body: undefined, attachment: picture }] });
 
     const message = items.find((item) => item.kind === "message");
-    expect(message).toMatchObject({ body: "", image: { src: "https://files/thumb", width: 64, height: 48 } });
+    expect(message).toMatchObject({ body: "", image: { src: "https://files/thumb", fullSrc: "https://files/full", width: 64, height: 48 } });
   });
 
   it("keeps the caption beside the image", () => {
