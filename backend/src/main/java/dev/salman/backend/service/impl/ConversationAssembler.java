@@ -45,6 +45,7 @@ class ConversationAssembler {
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
 	private final AttachmentLoader attachmentLoader;
+	private final AvatarLinks avatars;
 
 	List<ConversationResponse> assemble(List<Conversation> found, UUID viewerId) {
 		if (found.isEmpty()) {
@@ -88,7 +89,7 @@ class ConversationAssembler {
 		return visible;
 	}
 
-	private static ConversationResponse toResponse(Conversation conversation, UUID viewerId,
+	private ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
 			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
 			Map<UUID, AttachmentResponse> pictured, Instant now) {
@@ -100,7 +101,7 @@ class ConversationAssembler {
 				.sorted(Comparator.comparing((Participant m) -> m.getRole() != ParticipantRole.ADMIN)
 						.thenComparing(Participant::getJoinedAt).thenComparing(m -> m.getUserId().toString()))
 				.map(m -> new ParticipantSummary(m.getUserId(), usersById.get(m.getUserId()).getDisplayName(),
-						m.getRole()))
+						m.getRole(), avatars.urlOf(usersById.get(m.getUserId()).getAvatarKey())))
 				.toList();
 		return new ConversationResponse(conversation.getId(), conversation.getType(), conversation.getName(),
 				summaries,

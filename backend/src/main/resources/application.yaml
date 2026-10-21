@@ -44,6 +44,7 @@ app:
     url-ttl: 15m
   profile:
     max-name-changes-per-hour: 5
+    max-avatar-changes-per-hour: 10
   uploads:
     max-per-minute: 20
     unattached-lifetime: 24h

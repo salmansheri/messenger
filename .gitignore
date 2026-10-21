@@ -44,5 +44,6 @@ frontend/.vercel
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 
-# Uploaded images (local object storage)
-backend/data/
+# Uploaded images (local object storage): app.storage.directory defaults to data/uploads, relative to where the app
+# is started from (backend/ or the repo root), so ignore it in both (`**/data/uploads/`)
+**/data/uploads/

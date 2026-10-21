@@ -380,6 +380,19 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Sets the caller's avatar from {@code bytes} (multipart part {@code file}). */
+	public ResultActions uploadAvatar(String accessToken, String fileName, String contentType, byte[] bytes)
+			throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/users/me/avatar")
+				.file(new org.springframework.mock.web.MockMultipartFile("file", fileName, contentType, bytes))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions removeAvatar(String accessToken) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/users/me/avatar").header("Authorization",
+				"Bearer " + accessToken));
+	}
+
 	public ResultActions postJson(String path, Object body) throws Exception {
 		return mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))
 				.with(request -> {

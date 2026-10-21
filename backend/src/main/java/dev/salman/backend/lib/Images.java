@@ -28,6 +28,7 @@ public final class Images {
 	/** Decoding allocates width x height x 4 bytes, so the area is capped as well as each side. */
 	public static final long MAX_PIXELS = 40_000_000L;
 	public static final int THUMBNAIL_WIDTH = 480;
+	public static final int AVATAR_SIDE = 256;
 
 	private static final Set<String> ALLOWED = Set.of("png", "jpeg", "gif", "webp");
 	private static final float JPEG_QUALITY = 0.85f;
@@ -41,6 +42,51 @@ public final class Images {
 	}
 
 	public static Processed process(byte[] bytes) {
+		var prepared = prepare(bytes);
+		try {
+			var full = encode(prepared.image(), prepared.jpeg());
+			var thumbnail = encode(shrink(prepared.image(), THUMBNAIL_WIDTH), prepared.jpeg());
+			return new Processed(full, thumbnail, prepared.image().getWidth(), prepared.image().getHeight(),
+					prepared.jpeg() ? "image/jpeg" : "image/png", prepared.jpeg() ? "jpg" : "png");
+		}
+		catch (IOException | RuntimeException e) {
+			throw notAnImage();
+		}
+	}
+
+	/** A square picture of {@link #AVATAR_SIDE} pixels and how it is encoded. */
+	public record Avatar(byte[] bytes, String contentType, String extension) {
+	}
+
+	/**
+	 * The centre square of the picture, scaled to {@link #AVATAR_SIDE} pixels, under the same rules and with the same
+	 * cleaning as {@link #process}.
+	 */
+	public static Avatar avatar(byte[] bytes) {
+		var prepared = prepare(bytes);
+		try {
+			var source = prepared.image();
+			var side = Math.min(source.getWidth(), source.getHeight());
+			var square = source.getSubimage((source.getWidth() - side) / 2, (source.getHeight() - side) / 2, side, side);
+			var scaled = new BufferedImage(AVATAR_SIDE, AVATAR_SIDE, BufferedImage.TYPE_INT_ARGB);
+			var g = scaled.createGraphics();
+			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+			g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+			g.drawImage(square, 0, 0, AVATAR_SIDE, AVATAR_SIDE, null);
+			g.dispose();
+			return new Avatar(encode(scaled, prepared.jpeg()), prepared.jpeg() ? "image/jpeg" : "image/png",
+					prepared.jpeg() ? "jpg" : "png");
+		}
+		catch (IOException | RuntimeException e) {
+			throw notAnImage();
+		}
+	}
+
+	private record Prepared(BufferedImage image, boolean jpeg) {
+	}
+
+	/** Checks the bytes (empty, too large, not an allowed image, too many pixels), decodes them and turns them upright. */
+	private static Prepared prepare(byte[] bytes) {
 		if (bytes.length == 0) {
 			throw new BadRequestException("The file is empty.");
 		}
@@ -49,12 +95,8 @@ public final class Images {
 		}
 		try {
 			var decoded = decode(bytes);
-			var upright = turnUpright(decoded.image(), decoded.format().equals("jpeg") ? orientationOf(bytes) : 1);
 			var jpeg = decoded.format().equals("jpeg");
-			var full = encode(upright, jpeg);
-			var thumbnail = encode(shrink(upright, THUMBNAIL_WIDTH), jpeg);
-			return new Processed(full, thumbnail, upright.getWidth(), upright.getHeight(),
-					jpeg ? "image/jpeg" : "image/png", jpeg ? "jpg" : "png");
+			return new Prepared(turnUpright(decoded.image(), jpeg ? orientationOf(bytes) : 1), jpeg);
 		}
 		catch (IOException | RuntimeException e) {
 			if (e instanceof BadRequestException bad) {

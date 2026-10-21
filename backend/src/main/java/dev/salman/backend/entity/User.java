@@ -39,6 +39,10 @@ public class User {
 	@Column(name = "display_name", nullable = false)
 	private String displayName;
 
+	/** The object key of the avatar, or null for none. */
+	@Column(name = "avatar_key")
+	private String avatarKey;
+
 	@Column(name = "password_hash", nullable = false)
 	private String passwordHash;
 

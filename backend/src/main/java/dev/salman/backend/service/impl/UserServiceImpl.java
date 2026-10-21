@@ -31,11 +31,12 @@ public class UserServiceImpl implements UserService {
 	private final RateLimiter rateLimiter;
 	private final AppProperties props;
 	private final RealtimeEvents events;
+	private final AvatarLinks avatars;
 
 	@Override
 	public UserProfile profile(UUID userId) {
 		return users.findById(userId)
-				.map(UserProfile::from)
+				.map(user -> UserProfile.from(user, avatars.urlOf(user.getAvatarKey())))
 				.orElseThrow(() -> new UnauthorizedException("The user no longer exists."));
 	}
 
@@ -51,7 +52,7 @@ public class UserServiceImpl implements UserService {
 			users.save(user);
 			events.profileChanged(userId, name);
 		}
-		return UserProfile.from(user);
+		return UserProfile.from(user, avatars.urlOf(user.getAvatarKey()));
 	}
 
 	@Override

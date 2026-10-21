@@ -55,8 +55,12 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	public record Presence(Duration ttl, Duration offlineGrace, Duration sweepInterval) {
 	}
 
-	/** {@code maxNameChangesPerHour}: how often one User may change their display name (a repeat of the same name is free). */
-	public record Profile(int maxNameChangesPerHour) {
+	/**
+	 * {@code maxNameChangesPerHour}: how often one User may change their display name (a repeat of the same name is
+	 * free). {@code maxAvatarChangesPerHour}: how often one User may set a new avatar, each of which is announced to everyone
+	 * they share a Conversation with.
+	 */
+	public record Profile(int maxNameChangesPerHour, int maxAvatarChangesPerHour) {
 	}
 
 	/**

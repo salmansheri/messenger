@@ -85,6 +85,12 @@ public interface RealtimeEvents {
 	/** The User changed their display name; heard by everyone who shares a Conversation with them, and their own sessions. */
 	void profileChanged(UUID userId, String displayName);
 
+	/**
+	 * The User set or removed their avatar ({@code avatarUrl} null); heard by the same people as {@link #profileChanged}.
+	 * The link is the one those people would be given anyway.
+	 */
+	void avatarChanged(UUID userId, String avatarUrl);
+
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);
 
