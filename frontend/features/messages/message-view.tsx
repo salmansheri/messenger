@@ -85,6 +85,10 @@ export function MessageView({ conversation, myId }: Props) {
     () => new Map(conversation.participants?.map((participant) => [participant.userId, participant.displayName]) ?? []),
     [conversation.participants],
   );
+  const avatars = useMemo(
+    () => new Map(conversation.participants?.map((participant) => [participant.userId, participant.avatarUrl]) ?? []),
+    [conversation.participants],
+  );
 
   const spoken = useAnnouncements(confirmed, history.data !== undefined, myId, (id) => names.get(id) ?? "Someone");
 
@@ -251,6 +255,7 @@ export function MessageView({ conversation, myId }: Props) {
                   myId={myId}
                   group={conversation.type === "GROUP"}
                   names={names}
+                  avatars={avatars}
                   frontier={frontier}
                   onRetry={outbox.retry}
                   loaded={loaded}
@@ -298,6 +303,7 @@ function Row({
   myId,
   group,
   names,
+  avatars,
   frontier,
   onRetry,
   loaded,
@@ -310,6 +316,7 @@ function Row({
   myId: string | undefined;
   group: boolean;
   names: Map<string | undefined, string | undefined>;
+  avatars: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
   loaded: (messageId: string | undefined) => MessageResponse | undefined;
@@ -338,6 +345,7 @@ function Row({
       myId={myId}
       group={group}
       names={names}
+      avatars={avatars}
       frontier={frontier}
       onRetry={onRetry}
       loaded={loaded}

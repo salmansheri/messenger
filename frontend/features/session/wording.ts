@@ -14,3 +14,18 @@ export function nameChangeFailureMessage(problem: ApiProblem): string {
   }
   return messageFor(problem);
 }
+
+/**
+ * Why a new Avatar was not saved, or the old one not removed. Like the name, changes are limited per hour, so a 429
+ * says how long to wait; a picture the server refused (it decodes the file to decide) is described in its own words.
+ */
+export function avatarFailureMessage(problem: ApiProblem): string {
+  if (problem.status === 429) {
+    return problem.retryAfterSeconds === undefined
+      ? "You have changed your Avatar too often. Try again later."
+      : `You have changed your Avatar too often. Try again in ${describeWait(problem.retryAfterSeconds)}.`;
+  }
+  if (problem.status === 413) return "That image is larger than 10 MB.";
+  if (problem.status === 400) return problem.detail || "That picture could not be used. Choose a PNG, JPEG, WebP or GIF image.";
+  return messageFor(problem);
+}

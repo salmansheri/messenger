@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 import type { History } from "@/features/messages/history";
-import { applyToHistory, applyToList, applyUnread, withDisplayName } from "./apply-event";
+import { applyToHistory, applyToList, applyUnread, withProfile } from "./apply-event";
 
 const ME = "me";
 
@@ -365,7 +365,7 @@ describe("a name change", () => {
   const withPeople = (id: string, ...names: [string, string][]) =>
     conversation(id, { participants: names.map(([userId, displayName]) => ({ userId, displayName, role: "MEMBER" as const })) });
   const list = [withPeople("c1", ["ada", "Ada Lovelace"], ["grace", "Grace Hopper"]), withPeople("c2", ["ada", "Ada Lovelace"]), withPeople("c3", ["linus", "Linus"])];
-  const renamed: RealtimeEvent = { type: "profile.changed", userId: "ada", displayName: "Augusta Ada King" };
+  const renamed: RealtimeEvent = { type: "profile.changed", userId: "ada", changes: { displayName: "Augusta Ada King" } };
 
   it("renames the person in every Conversation they are in and leaves the others as they were", () => {
     const result = applyToList(list, renamed, ME);
@@ -379,6 +379,48 @@ describe("a name change", () => {
   it("changes nothing for a repeat, or for someone who is in none of the loaded Conversations", () => {
     const once = applyToList(list, renamed, ME).list;
     expect(applyToList(once, renamed, ME).list).toBe(once);
-    expect(withDisplayName(list, "stranger", "Anyone")).toBe(list);
+    expect(withProfile(list, "stranger", { displayName: "Anyone" })).toBe(list);
+  });
+});
+
+describe("an Avatar change", () => {
+  const OLD = "http://files/avatars/ada/old.png?expires=1&signature=a";
+  const NEW = "http://files/avatars/ada/new.png?expires=2&signature=b";
+  const person = (userId: string, displayName: string, avatarUrl?: string) => ({ userId, displayName, role: "MEMBER" as const, avatarUrl });
+  const list = [
+    conversation("c1", { participants: [person("ada", "Ada Lovelace", OLD), person("grace", "Grace Hopper")] }),
+    conversation("c2", { participants: [person("ada", "Ada Lovelace", OLD)] }),
+    conversation("c3", { participants: [person("linus", "Linus")] }),
+  ];
+  const changed = (avatarUrl: string | null): RealtimeEvent => ({ type: "profile.changed", userId: "ada", changes: { avatarUrl } });
+
+  it("shows the new picture wherever the person is a Participant, and keeps their name", () => {
+    const result = applyToList(list, changed(NEW), ME);
+
+    expect(result.refetch).toBe(false);
+    expect(result.list[0].participants?.[0]).toEqual(person("ada", "Ada Lovelace", NEW));
+    expect(result.list[0].participants?.[1]).toBe(list[0].participants?.[1]);
+    expect(result.list[1].participants?.[0].avatarUrl).toBe(NEW);
+    expect(result.list[2]).toBe(list[2]);
+  });
+
+  it("takes the picture away when it was removed", () => {
+    const result = applyToList(list, changed(null), ME);
+
+    expect(result.list[0].participants?.[0].avatarUrl).toBeUndefined();
+    expect(result.list[0].participants?.[0].displayName).toBe("Ada Lovelace");
+    expect(result.list[1].participants?.[0].avatarUrl).toBeUndefined();
+  });
+
+  it("leaves the picture alone on a name change, which says nothing about it", () => {
+    const result = applyToList(list, { type: "profile.changed", userId: "ada", changes: { displayName: "Ada King" } }, ME);
+
+    expect(result.list[0].participants?.[0]).toEqual(person("ada", "Ada King", OLD));
+  });
+
+  it("changes nothing for a repeat, or a removal of a picture the person did not have", () => {
+    const once = applyToList(list, changed(NEW), ME).list;
+    expect(applyToList(once, changed(NEW), ME).list).toBe(once);
+    expect(withProfile(list, "linus", { avatarUrl: null })).toBe(list);
   });
 });

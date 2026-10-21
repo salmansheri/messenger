@@ -40,7 +40,7 @@ function NameForm({ userId, current, saved, onSaved }: { userId: string; current
     },
     onSuccess: (profile) => {
       onSaved(true);
-      recordProfile(queryClient, userId, profile.displayName ?? current);
+      recordProfile(queryClient, userId, { displayName: profile.displayName ?? current });
     },
     onError: (error) => problems.show(toProblem(error), nameChangeFailureMessage),
   });

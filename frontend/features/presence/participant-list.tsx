@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ConversationResponse, ParticipantSummary } from "@/lib/api";
+import { Avatar } from "@/features/people/person-avatar";
 import { OnlineDot } from "./online-dot";
 import { presenceText } from "./text";
 import { usePresence } from "./use-presence";
@@ -26,7 +27,8 @@ export function ParticipantList({
         const mine = participant.userId === myId;
         const view = presence.data?.find((candidate) => candidate.userId === participant.userId);
         return (
-          <li key={participant.userId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <li key={participant.userId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Avatar id={participant.userId} name={participant.displayName} url={participant.avatarUrl} size="sm" />
             <span className="font-serif font-semibold">
               {participant.displayName}
               {mine ? " (you)" : ""}

@@ -8,7 +8,7 @@ import {
   type PresenceView,
   type UserProfile,
 } from "@/lib/api";
-import { parseEvent, type RealtimeEvent } from "@/lib/realtime/events";
+import { parseEvent, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey, reactionTimesKey } from "@/features/messages/queries";
@@ -18,7 +18,7 @@ import { mergeFrontier, type Frontier } from "@/features/receipts/status";
 import { applyPresence } from "@/features/presence/apply-presence";
 import type { TypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
-import { applyToHistory, applyToList, applyUnread } from "./apply-event";
+import { applyProfileChanges, applyToHistory, applyToList, applyUnread } from "./apply-event";
 
 /**
  * Whether a request for this data is under way. Its answer may have been worked out before the event happened, so
@@ -65,13 +65,17 @@ export function recordSettings(queryClient: QueryClient, conversationId: string,
 }
 
 /**
- * Someone's new name, from the event or from the answer to the person's own change: put into the Conversation list
- * (where every Participant's name is read from) and, when it is the signed-in person's own, into their profile.
+ * Someone's new name or Avatar, from the event or from the answer to the person's own change: put into the
+ * Conversation list (where every Participant's name and picture are read from) and, when it is the signed-in person's
+ * own, into their profile. Only the keys in `changes` are touched; `avatarUrl: null` takes the picture away.
  */
-export function recordProfile(queryClient: QueryClient, userId: string, displayName: string) {
+export function recordProfile(queryClient: QueryClient, userId: string, changes: ProfileChanges) {
   const me = queryClient.getQueryData<UserProfile>(meQueryKey());
-  if (me?.id === userId && me.displayName !== displayName) queryClient.setQueryData<UserProfile>(meQueryKey(), { ...me, displayName });
-  patchList(queryClient, { type: "profile.changed", userId, displayName });
+  if (me?.id === userId) {
+    const next = applyProfileChanges(me, changes);
+    if (next !== me) queryClient.setQueryData<UserProfile>(meQueryKey(), next);
+  }
+  patchList(queryClient, { type: "profile.changed", userId, changes });
 }
 
 /**
@@ -114,7 +118,7 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     return;
   }
   if (event.type === "profile.changed") {
-    recordProfile(queryClient, event.userId, event.displayName);
+    recordProfile(queryClient, event.userId, event.changes);
     return;
   }
   if (event.type === "reaction.changed" || event.type === "reactions.cleared") {

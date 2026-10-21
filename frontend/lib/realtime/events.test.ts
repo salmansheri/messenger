@@ -127,10 +127,27 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", displayName: "Ada King" }))).toEqual({
       type: "profile.changed",
       userId: "u1",
-      displayName: "Ada King",
+      changes: { displayName: "Ada King" },
     });
     expect(parseEvent(JSON.stringify({ type: "profile.changed", displayName: "Ada King" }))).toBeUndefined();
     expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1" }))).toBeUndefined();
+  });
+
+  it("reads a new or removed Avatar, keeping only the keys the server sent", () => {
+    const url = "http://localhost:8080/api/v1/files/avatars/u1/a.png?expires=1&signature=x";
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", avatarUrl: url }))).toEqual({
+      type: "profile.changed",
+      userId: "u1",
+      changes: { avatarUrl: url },
+    });
+    // null is a removal, which is not the same as the key being absent (a name change says nothing about the picture)
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", avatarUrl: null }))).toEqual({
+      type: "profile.changed",
+      userId: "u1",
+      changes: { avatarUrl: null },
+    });
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", avatarUrl: 42 }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", displayName: 7, avatarUrl: url }))).toBeUndefined();
   });
 
   it("knows about kinds it does not act on, and about kinds it has never heard of, without failing", () => {

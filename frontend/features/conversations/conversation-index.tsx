@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
-import { conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
+import { Avatar } from "@/features/people/person-avatar";
+import { conversationAvatar, conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
 import { useConversationList } from "./queries";
 import { archivedHasUnread, isMuted } from "./settings";
 
@@ -116,39 +117,43 @@ export function ConversationIndex() {
             const unread = unreadLabel(conversation.unreadCount);
             const pinned = Boolean(conversation.settings?.pinned);
             const muted = isMuted(conversation.settings, now);
+            const avatar = conversationAvatar(conversation, list.myId);
             return (
               <li key={conversation.id} className="border-t border-rule">
                 <Link
                   href={href}
                   aria-current={open ? "page" : undefined}
-                  className={`block border-l-2 px-4 py-3 sm:px-6 ${
+                  className={`flex items-center gap-3 border-l-2 px-4 py-3 sm:px-6 ${
                     open ? "border-accent bg-surface" : "border-transparent hover:bg-surface"
                   }`}
                 >
-                  <span className="flex items-baseline justify-between gap-3">
-                    <span className="truncate font-serif text-base font-semibold">
-                      {conversationTitle(conversation, list.myId)}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5 text-ink-muted">
-                      {pinned && <PinIcon />}
-                      {muted && <MuteIcon />}
-                      <time dateTime={conversation.lastMessage?.createdAt} className="font-mono text-xs">
-                        {formatWhen(conversation.lastMessage?.createdAt ?? conversation.updatedAt, now)}
-                      </time>
-                    </span>
-                  </span>
-                  <span className="mt-0.5 flex items-center justify-between gap-3">
-                    <span className="truncate text-sm text-ink-muted">{lastLine(conversation, list.myId)}</span>
-                    {unread && (
-                      <span
-                        className={`shrink-0 rounded-full px-2 text-xs font-medium ${
-                          muted ? "border border-rule text-ink" : "bg-accent text-on-accent"
-                        }`}
-                      >
-                        <span aria-hidden>{unread}</span>
-                        <span className="sr-only">{unreadSpeech(conversation.unreadCount)}</span>
+                  <Avatar {...avatar} />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="truncate font-serif text-base font-semibold">
+                        {conversationTitle(conversation, list.myId)}
                       </span>
-                    )}
+                      <span className="flex shrink-0 items-center gap-1.5 text-ink-muted">
+                        {pinned && <PinIcon />}
+                        {muted && <MuteIcon />}
+                        <time dateTime={conversation.lastMessage?.createdAt} className="font-mono text-xs">
+                          {formatWhen(conversation.lastMessage?.createdAt ?? conversation.updatedAt, now)}
+                        </time>
+                      </span>
+                    </span>
+                    <span className="mt-0.5 flex items-center justify-between gap-3">
+                      <span className="truncate text-sm text-ink-muted">{lastLine(conversation, list.myId)}</span>
+                      {unread && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 text-xs font-medium ${
+                            muted ? "border border-rule text-ink" : "bg-accent text-on-accent"
+                          }`}
+                        >
+                          <span aria-hidden>{unread}</span>
+                          <span className="sr-only">{unreadSpeech(conversation.unreadCount)}</span>
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </Link>
               </li>

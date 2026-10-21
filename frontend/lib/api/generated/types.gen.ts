@@ -4,6 +4,14 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:8080' | (string & {});
 };
 
+export type UserProfile = {
+    id?: string;
+    email?: string;
+    displayName?: string;
+    emailVerified?: boolean;
+    avatarUrl?: string;
+};
+
 export type SetReactionRequest = {
     emoji: string;
 };
@@ -103,6 +111,7 @@ export type ParticipantSummary = {
     userId?: string;
     displayName?: string;
     role?: 'ADMIN' | 'MEMBER';
+    avatarUrl?: string;
 };
 
 export type SendMessageRequest = {
@@ -165,13 +174,6 @@ export type UpdateProfileRequest = {
     displayName?: string;
 };
 
-export type UserProfile = {
-    id?: string;
-    email?: string;
-    displayName?: string;
-    emailVerified?: boolean;
-};
-
 export type RenameGroupRequest = {
     name?: string;
 };
@@ -196,6 +198,40 @@ export type MessagePage = {
     messages?: Array<MessageResponse>;
     hasMore?: boolean;
 };
+
+export type RemoveAvatarData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/avatar';
+};
+
+export type RemoveAvatarResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveAvatarResponse = RemoveAvatarResponses[keyof RemoveAvatarResponses];
+
+export type SetAvatarData = {
+    body?: {
+        file: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/avatar';
+};
+
+export type SetAvatarResponses = {
+    /**
+     * OK
+     */
+    200: UserProfile;
+};
+
+export type SetAvatarResponse = SetAvatarResponses[keyof SetAvatarResponses];
 
 export type UnreactData = {
     body?: never;

@@ -12,7 +12,8 @@ import { GroupPanel } from "@/features/groups/group-panel";
 import { PresenceLine } from "@/features/presence/presence-line";
 import { ConversationMenu } from "./conversation-menu";
 import { PaneHeader } from "./pane-header";
-import { conversationTitle, otherParticipantId, settingsLine } from "./present";
+import { Avatar } from "@/features/people/person-avatar";
+import { conversationAvatar, conversationTitle, otherParticipantId, settingsLine } from "./present";
 import { useConversationList } from "./queries";
 
 /**
@@ -75,9 +76,11 @@ export function ConversationPane() {
     );
   }
 
+  const avatar = conversationAvatar(conversation, list.myId);
   return (
     <>
       <PaneHeader
+        avatar={<Avatar {...avatar} />}
         actions={<ConversationMenu conversation={conversation} />}
         detail={
           <>

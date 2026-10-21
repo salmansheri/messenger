@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { logoutMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { messageFor } from "@/lib/api/messages";
+import { AvatarChooser } from "./avatar-chooser";
 import { ProfileForm } from "./profile-form";
 import { useMe } from "./use-me";
 
@@ -56,6 +57,15 @@ export function SettingsView() {
             Your name
           </h2>
           <ProfileForm userId={me.data.id} current={me.data.displayName ?? ""} />
+        </section>
+      )}
+
+      {me.data?.id && (
+        <section aria-labelledby="avatar" className="mt-10 border-t border-rule pt-6">
+          <h2 id="avatar" className="font-serif text-lg font-semibold">
+            Your Avatar
+          </h2>
+          <AvatarChooser userId={me.data.id} name={me.data.displayName} url={me.data.avatarUrl} />
         </section>
       )}
 

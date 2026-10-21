@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationResponse } from "@/lib/api";
 import {
+  conversationAvatar,
   conversationTitle,
   formatClock,
   formatDay,
@@ -200,5 +201,24 @@ describe("settingsLine", () => {
     expect(line({ muted: true, archived: true })).toBe("Muted · Archived");
     expect(line({ muted: false, pinned: true })).toBe("Pinned");
     expect(line({ muted: true, mutedUntil: "2026-03-10T20:00:00Z", pinned: true })).toBe("Pinned · Muted until 20:00");
+  });
+});
+
+describe("conversationAvatar", () => {
+  it("shows the other person in a Direct conversation, with their picture when they have one", () => {
+    const url = "http://files/avatars/grace-id/a.png?expires=1&signature=x";
+    const withPicture = direct({
+      participants: [
+        { userId: ME, displayName: "Me Myself", role: "MEMBER", avatarUrl: "http://files/mine.png" },
+        { userId: "grace-id", displayName: "Grace Hopper", role: "MEMBER", avatarUrl: url },
+      ],
+    });
+    expect(conversationAvatar(withPicture, ME)).toEqual({ id: "grace-id", name: "Grace Hopper", url });
+    expect(conversationAvatar(direct(), ME)).toEqual({ id: "grace-id", name: "Grace Hopper", url: undefined });
+  });
+
+  it("shows a Group by its name, which has no picture", () => {
+    const group = direct({ id: "g1", type: "GROUP", name: "Analytical Engine" });
+    expect(conversationAvatar(group, ME)).toEqual({ id: "g1", name: "Analytical Engine", url: undefined });
   });
 });

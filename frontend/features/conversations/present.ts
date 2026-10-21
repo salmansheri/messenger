@@ -12,6 +12,17 @@ export function conversationTitle(conversation: ConversationResponse, myId: stri
   return other?.displayName || "Conversation";
 }
 
+/**
+ * Whose disc stands for a Conversation in its row and header: the other person in a Direct conversation (with their
+ * Avatar when they have one), or the Group itself, which has no picture and shows the initials of its name.
+ */
+export function conversationAvatar(conversation: ConversationResponse, myId: string | undefined): { id: string | undefined; name: string; url: string | undefined } {
+  const name = conversationTitle(conversation, myId);
+  if (conversation.type === "GROUP") return { id: conversation.id, name, url: undefined };
+  const other = conversation.participants?.find((participant) => participant.userId !== myId);
+  return { id: other?.userId, name, url: other?.avatarUrl };
+}
+
 /** The other person in a Direct conversation (the first Participant who is not the viewer). */
 export function otherParticipantId(conversation: ConversationResponse, myId: string | undefined): string | undefined {
   return conversation.participants?.find((participant) => participant.userId !== myId)?.userId;

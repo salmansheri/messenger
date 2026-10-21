@@ -23,9 +23,15 @@ export type RealtimeEvent =
   | { type: "typing.changed"; conversationId: string; userId: string; typing: boolean }
   /** Someone who shares a Conversation with this person came online or went offline. */
   | { type: "presence.changed"; userId: string; online: boolean; lastSeenAt: string | undefined }
-  /** Someone who shares a Conversation with this person (or this person, in another session) changed their name. */
-  | { type: "profile.changed"; userId: string; displayName: string }
+  /**
+   * Someone who shares a Conversation with this person (or this person, in another session) changed their name or
+   * Avatar. Only what changed is there: a name change says nothing about the picture, and `avatarUrl: null` is a removal.
+   */
+  | { type: "profile.changed"; userId: string; changes: ProfileChanges }
   | { type: "ignored" };
+
+/** What a `profile.changed` event changes; a key that is absent was not changed. */
+export type ProfileChanges = { displayName?: string; avatarUrl?: string | null };
 
 /** The named fields of an object as numbers, or nothing if any is missing or not a number. */
 function numbers<K extends string>(payload: Record<string, unknown>, keys: readonly K[]): Record<K, number> | undefined {
@@ -107,10 +113,19 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
         online: payload.online,
         lastSeenAt: typeof payload.lastSeenAt === "string" ? payload.lastSeenAt : undefined,
       };
-    case "profile.changed":
-      return typeof payload.userId === "string" && typeof payload.displayName === "string"
-        ? { type: "profile.changed", userId: payload.userId, displayName: payload.displayName }
-        : undefined;
+    case "profile.changed": {
+      if (typeof payload.userId !== "string") return undefined;
+      const changes: ProfileChanges = {};
+      if ("displayName" in payload) {
+        if (typeof payload.displayName !== "string") return undefined;
+        changes.displayName = payload.displayName;
+      }
+      if ("avatarUrl" in payload) {
+        if (typeof payload.avatarUrl !== "string" && payload.avatarUrl !== null) return undefined;
+        changes.avatarUrl = payload.avatarUrl;
+      }
+      return Object.keys(changes).length > 0 ? { type: "profile.changed", userId: payload.userId, changes } : undefined;
+    }
     default:
       return { type: "ignored" };
   }

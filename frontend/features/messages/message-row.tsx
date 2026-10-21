@@ -6,6 +6,7 @@ import { MenuItem } from "@/components/ui/dropdown-menu";
 import { toProblem, type MessageResponse } from "@/lib/api";
 import { formatClock } from "@/features/conversations/present";
 import { statusFor, type Frontier } from "@/features/receipts/status";
+import { Avatar } from "@/features/people/person-avatar";
 import { nextMenuIndex } from "@/components/ui/menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
@@ -25,6 +26,8 @@ type Props = {
   myId: string | undefined;
   group: boolean;
   names: Map<string | undefined, string | undefined>;
+  /** Each Participant's Avatar link, shown beside the name at the start of a run. */
+  avatars: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
   onRetry: (clientMessageId: string) => void;
   /** A loaded Message by its id: a quote takes its text from it, so an edit or deletion shows through. */
@@ -36,9 +39,10 @@ type Props = {
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, myId, group, names, frontier, onRetry, loaded, onReply, onJump, onImageExpired }: Props) {
+export function MessageRow({ item, conversationId, myId, group, names, avatars, frontier, onRetry, loaded, onReply, onJump, onImageExpired }: Props) {
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
+  const senderId = mine ? myId : item.senderId;
   const [editing, setEditing] = useState(false);
   // After editing ends, focus goes back to where the person started it: this Message's menu button.
   const trigger = useRef<HTMLButtonElement>(null);
@@ -63,7 +67,12 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
         {mine && !pending && item.seq !== undefined && <ReceiptMark status={statusFor({ seq: item.seq, status: item.status }, frontier)} />}
       </div>
       <div className={`relative min-w-0 border-l-2 pr-20 pl-3 ${mine ? "border-accent" : "border-rule"}`}>
-        {item.startsRun && <p className="font-serif text-sm font-semibold">{sender}</p>}
+        {item.startsRun && (
+          <p className="flex items-center gap-1.5 font-serif text-sm font-semibold">
+            <Avatar id={senderId} name={names.get(senderId)} url={avatars.get(senderId)} size="xs" />
+            {sender}
+          </p>
+        )}
         {item.replyTo && !item.deleted && (
           <QuoteBlock
             view={quoteView(item.replyTo, loaded, (id) => (id === myId ? "You" : (names.get(id) ?? "Someone who left")))}

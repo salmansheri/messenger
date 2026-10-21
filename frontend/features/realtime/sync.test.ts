@@ -318,9 +318,23 @@ describe("typing and presence events", () => {
     const { client } = withList([{ ...conversation(2, 0), participants: [{ userId: "me", displayName: "Ada", role: "MEMBER" }] }]);
     client.setQueryData(meQueryKey(), { id: "me", displayName: "Ada" });
 
-    recordProfile(client, "me", "Ada King");
+    recordProfile(client, "me", { displayName: "Ada King" });
 
     expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[0].displayName).toBe("Ada King");
+  });
+
+  it("puts a new or removed Avatar into the list, and into the profile when it is the person's own", () => {
+    const url = "http://files/avatars/me/a.png?expires=1&signature=x";
+    const { client } = withList([{ ...conversation(2, 0), participants: [{ userId: "me", displayName: "Ada", role: "MEMBER" }] }]);
+    client.setQueryData(meQueryKey(), { id: "me", displayName: "Ada" });
+
+    handleEvent(client, JSON.stringify({ type: "profile.changed", userId: "me", avatarUrl: url }), createTypingTracker());
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[0].avatarUrl).toBe(url);
+    expect(client.getQueryData(meQueryKey())).toEqual({ id: "me", displayName: "Ada", avatarUrl: url });
+
+    handleEvent(client, JSON.stringify({ type: "profile.changed", userId: "me", avatarUrl: null }), createTypingTracker());
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[0].avatarUrl).toBeUndefined();
+    expect(client.getQueryData(meQueryKey())).toEqual({ id: "me", displayName: "Ada" });
   });
 
   it("shows a person online or offline in every Conversation's presence that has loaded", () => {

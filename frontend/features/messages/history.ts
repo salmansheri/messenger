@@ -1,4 +1,5 @@
 import type { AttachmentResponse, MessagePage, MessageResponse, ReactionView } from "@/lib/api";
+import { linkLapsed } from "@/lib/signed-link";
 import { clearUser } from "./reactions";
 import { mergeVersion } from "./versions";
 
@@ -52,20 +53,9 @@ export function removeMessage(history: History, seq: number): History {
   };
 }
 
-/** Links held for less than this much longer count as run out, so a picture is not left to fail a moment after a refresh. */
-const LINK_MARGIN_MS = 60_000;
-
-/**
- * Whether the signed links of an image have run out (or are about to), read from the `expires` the server put into
- * them (seconds since 1970). A link whose expiry cannot be read counts as run out.
- */
+/** Whether the signed links of an image have run out (or are about to); see `linkLapsed`. */
 export function linksLapsed(attachment: AttachmentResponse, now: number): boolean {
-  try {
-    const expires = Number(new URL(attachment.thumbnailUrl ?? "", "http://x").searchParams.get("expires"));
-    return !Number.isFinite(expires) || expires * 1000 - now < LINK_MARGIN_MS;
-  } catch {
-    return true;
-  }
+  return linkLapsed(attachment.thumbnailUrl, now);
 }
 
 /**

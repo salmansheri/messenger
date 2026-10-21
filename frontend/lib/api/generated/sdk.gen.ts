@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddParticipantData, AddParticipantResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SendData, SendResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
+import type { AddParticipantData, AddParticipantResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SendData, SendResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,23 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+export const removeAvatar = <ThrowOnError extends boolean = true>(options?: Options<RemoveAvatarData, ThrowOnError>): RequestResult<RemoveAvatarResponses, unknown, ThrowOnError> => (options?.client ?? client).delete<RemoveAvatarResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/me/avatar',
+    ...options
+});
+
+export const setAvatar = <ThrowOnError extends boolean = true>(options?: Options<SetAvatarData, ThrowOnError>): RequestResult<SetAvatarResponses, unknown, ThrowOnError> => (options?.client ?? client).put<SetAvatarResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/me/avatar',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options?.headers
+    }
+});
 
 export const unreact = <ThrowOnError extends boolean = true>(options: Options<UnreactData, ThrowOnError>): RequestResult<UnreactResponses, unknown, ThrowOnError> => (options.client ?? client).delete<UnreactResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

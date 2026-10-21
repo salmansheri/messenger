@@ -1,5 +1,5 @@
 import type { ConversationResponse, MessageResponse } from "@/lib/api";
-import type { RealtimeEvent } from "@/lib/realtime/events";
+import type { ProfileChanges, RealtimeEvent } from "@/lib/realtime/events";
 import { applyReaction } from "@/features/messages/reactions";
 import { clearReactionsOf, latestSeq, replaceMessage, updateReactions, withMessage, type History } from "@/features/messages/history";
 import { mergeVersion } from "@/features/messages/versions";
@@ -8,19 +8,37 @@ import { orderConversations, withSettings } from "@/features/conversations/setti
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
 
 /**
- * The list with one person's name changed wherever they are a Participant (list rows, headers, the names above runs of
- * Messages and the Group panel all read it from here). The same list when nobody has that name already, so a repeat
- * (or an event about someone in none of these Conversations) changes nothing.
+ * A Participant or profile with a name or Avatar change put in: only the keys in `changes`, with `avatarUrl: null`
+ * taking the picture away. The same object when it already says so.
  */
-export function withDisplayName(list: ConversationResponse[], userId: string, displayName: string): ConversationResponse[] {
+export function applyProfileChanges<T extends { displayName?: string; avatarUrl?: string }>(target: T, changes: ProfileChanges): T {
+  const renamed = changes.displayName !== undefined && target.displayName !== changes.displayName;
+  const repictured = changes.avatarUrl !== undefined && (target.avatarUrl ?? null) !== changes.avatarUrl;
+  if (!renamed && !repictured) return target;
+  const next = { ...target };
+  if (renamed) next.displayName = changes.displayName;
+  if (repictured) {
+    if (changes.avatarUrl === null) delete next.avatarUrl;
+    else next.avatarUrl = changes.avatarUrl;
+  }
+  return next;
+}
+
+/**
+ * The list with one person's name or Avatar changed wherever they are a Participant (list rows, headers, the names and
+ * pictures beside runs of Messages and the Group panel all read them from here). Only the keys in `changes` are
+ * touched, and the same list comes back when nothing differs, so a repeat (or an event about someone in none of these
+ * Conversations) changes nothing.
+ */
+export function withProfile(list: ConversationResponse[], userId: string, changes: ProfileChanges): ConversationResponse[] {
   let changed = false;
   const next = list.map((conversation) => {
-    if (!conversation.participants?.some((p) => p.userId === userId && p.displayName !== displayName)) return conversation;
+    const participants = conversation.participants;
+    if (!participants) return conversation;
+    const updated = participants.map((p) => (p.userId === userId ? applyProfileChanges(p, changes) : p));
+    if (updated.every((p, i) => p === participants[i])) return conversation;
     changed = true;
-    return {
-      ...conversation,
-      participants: conversation.participants.map((p) => (p.userId === userId ? { ...p, displayName } : p)),
-    };
+    return { ...conversation, participants: updated };
   });
   return changed ? next : list;
 }
@@ -37,7 +55,7 @@ export function applyToList(
   myId: string | undefined,
 ): { list: ConversationResponse[]; refetch: boolean } {
   if (event.type === "conversation.changed") return { list, refetch: true };
-  if (event.type === "profile.changed") return { list: withDisplayName(list, event.userId, event.displayName), refetch: false };
+  if (event.type === "profile.changed") return { list: withProfile(list, event.userId, event.changes), refetch: false };
   if (event.type === "message.updated") return applyUpdateToList(list, event);
   if (event.type === "settings.changed") {
     const next = withSettings(list, event.conversationId, event.settings);

@@ -17,6 +17,14 @@
      picture is looked at against dark whatever the page around it is. */
   --scrim: #0c0b09;
   --on-scrim: #f6f1e6;
+  /* The discs behind a person's initials when they have no Avatar (picked per person, features/people/avatar.ts):
+     quiet tints that carry ink text at AA in each theme. */
+  --tone-clay: #efcfc0;
+  --tone-ochre: #ecdcae;
+  --tone-moss: #d3dfbd;
+  --tone-sea: #c4dedb;
+  --tone-slate: #cfd5e2;
+  --tone-plum: #e2cfdf;
   color-scheme: light;
 }
 
@@ -29,6 +37,12 @@
   --accent: #f0704a;
   --on-accent: #14130f;
   --band: #2a1f19;
+  --tone-clay: #5a3427;
+  --tone-ochre: #554419;
+  --tone-moss: #3b4a2a;
+  --tone-sea: #1f4744;
+  --tone-slate: #33405a;
+  --tone-plum: #4d2f4a;
   color-scheme: dark;
 }
 
@@ -42,6 +56,12 @@
     --accent: #f0704a;
     --on-accent: #14130f;
     --band: #2a1f19;
+    --tone-clay: #5a3427;
+    --tone-ochre: #554419;
+    --tone-moss: #3b4a2a;
+    --tone-sea: #1f4744;
+    --tone-slate: #33405a;
+    --tone-plum: #4d2f4a;
     color-scheme: dark;
   }
 }
@@ -57,6 +77,12 @@
   --color-band: var(--band);
   --color-scrim: var(--scrim);
   --color-on-scrim: var(--on-scrim);
+  --color-tone-clay: var(--tone-clay);
+  --color-tone-ochre: var(--tone-ochre);
+  --color-tone-moss: var(--tone-moss);
+  --color-tone-sea: var(--tone-sea);
+  --color-tone-slate: var(--tone-slate);
+  --color-tone-plum: var(--tone-plum);
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
