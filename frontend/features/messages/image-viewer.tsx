@@ -5,7 +5,8 @@ import { useImageRecovery } from "./use-image-recovery";
 
 /**
  * The picture at full size over the page, in the browser's own modal dialog: it keeps focus inside, closes on Escape
- * and gives focus back to what opened it. Dark glass fills the screen (blurred, in every theme), the picture sits in
+ * and gives focus back to what opened it. Dark glass fills the screen (the page behind it blurred, in every theme; the
+ * glass is a layer inside the dialog, because the blur of the dialog's own backdrop is not reliable), the picture sits in
  * the middle with its caption beneath, and a round Close button is in the corner. A click anywhere outside the
  * picture closes it too.
  */
@@ -39,11 +40,11 @@ export function ImageViewer({
       ref={dialog}
       aria-label={label}
       onClose={onClose}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-transparent p-0 text-on-scrim backdrop:bg-scrim/90 backdrop:backdrop-blur-md"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-transparent p-0 text-on-scrim backdrop:bg-transparent"
     >
       <div
         onClick={(event) => event.target === event.currentTarget && onClose()}
-        className="viewer-in relative flex h-full w-full items-center justify-center p-4 sm:p-10"
+        className="viewer-fade relative flex h-full w-full items-center justify-center bg-scrim/70 p-4 backdrop-blur-2xl backdrop-saturate-150 sm:p-10"
       >
         <button
           ref={closeButton}
@@ -58,7 +59,7 @@ export function ImageViewer({
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
-        <figure className="flex max-h-full max-w-full flex-col items-center gap-4">
+        <figure className="viewer-in flex max-h-full max-w-full flex-col items-center gap-4">
           {picture.status === "failed" ? (
             <div role="status" className="flex min-h-40 min-w-64 flex-col items-center justify-center gap-3 rounded-xl bg-on-scrim/10 p-8 text-center">
               <p>Couldn&apos;t load image.</p>

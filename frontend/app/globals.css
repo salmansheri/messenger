@@ -95,6 +95,19 @@ h1[tabindex="-1"]:focus {
   animation: viewer-in 180ms ease-out;
 }
 
+@keyframes viewer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.viewer-fade {
+  animation: viewer-fade 180ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
