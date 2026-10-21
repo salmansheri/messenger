@@ -187,9 +187,21 @@ export function Composer({
             event.target.value = ""; // the same file can be chosen again after it was removed
           }}
         />
-        <Button ref={attach} variant="quiet" onClick={() => picker.current?.click()} className="min-h-11">
-          Attach image
-        </Button>
+        {/* An icon, so its name is given to assistive technology and shown as a hint on hover. */}
+        <button
+          ref={attach}
+          type="button"
+          aria-label="Attach image"
+          title="Attach image"
+          onClick={() => picker.current?.click()}
+          className="flex size-11 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors hover:text-ink"
+        >
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <circle cx="8.5" cy="9.5" r="1.5" />
+            <path d="m21 16-5-5-9 9" />
+          </svg>
+        </button>
         <textarea
           ref={textareaRef}
           aria-label="Message"
