@@ -46,9 +46,14 @@ class UploadImageTests extends IntegrationTest {
 		return out.toByteArray();
 	}
 
+	/** The signed links name the configured public address; the test server listens on a random port instead. */
+	URI local(String url) {
+		var link = URI.create(url);
+		return URI.create("http://localhost:" + port + link.getRawPath() + "?" + link.getRawQuery());
+	}
+
 	byte[] fetch(String url) throws Exception {
-		var response = http.send(HttpRequest.newBuilder(URI.create(url)).build(),
-				HttpResponse.BodyHandlers.ofByteArray());
+		var response = http.send(HttpRequest.newBuilder(local(url)).build(), HttpResponse.BodyHandlers.ofByteArray());
 		assertThat(response.statusCode()).isEqualTo(200);
 		return response.body();
 	}
@@ -194,27 +199,70 @@ class UploadImageTests extends IntegrationTest {
 				.andExpect(status().isCreated());
 	}
 
+	/** The stored file behind a signed link: links lapse with the clock, so removal is seen on the disk. */
+	java.nio.file.Path fileOf(String url) {
+		return java.nio.file.Path.of("target/test-uploads")
+				.resolve(URI.create(url).getPath().substring("/api/v1/files/".length()));
+	}
+
 	@Test
-	void anUploadNeverSentWithAMessageIsRemovedAfterADayAndItsLinkStopsWorking() throws Exception {
+	void anUploadNeverSentWithAMessageIsRemovedAfterADay() throws Exception {
 		var body = upload("abandoned.png", "image/png", image("png", 20, 20));
-		var url = body.get("url").asString();
-		var thumbnailUrl = body.get("thumbnailUrl").asString();
-		assertThat(fetch(url)).isNotEmpty();
+		var image = fileOf(body.get("url").asString());
+		var thumbnail = fileOf(body.get("thumbnailUrl").asString());
+		assertThat(image).exists();
+		assertThat(thumbnail).exists();
 
 		clock.advance(java.time.Duration.ofHours(23));
 		Thread.sleep(1000);
-		assertThat(fetch(url)).isNotEmpty();
+		assertThat(image).exists();
 
 		clock.advance(java.time.Duration.ofHours(2));
 		org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() -> {
-			assertThat(statusOf(url)).isEqualTo(404);
-			assertThat(statusOf(thumbnailUrl)).isEqualTo(404);
+			assertThat(image).doesNotExist();
+			assertThat(thumbnail).doesNotExist();
 		});
 	}
 
 	int statusOf(String url) throws Exception {
-		return http.send(HttpRequest.newBuilder(URI.create(url)).build(), HttpResponse.BodyHandlers.discarding())
+		return http.send(HttpRequest.newBuilder(local(url)).build(), HttpResponse.BodyHandlers.discarding())
 				.statusCode();
+	}
+
+	@Test
+	void aLinkIsServedWithTheImageTypeAndNeedsNoSignIn() throws Exception {
+		var body = upload("a.jpg", "image/jpeg", image("jpg", 30, 30));
+
+		var response = http.send(HttpRequest.newBuilder(local(body.get("url").asString())).build(),
+				HttpResponse.BodyHandlers.discarding());
+
+		assertThat(response.statusCode()).isEqualTo(200);
+		assertThat(response.headers().firstValue("Content-Type")).hasValue("image/jpeg");
+	}
+
+	@Test
+	void aLinkWithATamperedSignatureOrChangedExpiryOrAnotherFileIsRefused() throws Exception {
+		var one = upload("one.png", "image/png", image("png", 12, 12));
+		var two = upload("two.png", "image/png", image("png", 12, 12));
+		var url = one.get("url").asString();
+
+		assertThat(statusOf(url.replaceAll("signature=(.)", "signature=X"))).isEqualTo(404);
+		assertThat(statusOf(url.replaceAll("expires=\\d+", "expires=9999999999"))).isEqualTo(404);
+		assertThat(statusOf(url.substring(0, url.indexOf("?")))).isEqualTo(404);
+		var otherFile = two.get("url").asString().replaceAll("\\?.*", "") + url.substring(url.indexOf("?"));
+		assertThat(statusOf(otherFile)).isEqualTo(404);
+	}
+
+	@Test
+	void aLinkStopsWorkingAfterFifteenMinutes() throws Exception {
+		var url = upload("a.png", "image/png", image("png", 12, 12)).get("url").asString();
+		assertThat(statusOf(url)).isEqualTo(200);
+
+		clock.advance(java.time.Duration.ofMinutes(14));
+		assertThat(statusOf(url)).isEqualTo(200);
+
+		clock.advance(java.time.Duration.ofMinutes(2));
+		assertThat(statusOf(url)).isEqualTo(404);
 	}
 
 }

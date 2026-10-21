@@ -29,11 +29,3 @@ services:
     ports:
       - '1025:1025'
       - '8025:8025'
-  objectstorage:
-    image: 'rustfs/rustfs:latest'
-    command: /data
-    environment:
-      - 'RUSTFS_ACCESS_KEY=rubricaccess'
-      - 'RUSTFS_SECRET_KEY=rubricsecretkey'
-    ports:
-      - '9000:9000'

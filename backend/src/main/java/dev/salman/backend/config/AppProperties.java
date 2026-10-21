@@ -56,12 +56,11 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	}
 
 	/**
-	 * The S3-compatible object store holding images. {@code endpoint} is where the server reaches it;
-	 * {@code publicEndpoint} (defaults to {@code endpoint}) is the address put into signed URLs, for when browsers
-	 * reach it by another name. {@code urlTtl}: how long a signed URL works.
+	 * Where images are kept. {@code directory}: files live under it on this machine. {@code publicBaseUrl}: the
+	 * address of this API as browsers reach it, put into signed links. {@code signingSecret}: signs and checks them
+	 * (change it in production; links stop working when it changes). {@code urlTtl}: how long a link works.
 	 */
-	public record Storage(String endpoint, String publicEndpoint, String region, String accessKey, String secretKey,
-			String bucket, Duration urlTtl) {
+	public record Storage(String directory, String publicBaseUrl, String signingSecret, Duration urlTtl) {
 	}
 
 	/**

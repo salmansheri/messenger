@@ -15,7 +15,7 @@ import dev.salman.backend.lib.ProblemSecurityHandlers;
 public class SecurityConfig {
 
 	private static final String[] PUBLIC_PATHS = { "/api/v1/auth/**", "/actuator/health/**", "/actuator/info",
-			"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/ws/**" };
+			"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/ws/**", "/api/v1/files/**" };
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, ProblemSecurityHandlers problems) throws Exception {

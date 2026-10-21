@@ -52,8 +52,8 @@ public class AttachmentServiceImpl implements AttachmentService {
 		// Files first: a row must never point at files that are not there. If anything fails after the first file is
 		// stored, remove what was stored (best effort), because no row would ever lead the sweep to it.
 		try {
-			storage.put(attachment.getStorageKey(), image.full(), image.contentType());
-			storage.put(attachment.getThumbnailKey(), image.thumbnail(), image.contentType());
+			storage.put(attachment.getStorageKey(), image.full());
+			storage.put(attachment.getThumbnailKey(), image.thumbnail());
 			attachments.save(attachment);
 		}
 		catch (RuntimeException e) {

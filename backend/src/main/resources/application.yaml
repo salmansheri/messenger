@@ -37,12 +37,10 @@ app:
     edit-window: 15m
     delete-window: 1h
   storage:
-    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
-    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:}
-    region: us-east-1
-    access-key: ${STORAGE_ACCESS_KEY:rubricaccess}
-    secret-key: ${STORAGE_SECRET_KEY:rubricsecretkey}
-    bucket: rubric
+    # Images are files under this directory; links to them are signed with the secret and expire.
+    directory: ${STORAGE_DIRECTORY:data/uploads}
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}
+    signing-secret: ${STORAGE_SIGNING_SECRET:dev-only-change-me-too}
     url-ttl: 15m
   uploads:
     max-per-minute: 20
