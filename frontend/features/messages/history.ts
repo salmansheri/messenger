@@ -80,11 +80,11 @@ export function syncRange(history: History, fresh: readonly MessageResponse[], f
   return { ...history, pages };
 }
 
-/** The Message with this id as a placeholder (no text, deleted at `at`); the same history when it is absent or already one. */
+/** The Message with this id as a placeholder (no text or image, deleted at `at`); the same history when it is absent or already one. */
 export function markDeleted(history: History, messageId: string, at: string): History {
   const known = history.pages.flatMap((page) => page.messages ?? []).find((message) => message.id === messageId);
   if (!known || known.deletedAt) return history;
-  return replaceMessage(history, { ...known, body: undefined, deletedAt: at });
+  return replaceMessage(history, { ...known, body: undefined, deletedAt: at, attachment: undefined });
 }
 
 /** The history without the Message with this id (the same object when it was not there). */

@@ -27,6 +27,10 @@ function spokenText(body: string | undefined): string {
 
 /** What a screen reader says for a new Message: who, then what, on one line and not longer than is bearable. */
 export function announcementOf(message: MessageResponse, sender: string): string {
+  if (message.attachment) {
+    const caption = spokenText(message.body);
+    return caption ? `${sender} sent an image: ${caption}` : `${sender} sent an image`;
+  }
   return `${sender}: ${spokenText(message.body)}`;
 }
 

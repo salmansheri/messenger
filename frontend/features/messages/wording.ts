@@ -14,14 +14,28 @@ function waitWords(problem: ApiProblem): string {
  * someone who is waiting to press Retry how long to wait, so a short wait is counted in seconds; a refused reply says why
  * in the server's words; every other failure keeps the general wording.
  */
-export function sendFailureMessage(problem: ApiProblem, wasReply = false): string {
+export function sendFailureMessage(problem: ApiProblem, wasReply = false, hadImage = false): string {
   if (problem.status === 429) return `You are sending Messages too often. Try again in ${waitWords(problem)}.`;
+  // With an image a 404 usually means the server no longer has the upload; trying again uploads it afresh.
+  if (problem.status === 404 && hadImage && !wasReply) return "This image could not be sent. Try again.";
   // A reply can be refused in the server's own words (the Message was deleted), or the Message it answers is gone; for
   // a plain send a 404 means the Conversation itself is no longer the person's.
   if (problem.status === 409) return problem.detail ?? "That can no longer be done.";
   if (problem.status === 404) {
     return wasReply ? "The Message you were replying to is no longer there." : "This Conversation is no longer yours.";
   }
+  return messageFor(problem);
+}
+
+/**
+ * Why an image could not be uploaded: the server says in its own words what is wrong with a file it refuses (not an
+ * image it can use, too many pixels, empty), a file over the size limit and too many uploads have their own wording,
+ * and every other failure keeps the general one.
+ */
+export function uploadFailureMessage(problem: ApiProblem): string {
+  if (problem.status === 413) return "That image is larger than 10 MB.";
+  if (problem.status === 429) return `You are sending images too often. Try again in ${waitWords(problem)}.`;
+  if (problem.status === 400) return problem.detail ?? "That image cannot be sent.";
   return messageFor(problem);
 }
 

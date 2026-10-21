@@ -43,3 +43,25 @@ describe("mergeVersion", () => {
     expect(mergeVersion(known, edited("2026-03-10T10:00:00Z"))).toBe(known);
   });
 });
+
+describe("an edit of an image Message", () => {
+  const picture = (url: string) => ({ id: "a1", width: 4, height: 3, url, thumbnailUrl: `${url}-thumb` });
+
+  it("changes the caption and keeps the image, taking the fresh links the edit brings", () => {
+    const known: MessageResponse = { ...base, body: "Helo", attachment: picture("old") };
+    const incoming: MessageResponse = { ...base, body: "Hello", editedAt: "2026-03-10T10:00:00Z", attachment: picture("new") };
+
+    const merged = mergeVersion(known, incoming);
+
+    expect(merged.body).toBe("Hello");
+    expect(merged.attachment?.url).toBe("new");
+    expect(merged.attachment?.id).toBe("a1");
+  });
+
+  it("keeps the image it has when an older version arrives late", () => {
+    const known: MessageResponse = { ...base, body: "Hello", editedAt: "2026-03-10T10:00:00Z", attachment: picture("current") };
+    const late: MessageResponse = { ...base, body: "Helo", attachment: picture("stale") };
+
+    expect(mergeVersion(known, late)).toBe(known);
+  });
+});

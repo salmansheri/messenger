@@ -98,3 +98,19 @@ describe("replyTarget", () => {
     expect(replyTarget(undefined, loaded())).toBeUndefined();
   });
 });
+
+describe("quoting an image", () => {
+  const attachment = { id: "a1", width: 4, height: 3, url: "u", thumbnailUrl: "t" };
+  const image = (body?: string): MessageResponse => ({ id: "q1", senderId: "ada", body, attachment });
+
+  it("shows Photo when the quoted Message is an image sent alone, and Photo with the caption otherwise", () => {
+    expect(quoteView(quote(), loaded(image()), nameOf)).toMatchObject({ kind: "text", text: "Photo" });
+    expect(quoteView(quote(), loaded(image("Lunch today")), nameOf)).toMatchObject({ kind: "text", text: "Photo: Lunch today" });
+  });
+
+  it("starts a reply to an image with the same words in the strip", () => {
+    expect(replyDraft(image()).text).toBe("Photo");
+    expect(replyDraft(image("Lunch today")).text).toBe("Photo: Lunch today");
+  });
+});
+

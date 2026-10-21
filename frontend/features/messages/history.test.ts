@@ -108,6 +108,15 @@ describe("markDeleted", () => {
     expect(after.pages[0].messages?.[0]).toEqual(msg(5));
   });
 
+  it("takes the image off a deleted Message", () => {
+    const picture = { id: "a1", width: 4, height: 3, url: "u", thumbnailUrl: "t" };
+    const before = history({ messages: [msg(6, { attachment: picture })], hasMore: false });
+
+    const after = markDeleted(before, "id6", "2026-03-10T10:06:00Z");
+
+    expect(after.pages[0].messages?.[0].attachment).toBeUndefined();
+  });
+
   it("returns the same history when the Message is not loaded or is already deleted", () => {
     const before = history(page(5), { messages: [msg(6, { body: undefined, deletedAt: "2026-03-10T10:00:00Z" })], hasMore: false });
 

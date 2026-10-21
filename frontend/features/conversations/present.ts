@@ -1,5 +1,9 @@
 import type { ConversationResponse, ConversationSettings } from "@/lib/api";
+import { glimpse } from "@/features/messages/glimpse";
 import { isMuted } from "./settings";
+
+/** How much of an image's caption the list line shows, as the server's pushes and quotes do. */
+const PHOTO_CAPTION_CHARACTERS = 100;
 
 /** What a Conversation is called: the other person in a Direct conversation, the name of a Group. */
 export function conversationTitle(conversation: ConversationResponse, myId: string | undefined): string {
@@ -17,8 +21,10 @@ export function otherParticipantId(conversation: ConversationResponse, myId: str
 export function lastLine(conversation: ConversationResponse, myId: string | undefined): string {
   const message = conversation.lastMessage;
   if (message?.deletedAt) return "This Message was deleted";
-  if (!message?.body) return "No Messages yet";
-  const text = message.body.replace(/\s+/g, " ").trim();
+  if (!message?.body && !message?.attachment) return "No Messages yet";
+  const text = message.attachment
+    ? glimpse(message.body, true, PHOTO_CAPTION_CHARACTERS)
+    : (message.body ?? "").replace(/\s+/g, " ").trim();
   if (message.senderId === myId) return `You: ${text}`;
   if (conversation.type === "GROUP") {
     const sender = conversation.participants?.find((participant) => participant.userId === message.senderId);

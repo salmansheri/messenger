@@ -1,13 +1,10 @@
 import type { MessageResponse, ReplyQuote } from "@/lib/api";
+import { firstCharacters, glimpse } from "./glimpse";
 
 /** A quote shows the start of the text, as the server's quotes and push notifications do. */
 const QUOTE_CHARACTERS = 100;
 
-/** The first `characters` characters of the text (counted as people count them, an emoji is one), with an ellipsis if it was cut. */
-export function firstCharacters(text: string, characters: number): string {
-  const all = [...text];
-  return all.length <= characters ? text : `${all.slice(0, characters).join("")}…`;
-}
+export { firstCharacters };
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -34,7 +31,7 @@ export function quoteView(
       kind: "text",
       messageId: quote.messageId,
       sender: nameOf(message.senderId),
-      text: firstCharacters(oneLine(message.body ?? ""), QUOTE_CHARACTERS),
+      text: glimpse(message.body, Boolean(message.attachment), QUOTE_CHARACTERS),
     };
   }
   if (quote.unavailable) return { kind: "unavailable", messageId: quote.messageId };
@@ -47,7 +44,7 @@ export function replyDraft(message: MessageResponse): ReplyQuote {
   return {
     messageId: message.id,
     senderId: message.senderId,
-    text: firstCharacters(oneLine(message.body ?? ""), QUOTE_CHARACTERS),
+    text: glimpse(message.body, Boolean(message.attachment), QUOTE_CHARACTERS),
     deleted: false,
     unavailable: false,
   };

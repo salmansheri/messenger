@@ -63,6 +63,13 @@ describe("lastLine", () => {
     expect(lastLine(direct({ lastMessage: { senderId: "grace-id", deletedAt } }), ME)).toBe("This Message was deleted");
   });
 
+  it("says Photo for an image sent alone, and Photo with the caption when it has one", () => {
+    const attachment = { id: "a1", width: 4, height: 3, url: "u", thumbnailUrl: "t" };
+    expect(lastLine(direct({ lastMessage: { senderId: "grace-id", attachment } }), ME)).toBe("Photo");
+    expect(lastLine(direct({ lastMessage: { senderId: "grace-id", body: "Lunch today", attachment } }), ME)).toBe("Photo: Lunch today");
+    expect(lastLine(direct({ lastMessage: { senderId: ME, attachment } }), ME)).toBe("You: Photo");
+  });
+
   it("marks the viewer's own Message", () => {
     const c = direct({ lastMessage: { senderId: ME, body: "On my way" } });
     expect(lastLine(c, ME)).toBe("You: On my way");

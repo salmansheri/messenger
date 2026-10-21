@@ -17,6 +17,9 @@ export function firstUnreadSeq(conversation: Pick<ConversationResponse, "unreadC
   return latest - unread + 1;
 }
 
+/** The picture on a Message: the thumbnail the server made, or for a Message still being sent the one chosen here. */
+export type TimelineImage = { src: string; width?: number; height?: number };
+
 export type TimelineItem =
   | { kind: "day"; key: string; label: string }
   | { kind: "unread"; key: string }
@@ -45,6 +48,8 @@ export type TimelineItem =
       reactions: ReactionView[];
       /** The Message this one answers (none for a deleted reply); for one still being sent, what the person chose. */
       replyTo?: ReplyQuote;
+      /** The image sent with it (none for a deleted Message). */
+      image?: TimelineImage;
     };
 
 type Input = {
@@ -71,6 +76,11 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       deleted: Boolean(message.deletedAt),
       reactions: message.deletedAt ? [] : (message.reactions ?? []),
       replyTo: message.deletedAt || !message.replyTo ? undefined : message.replyTo,
+      image: message.deletedAt || !message.attachment?.thumbnailUrl ? undefined : {
+        src: message.attachment.thumbnailUrl,
+        width: message.attachment.width,
+        height: message.attachment.height,
+      },
       seq: message.seq,
       senderId: message.senderId,
       body: message.body ?? "",
@@ -87,6 +97,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
         deleted: false,
         reactions: [] as ReactionView[],
         replyTo: entry.replyTo,
+        image: entry.image && { src: entry.image.previewUrl, width: entry.image.width, height: entry.image.height },
         seq: undefined,
         senderId: myId,
         body: entry.body,
@@ -120,6 +131,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       deleted: row.deleted,
       reactions: row.reactions,
       replyTo: row.replyTo,
+      image: row.image,
       senderId: row.senderId,
       body: row.body,
       createdAt: row.createdAt,

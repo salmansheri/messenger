@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem, NETWORK_FAILURE } from "@/lib/api/problem";
-import { changeFailureMessage, sendFailureMessage } from "./wording";
+import { changeFailureMessage, sendFailureMessage, uploadFailureMessage } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number) =>
   new ApiProblem(status, "Problem", undefined, {}, retryAfterSeconds);
@@ -71,3 +71,27 @@ describe("changeFailureMessage", () => {
     expect(changeFailureMessage(problem(NETWORK_FAILURE))).toContain("Could not reach the server");
   });
 });
+
+describe("sending an image", () => {
+  it("says the image could not be sent, not that the Conversation is gone, when a send with an image finds nothing", () => {
+    expect(sendFailureMessage(problem(404), false, true)).toBe("This image could not be sent. Try again.");
+    expect(sendFailureMessage(problem(404), false, false)).toBe("This Conversation is no longer yours.");
+  });
+});
+
+describe("uploadFailureMessage", () => {
+  it("passes on the server's own reason for refusing a file", () => {
+    const refused = new ApiProblem(400, "Bad Request", "That file is not a supported image. Use a PNG, JPEG, WebP or GIF.", {}, undefined);
+    expect(uploadFailureMessage(refused)).toBe("That file is not a supported image. Use a PNG, JPEG, WebP or GIF.");
+  });
+
+  it("words an oversize file and too many uploads", () => {
+    expect(uploadFailureMessage(problem(413))).toBe("That image is larger than 10 MB.");
+    expect(uploadFailureMessage(problem(429, 20))).toBe("You are sending images too often. Try again in 20 seconds.");
+  });
+
+  it("keeps the general wording for everything else", () => {
+    expect(uploadFailureMessage(problem(NETWORK_FAILURE))).toBe(sendFailureMessage(problem(NETWORK_FAILURE)));
+  });
+});
+

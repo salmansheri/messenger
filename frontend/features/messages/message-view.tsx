@@ -55,8 +55,10 @@ export function MessageView({ conversation, myId }: Props) {
 
   const [outbox] = useState(() =>
     createOutbox({
-      send: async (clientMessageId, body, replyToMessageId) =>
-        (await sdk.send({ path: { conversationId }, body: { clientMessageId, body, replyToMessageId } })).data,
+      upload: async (file) => (await sdk.upload({ body: { file } })).data as { id: string },
+      send: async (clientMessageId, body, replyToMessageId, attachmentId) =>
+        (await sdk.send({ path: { conversationId }, body: { clientMessageId, body, replyToMessageId, attachmentId } })).data,
+      release: (previewUrl) => URL.revokeObjectURL(previewUrl),
       onSent: (message) => {
         addMessageToHistory(queryClient, message);
         void queryClient.invalidateQueries({ queryKey: listQueryKey() });
@@ -269,9 +271,9 @@ export function MessageView({ conversation, myId }: Props) {
           composer.current?.focus();
         }}
         onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
-        onSend={(body) => {
+        onSend={(body, image) => {
           keepAtBottom.current = true;
-          outbox.submit(body, reply);
+          outbox.submit(body, reply, image);
           setChosen(undefined);
         }}
       />

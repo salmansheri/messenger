@@ -8,6 +8,14 @@ export type SetReactionRequest = {
     emoji: string;
 };
 
+export type AttachmentResponse = {
+    id?: string;
+    width?: number;
+    height?: number;
+    url?: string;
+    thumbnailUrl?: string;
+};
+
 export type MessageResponse = {
     id?: string;
     conversationId?: string;
@@ -21,6 +29,7 @@ export type MessageResponse = {
     status?: 'SENT' | 'DELIVERED' | 'READ';
     replyTo?: ReplyQuote;
     reactions?: Array<ReactionView>;
+    attachment?: AttachmentResponse;
 };
 
 export type ReactionView = {
@@ -100,6 +109,7 @@ export type SendMessageRequest = {
     clientMessageId: string;
     body?: string;
     replyToMessageId?: string;
+    attachmentId?: string;
 };
 
 export type CreateGroupRequest = {
@@ -543,6 +553,24 @@ export type ForgotPasswordResponses = {
 
 export type ForgotPasswordResponse = ForgotPasswordResponses[keyof ForgotPasswordResponses];
 
+export type UploadData = {
+    body?: {
+        file: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/attachments';
+};
+
+export type UploadResponses = {
+    /**
+     * Created
+     */
+    201: AttachmentResponse;
+};
+
+export type UploadResponse = UploadResponses[keyof UploadResponses];
+
 export type GetData = {
     body?: never;
     path: {
@@ -650,6 +678,27 @@ export type MeResponses = {
 };
 
 export type MeResponse = MeResponses[keyof MeResponses];
+
+export type FileData = {
+    body?: never;
+    path: {
+        key: string;
+    };
+    query?: {
+        expires?: number;
+        signature?: string;
+    };
+    url: '/api/v1/files/{key}';
+};
+
+export type FileResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type FileResponse = FileResponses[keyof FileResponses];
 
 export type ListData = {
     body?: never;

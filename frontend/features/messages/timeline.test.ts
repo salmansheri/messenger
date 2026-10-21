@@ -171,3 +171,39 @@ describe("replies in the timeline", () => {
     expect(messages.map((m) => m.replyTo)).toEqual([quote, undefined, undefined, quote]);
   });
 });
+
+describe("images in the timeline", () => {
+  const picture = { id: "a1", width: 64, height: 48, url: "https://files/full", thumbnailUrl: "https://files/thumb" };
+
+  it("shows the thumbnail the server made, with its size so the space is reserved, and an empty text for an image sent alone", () => {
+    const items = build({ confirmed: [{ ...msg(1, "a", "2026-03-10T10:00:00Z"), body: undefined, attachment: picture }] });
+
+    const message = items.find((item) => item.kind === "message");
+    expect(message).toMatchObject({ body: "", image: { src: "https://files/thumb", width: 64, height: 48 } });
+  });
+
+  it("keeps the caption beside the image", () => {
+    const items = build({ confirmed: [{ ...msg(1, "a", "2026-03-10T10:00:00Z", "Lunch"), attachment: picture }] });
+
+    expect(items.find((item) => item.kind === "message")).toMatchObject({ body: "Lunch", image: { src: "https://files/thumb" } });
+  });
+
+  it("shows no image for a deleted Message, and none for a plain one", () => {
+    const deleted = { ...msg(1, "a", "2026-03-10T10:00:00Z"), body: undefined, deletedAt: "2026-03-10T10:05:00Z", attachment: picture };
+    const plain = msg(2, "a", "2026-03-10T10:06:00Z");
+
+    const messages = build({ confirmed: [deleted, plain] }).filter((item) => item.kind === "message");
+    expect(messages.map((item) => item.kind === "message" && item.image)).toEqual([undefined, undefined]);
+  });
+
+  it("shows a Message still being sent with the preview chosen on this device", () => {
+    const sending: Pending = {
+      ...pending("p1", ""),
+      image: { file: new File(["x"], "a.png"), previewUrl: "blob:local", width: 10, height: 20 },
+    };
+
+    const item = build({ pending: [sending], myId: "me" }).find((entry) => entry.kind === "message");
+    expect(item).toMatchObject({ image: { src: "blob:local", width: 10, height: 20 }, body: "" });
+  });
+});
+

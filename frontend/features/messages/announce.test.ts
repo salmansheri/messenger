@@ -35,6 +35,15 @@ describe("unannounced", () => {
   });
 });
 
+describe("announcementOf an image", () => {
+  const attachment = { id: "a1", width: 4, height: 3, url: "u", thumbnailUrl: "t" };
+
+  it("says who sent an image, with the caption when there is one", () => {
+    expect(announcementOf({ ...msg(1, "grace", "Lunch today"), attachment }, "Grace Hopper")).toBe("Grace Hopper sent an image: Lunch today");
+    expect(announcementOf({ ...msg(1, "grace", ""), body: undefined, attachment }, "Grace Hopper")).toBe("Grace Hopper sent an image");
+  });
+});
+
 describe("announcementOf", () => {
   it("says who wrote it and what, on one line", () => {
     expect(announcementOf(msg(1, "grace", "Are you free\nat nine?"), "Grace Hopper")).toBe("Grace Hopper: Are you free at nine?");

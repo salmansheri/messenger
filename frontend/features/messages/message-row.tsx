@@ -13,7 +13,8 @@ import { QuoteBlock } from "./quote-block";
 import { quoteView } from "./quote";
 import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
-import { changeFailureMessage, sendFailureMessage } from "./wording";
+import { changeFailureMessage, sendFailureMessage, uploadFailureMessage } from "./wording";
+import { MessageImage } from "./message-image";
 
 type MessageItem = Extract<TimelineItem, { kind: "message" }>;
 
@@ -67,6 +68,9 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
             onJump={item.replyTo.messageId && loaded(item.replyTo.messageId) ? () => onJump(item.replyTo?.messageId ?? "") : undefined}
           />
         )}
+        {item.image && !item.deleted && (
+          <MessageImage image={item.image} label={`Image from ${sender} at ${formatClock(item.createdAt)}`} />
+        )}
         {editing && item.messageId && !item.deleted ? (
           <MessageEditor
             conversationId={conversationId}
@@ -77,7 +81,7 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
         ) : item.deleted ? (
           <p className="text-ink-muted italic">This Message was deleted.</p>
         ) : (
-          <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
+          item.body && <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{item.body}</p>
         )}
         {item.messageId && !pending && !item.deleted && (
           <ReactionChips
@@ -92,7 +96,12 @@ export function MessageRow({ item, conversationId, myId, group, names, frontier,
         {pending?.status === "failed" && (
           <p className="flex flex-wrap items-center gap-x-3 text-sm">
             <span className="text-accent">
-              Not sent. {pending.error ? sendFailureMessage(toProblem(pending.error), Boolean(pending.replyTo)) : ""}
+              Not sent.{" "}
+              {pending.error
+                ? pending.failedAt === "upload"
+                  ? uploadFailureMessage(toProblem(pending.error))
+                  : sendFailureMessage(toProblem(pending.error), Boolean(pending.replyTo), Boolean(pending.image))
+                : ""}
             </span>
             <Button variant="quiet" onClick={() => onRetry(pending.clientMessageId)}>
               Retry

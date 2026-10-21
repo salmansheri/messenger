@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, create, deleteForEveryone, edit, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unreact, unregister, updateSettings, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateSettingsData, UpdateSettingsResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeParticipant, rename, report, resendVerification, resetPassword, send, signUp, startDirect, unreact, unregister, updateSettings, upload, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
 
 export const unreactMutation = (options?: Partial<Options<UnreactData>>): UseMutationOptions<UnreactResponse, DefaultError, Options<UnreactData>> => {
     const mutationOptions: UseMutationOptions<UnreactResponse, DefaultError, Options<UnreactData>> = {
@@ -390,6 +390,20 @@ export const forgotPasswordMutation = (options?: Partial<Options<ForgotPasswordD
     return mutationOptions;
 };
 
+export const uploadMutation = (options?: Partial<Options<UploadData>>): UseMutationOptions<UploadResponse, DefaultError, Options<UploadData>> => {
+    const mutationOptions: UseMutationOptions<UploadResponse, DefaultError, Options<UploadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await upload({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getQueryKey = (options: Options<GetData>) => createQueryKey('get', options);
 
 export const getOptions = (options: Options<GetData>) => queryOptions<GetResponse, DefaultError, GetResponse, ReturnType<typeof getQueryKey>>({
@@ -474,6 +488,21 @@ export const meOptions = (options?: Options<MeData>) => queryOptions<MeResponse,
         return data;
     },
     queryKey: meQueryKey(options)
+});
+
+export const fileQueryKey = (options: Options<FileData>) => createQueryKey('file', options);
+
+export const fileOptions = (options: Options<FileData>) => queryOptions<FileResponse, DefaultError, FileResponse, ReturnType<typeof fileQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await file({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: fileQueryKey(options)
 });
 
 export const listQueryKey = (options?: Options<ListData>) => createQueryKey('list', options);
