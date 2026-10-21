@@ -38,7 +38,8 @@ class JwtConfigTests {
 				new AppProperties.Presence(Duration.ofSeconds(30), Duration.ofSeconds(5), Duration.ofSeconds(2)),
 				new AppProperties.Push(10, Duration.ofSeconds(30), 5),
 				new AppProperties.Storage("data/uploads", "http://localhost:8080", "secret", Duration.ofMinutes(15)),
-				new AppProperties.Uploads(20, Duration.ofHours(24), Duration.ofMinutes(10)), new AppProperties.Profile(5, 10));
+				new AppProperties.Uploads(20, Duration.ofHours(24), Duration.ofMinutes(10)), new AppProperties.Profile(5, 10),
+				new AppProperties.Search(30));
 	}
 
 	private static String tokenFor(JwtConfig config, AppProperties props, com.nimbusds.jose.jwk.ECKey key,

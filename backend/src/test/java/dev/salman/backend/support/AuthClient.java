@@ -262,6 +262,17 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Searches one Conversation; {@code before} (a result's message id) asks for the next page, or is null. */
+	public ResultActions searchConversation(String accessToken, String conversationId, String q, String before)
+			throws Exception {
+		var request = MockMvcRequestBuilders.get("/api/v1/conversations/{id}/messages/search", conversationId)
+				.param("q", q).header("Authorization", "Bearer " + accessToken);
+		if (before != null) {
+			request.param("before", before);
+		}
+		return mvc.perform(request);
+	}
+
 	public ResultActions historyWithoutToken(String conversationId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}/messages", conversationId));
 	}

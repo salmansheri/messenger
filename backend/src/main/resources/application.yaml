@@ -45,6 +45,8 @@ app:
   profile:
     max-name-changes-per-hour: 5
     max-avatar-changes-per-hour: 10
+  search:
+    max-per-minute: 30
   uploads:
     max-per-minute: 20
     unattached-lifetime: 24h

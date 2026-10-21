@@ -1,5 +1,6 @@
 package dev.salman.backend.repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -53,5 +54,46 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 			where c.id in :conversationIds and m.seq = c.lastSeq
 			""")
 	List<Message> findLatestIn(Collection<UUID> conversationIds);
+
+	/**
+	 * Search in one Conversation (migration V16, configuration {@code message_search}): Messages with text after
+	 * {@code minSeq} (the viewer's join point) that are not deleted, not hidden by the viewer and match the query,
+	 * newest first, older than the cursor {@code (beforeAt, beforeId)}. The query is {@code message_search_query} of
+	 * {@code words} and {@code prefix}; one with nothing to look for but exclusions ({@code -word} alone, whose
+	 * {@code querytree} is {@code T}) finds nothing rather than everything else.
+	 */
+	@Query(value = """
+			select m.* from message m
+			cross join message_search_query(:words, :prefix) q
+			where m.conversation_id = :conversationId and m.seq > :minSeq and m.deleted_at is null
+			and m.body is not null and querytree(q) <> 'T' and m.search_vector @@ q
+			and not exists (select 1 from message_hidden h where h.message_id = m.id and h.user_id = :viewerId)
+			and (m.created_at, m.id) < (:beforeAt, :beforeId)
+			order by m.created_at desc, m.id desc
+			limit :limit
+			""", nativeQuery = true)
+	List<Message> searchConversation(UUID conversationId, UUID viewerId, long minSeq, String words, String prefix,
+			Instant beforeAt, UUID beforeId, int limit);
+
+	/** A found Message's snippet: its text around the matches, marked as {@code options} say. */
+	interface Snippet {
+
+		UUID getId();
+
+		String getSnippet();
+
+	}
+
+	/**
+	 * The snippets of the given Messages for the same query as the search ({@code ts_headline}), with the characters
+	 * in {@code markers} taken out of the text first so only the server's marks are in it.
+	 */
+	@Query(value = """
+			select m.id as id,
+			       ts_headline('message_search', translate(m.body, :markers, ''), q, :options) as snippet
+			from message m cross join message_search_query(:words, :prefix) q
+			where m.id in (:ids) and m.body is not null
+			""", nativeQuery = true)
+	List<Snippet> snippets(Collection<UUID> ids, String words, String prefix, String markers, String options);
 
 }
