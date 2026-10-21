@@ -3,6 +3,7 @@ import type { ProfileChanges, RealtimeEvent } from "@/lib/realtime/events";
 import { applyReaction } from "@/features/messages/reactions";
 import { clearReactionsOf, latestSeq, replaceMessage, updateReactions, withMessage, type History } from "@/features/messages/history";
 import { mergeVersion } from "@/features/messages/versions";
+import { isDetached } from "@/features/messages/window";
 import { orderConversations, withSettings } from "@/features/conversations/settings";
 
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
@@ -104,7 +105,9 @@ function applyUpdateToList(
 
 /**
  * How an event changes a Conversation's loaded history. `catchUp` says a Message skipped ahead of what is loaded, so
- * the ones in between should be fetched.
+ * the ones in between should be fetched. A detached history (a window further back, see `window.ts`) only takes
+ * changes to Messages it has loaded: a new one would land after a gap, and it is fetched when the person pages forward
+ * or jumps to the latest.
  */
 export function applyToHistory(
   history: History | undefined,
@@ -123,11 +126,13 @@ export function applyToHistory(
       const merged = mergeVersion(known, event.message);
       return { history: merged === known ? history : replaceMessage(history, merged), catchUp: false };
     }
+    if (isDetached(history)) return { history, catchUp: false };
     // Not loaded: older than anything shown (nothing to do), or newer than the newest (the new Message was missed).
     if (seq < have) return { history, catchUp: false };
     return { history: withMessage(history, event.message), catchUp: have > 0 && seq > have + 1 };
   }
   if (history.pages.some((page) => page.messages?.some((known) => known.seq === seq))) return { history, catchUp: false };
+  if (isDetached(history)) return { history, catchUp: false };
   return { history: withMessage(history, event.message), catchUp: have > 0 && seq > have + 1 };
 }
 

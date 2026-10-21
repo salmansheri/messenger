@@ -12,6 +12,7 @@ import { parseEvent, type ProfileChanges, type RealtimeEvent } from "@/lib/realt
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey, reactionTimesKey } from "@/features/messages/queries";
+import { isDetached } from "@/features/messages/window";
 import { acceptReaction } from "@/features/messages/reactions";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
 import { mergeFrontier, type Frontier } from "@/features/receipts/status";
@@ -144,6 +145,10 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
   }
   if (event.type !== "message.created" && event.type !== "message.updated") return;
   const key = messagesKey(event.conversationId);
+  // A detached window takes no new Message (`applyToHistory`), so one arriving while a page of it is fetched need not
+  // restart that request: in a busy Group it would never finish. The view catches up once the window attaches.
+  const loaded = queryClient.getQueryData<History>(key);
+  if (event.type === "message.created" && loaded && isDetached(loaded)) return;
   if (fetching(queryClient, key)) {
     void queryClient.invalidateQueries({ queryKey: key });
     return;

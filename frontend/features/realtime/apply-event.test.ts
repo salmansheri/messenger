@@ -156,6 +156,50 @@ const updated = (message: MessageResponse, conversationId = "c1"): RealtimeEvent
   message,
 });
 
+describe("applyToHistory while detached (a window opened at an older Message)", () => {
+  const around = { path: { conversationId: "c1" }, query: { aroundSeq: 20 } };
+  const window = (hasNewer: boolean): History => ({
+    pages: [{ messages: [msg(19), msg(20), msg(21)], hasMore: true, hasOlder: true, hasNewer }],
+    pageParams: [around],
+  });
+
+  it("does not put a live Message after the window, where it would sit after a gap", () => {
+    const detached = window(true);
+    const result = applyToHistory(detached, created(msg(80)));
+    expect(result.history).toBe(detached);
+    expect(result.catchUp).toBe(false);
+  });
+
+  it("does not take an edit of a Message it has not loaded, older or newer", () => {
+    const detached = window(true);
+    expect(applyToHistory(detached, updated({ ...msg(80), body: "edited", editedAt: "2026-03-10T10:05:00Z" })).history).toBe(detached);
+    expect(applyToHistory(detached, updated({ ...msg(5), body: "edited", editedAt: "2026-03-10T10:05:00Z" })).history).toBe(detached);
+  });
+
+  it("still shows an edit, a deletion or a reaction on a Message in the window", () => {
+    const detached = window(true);
+    const edited = applyToHistory(detached, updated({ ...msg(20), body: "edited", editedAt: "2026-03-10T10:05:00Z" }));
+    expect(edited.history?.pages[0].messages?.[1].body).toBe("edited");
+    const reacted = applyToHistory(detached, {
+      type: "reaction.changed",
+      conversationId: "c1",
+      messageId: "id21",
+      seq: 21,
+      userId: "grace",
+      emoji: "👍",
+      at: "2026-03-10T10:06:00Z",
+    });
+    expect(reacted.history?.pages[0].messages?.[2].reactions).toEqual([{ emoji: "👍", userIds: ["grace"] }]);
+  });
+
+  it("takes live Messages again once the window reaches the newest one", () => {
+    const attached = window(false);
+    const result = applyToHistory(attached, created(msg(22)));
+    expect(result.history?.pages[0].messages?.map((m) => m.seq)).toEqual([19, 20, 21, 22]);
+    expect(applyToHistory(attached, created(msg(25))).catchUp).toBe(true);
+  });
+});
+
 describe("applyToList for an edited or deleted Message", () => {
   const list = [conversation("c1", { lastMessage: { ...msg(3, ME), status: "DELIVERED" }, unreadCount: 2, updatedAt: "2026-03-10T09:00:00Z" })];
 

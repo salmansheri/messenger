@@ -7,21 +7,24 @@ import { useReceiptReporter } from "@/features/receipts/receipts-provider";
  * Reports what has been read: the newest Message from someone else that has been on screen (`data-seq` rows inside
  * `scroller`; half of a row, or half the screen for a very long one, counts as seen). It is reported only while this
  * tab is the one in use (visible and focused), and again when the tab or window comes back, so what was on screen
- * while it was away counts then. `rows` changes whenever the rows do, so new ones are watched.
+ * while it was away counts then. `rows` changes whenever the rows do, so new ones are watched. Nothing is noted or
+ * reported while not `enabled` (`readingReportable`: a window opened further back, where a read position would mark
+ * everything before it as read, including unread Messages before the window that were never shown); once enabled
+ * again, what is on screen then counts.
  */
-export function useReportReading(scroller: RefObject<HTMLElement | null>, conversationId: string, rows: unknown) {
+export function useReportReading(scroller: RefObject<HTMLElement | null>, conversationId: string, rows: unknown, enabled = true) {
   const reporter = useReceiptReporter();
   const mostSeen = useRef(0);
 
   const reportSeen = useCallback(() => {
-    if (mostSeen.current > 0 && document.visibilityState === "visible" && document.hasFocus()) {
+    if (enabled && mostSeen.current > 0 && document.visibilityState === "visible" && document.hasFocus()) {
       reporter.read(conversationId, mostSeen.current);
     }
-  }, [reporter, conversationId]);
+  }, [reporter, conversationId, enabled]);
 
   useEffect(() => {
     const element = scroller.current;
-    if (!element) return;
+    if (!element || !enabled) return;
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -36,7 +39,7 @@ export function useReportReading(scroller: RefObject<HTMLElement | null>, conver
     );
     element.querySelectorAll("[data-seq]").forEach((row) => observer.observe(row));
     return () => observer.disconnect();
-  }, [scroller, rows, reportSeen]);
+  }, [scroller, rows, reportSeen, enabled]);
 
   useEffect(() => {
     window.addEventListener("focus", reportSeen);

@@ -57,6 +57,50 @@ function withList(initial: ConversationResponse[]) {
   return { client, answers };
 }
 
+describe("handleEvent while a detached window is open", () => {
+  it("keeps live Messages out of the window and asks for no catch-up, while the list still learns of them", () => {
+    const { client } = withList([conversation(200, 0)]);
+    const window: History = {
+      pages: [{ messages: [19, 20, 21].map((seq) => ({ id: `m${seq}`, conversationId: "c1", seq, senderId: "grace", body: `m${seq}` })), hasMore: true, hasOlder: true, hasNewer: true }],
+      pageParams: [{ path: { conversationId: "c1" }, query: { aroundSeq: 20 } }],
+    };
+    client.setQueryData(messagesKey("c1"), window);
+
+    handleEvent(client, newMessage(201), createTypingTracker());
+
+    expect(client.getQueryData(messagesKey("c1"))).toBe(window);
+    expect(client.isFetching(), "no catch-up was started").toBe(0);
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].lastMessage?.seq).toBe(201);
+  });
+
+  it("does not restart a page being fetched for the window when a new Message arrives (it would starve paging)", async () => {
+    const { client } = withList([conversation(200, 0)]);
+    const window: History = {
+      pages: [{ messages: [{ id: "m20", conversationId: "c1", seq: 20, senderId: "grace", body: "m20" }], hasMore: true, hasOlder: true, hasNewer: true }],
+      pageParams: [{ path: { conversationId: "c1" }, query: { aroundSeq: 20 } }],
+    };
+    client.setQueryData(messagesKey("c1"), window);
+    let fetches = 0;
+    const observer = new QueryObserver(client, {
+      queryKey: messagesKey("c1"),
+      staleTime: Infinity,
+      queryFn: () => {
+        fetches += 1;
+        return deferred<History>().promise;
+      },
+    });
+    stops.push(observer.subscribe(() => {}));
+    void observer.refetch(); // a page is being fetched
+    await Promise.resolve();
+    expect(fetches).toBe(1);
+
+    handleEvent(client, newMessage(201), createTypingTracker());
+    await Promise.resolve();
+
+    expect(fetches, "the fetch under way was left alone").toBe(1);
+  });
+});
+
 describe("handleEvent", () => {
   it("puts a new Message into the list that is on screen", () => {
     const { client, answers } = withList([conversation(2, 0)]);

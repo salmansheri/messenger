@@ -36,10 +36,12 @@ type Props = {
   onJump: (messageId: string) => void;
   /** Fetches fresh image links when one has run out. */
   onImageExpired?: () => Promise<void>;
+  /** Marked for a moment: the Message a search result opened the Conversation at. */
+  highlighted?: boolean;
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, myId, group, names, avatars, frontier, onRetry, loaded, onReply, onJump, onImageExpired }: Props) {
+export function MessageRow({ item, conversationId, myId, group, names, avatars, frontier, onRetry, loaded, onReply, onJump, onImageExpired, highlighted = false }: Props) {
   const { mine, pending } = item;
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const senderId = mine ? myId : item.senderId;
@@ -56,8 +58,10 @@ export function MessageRow({ item, conversationId, myId, group, names, avatars, 
     <li
       data-seq={!mine && item.seq !== undefined ? item.seq : undefined}
       data-message-id={item.messageId}
+      data-message-seq={item.seq}
+      data-highlighted={highlighted || undefined}
       tabIndex={item.messageId ? -1 : undefined}
-      className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"}`}
+      className={`grid grid-cols-[3rem_1fr] gap-x-3 px-4 transition-colors duration-1000 sm:grid-cols-[3.5rem_1fr] sm:px-8 ${item.startsRun ? "pt-3" : "pt-0.5"} ${highlighted ? "bg-band" : ""}`}
     >
       <div className="flex flex-col items-start gap-0.5 pt-1">
         <time dateTime={item.createdAt} className="font-mono text-xs text-ink-muted">

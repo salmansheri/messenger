@@ -197,6 +197,22 @@ export type PresenceView = {
 export type MessagePage = {
     messages?: Array<MessageResponse>;
     hasMore?: boolean;
+    hasOlder?: boolean;
+    hasNewer?: boolean;
+};
+
+export type SearchPage = {
+    results?: Array<SearchResult>;
+    hasMore?: boolean;
+};
+
+export type SearchResult = {
+    messageId?: string;
+    conversationId?: string;
+    seq?: number;
+    senderId?: string;
+    createdAt?: string;
+    snippet?: string;
 };
 
 export type RemoveAvatarData = {
@@ -366,6 +382,7 @@ export type HistoryData = {
     query?: {
         beforeSeq?: number;
         afterSeq?: number;
+        aroundSeq?: number;
         limit?: number;
     };
     url: '/api/v1/conversations/{conversationId}/messages';
@@ -789,6 +806,27 @@ export type PresenceResponses = {
 };
 
 export type PresenceResponse = PresenceResponses[keyof PresenceResponses];
+
+export type SearchConversationData = {
+    body?: never;
+    path: {
+        conversationId: string;
+    };
+    query: {
+        q: string;
+        before?: string;
+    };
+    url: '/api/v1/conversations/{conversationId}/messages/search';
+};
+
+export type SearchConversationResponses = {
+    /**
+     * OK
+     */
+    200: SearchPage;
+};
+
+export type SearchConversationResponse = SearchConversationResponses[keyof SearchConversationResponses];
 
 export type UnregisterData = {
     body?: never;

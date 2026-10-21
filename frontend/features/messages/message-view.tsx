@@ -11,41 +11,57 @@ import type { Frontier } from "@/features/receipts/status";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
-import { refreshHistory } from "./catch-up";
+import { catchUpHistory, refreshHistory } from "./catch-up";
+import type { History } from "./history";
 import { Composer } from "./composer";
 import { createOutbox } from "./outbox";
-import { addMessageToHistory, useMessageHistory } from "./queries";
+import { addMessageToHistory, messagesKey, useMessageHistory } from "./queries";
 import { useAnnouncements } from "./use-announcements";
 import { MessageRow } from "./message-row";
 import { quoteView, replyDraft, replyTarget } from "./quote";
 import { useReportReading } from "./use-report-reading";
 import { buildTimeline, confirmedMessages, firstUnreadSeq, type TimelineItem } from "./timeline";
+import { firstParam, isDetached, readingReportable } from "./window";
 
 /** Within this many pixels of the bottom, the view follows new Messages. */
 const NEAR_BOTTOM_PX = 80;
 /** Further than this from the bottom, "Jump to latest" shows. */
 const AWAY_FROM_BOTTOM_PX = 240;
-/** Closer than this to the top, older Messages are asked for. */
-const NEAR_TOP_PX = 120;
+/** Closer than this to the top, older Messages are asked for (and, in a detached window, to the bottom, newer ones). */
+const NEAR_END_PX = 120;
 
 const distanceFromBottom = (element: HTMLElement) => element.scrollHeight - element.scrollTop - element.clientHeight;
 
 /** How many of the newest Messages to ask for first: the usual page, or enough to reach the first unread one. */
 const firstPageFor = (unread: number) => Math.min(100, Math.max(50, unread + 10));
 
-type Props = { conversation: ConversationResponse; myId: string | undefined };
+/** How long a Message opened from a search result stays marked. */
+const HIGHLIGHT_MS = 2500;
+
+type Props = {
+  conversation: ConversationResponse;
+  myId: string | undefined;
+  /** The Sequence number of a Message to open at (a search result), from the address; the latest when absent. */
+  target?: number;
+  /** Goes back to the latest: takes `target` out of the address. */
+  onLeaveTarget?: () => void;
+};
 
 /**
  * One Conversation's Messages and the box to write in. Newest at the bottom; it opens on the first unread Message or,
  * when caught up, the bottom; older Messages load as the person scrolls up without moving what they are reading; a
- * control to jump to the latest shows when they are away from the bottom. Used with `key={conversation.id}`.
+ * control to jump to the latest shows when they are away from the bottom. With a `target` it opens instead on that
+ * Message, centred, focused and briefly marked, in a window that may be detached from the latest (`window.ts`): it then
+ * pages forward too, takes no live Messages, reports no reading, and "Jump to latest" goes back to the newest Messages.
+ * Used with `key={conversation.id}`.
  */
-export function MessageView({ conversation, myId }: Props) {
+export function MessageView({ conversation, myId, target, onLeaveTarget }: Props) {
   const conversationId = conversation.id ?? "";
   const queryClient = useQueryClient();
   // Taken once when the Conversation opens: sending or reading changes the list's numbers, not where this view started.
   const [openedAt] = useState(() => ({ firstUnread: firstUnreadSeq(conversation), unread: conversation.unreadCount ?? 0 }));
-  const history = useMessageHistory(conversationId, firstPageFor(openedAt.unread));
+  const history = useMessageHistory(conversationId, firstPageFor(openedAt.unread), target);
+  const detached = history.data !== undefined && isDetached(history.data);
 
   const frontier = useFrontier(conversationId);
 
@@ -73,12 +89,13 @@ export function MessageView({ conversation, myId }: Props) {
     () =>
       buildTimeline({
         confirmed,
-        pending,
+        // A detached window ends before the latest, so unsent Messages (which belong after it) wait until it attaches.
+        pending: detached ? [] : pending,
         myId,
         firstUnreadSeq: openedAt.firstUnread,
         now: new Date(),
       }),
-    [confirmed, pending, myId, openedAt.firstUnread],
+    [confirmed, pending, detached, myId, openedAt.firstUnread],
   );
 
   const names = useMemo(
@@ -90,7 +107,7 @@ export function MessageView({ conversation, myId }: Props) {
     [conversation.participants],
   );
 
-  const spoken = useAnnouncements(confirmed, history.data !== undefined, myId, (id) => names.get(id) ?? "Someone");
+  const spoken = useAnnouncements(confirmed, history.data !== undefined, myId, (id) => names.get(id) ?? "Someone", detached);
 
   // Replying: the Message the person chose to answer, shown above the box. It is dropped if that Message is deleted
   // meanwhile (the server would refuse the reply), and sent along with the next Message otherwise.
@@ -119,7 +136,61 @@ export function MessageView({ conversation, myId }: Props) {
   const positioned = useRef(false);
   const keepAtBottom = useRef(true);
   const anchor = useRef<{ height: number; firstKey: string | undefined } | null>(null);
+  /** The next positioning goes to the bottom: the person left a window for the latest. */
+  const landAtLatest = useRef(false);
   const [away, setAway] = useState(false);
+  const [highlighted, setHighlighted] = useState<string>();
+
+  // A different target in the address (another search result, or none: back to the latest) starts the history again
+  // from it. Its first page is fetched here and put in place in one step, so what is on screen (and the box being typed
+  // in) stays until the new Messages are there; only if that fails is the query reset, showing its own loading and
+  // error states. A history that already holds the newest Messages just goes to the bottom.
+  const shownTarget = useRef(target);
+  useEffect(() => {
+    if (shownTarget.current === target) return;
+    shownTarget.current = target;
+    const key = messagesKey(conversationId);
+    const current = queryClient.getQueryData<History>(key);
+    if (target === undefined && current && !isDetached(current)) {
+      keepAtBottom.current = true;
+      scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+      composer.current?.focus();
+      return;
+    }
+    const param = firstParam(conversationId, target, firstPageFor(openedAt.unread));
+    let active = true;
+    void (async () => {
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      try {
+        const { data } = await sdk.history_(param);
+        if (!active) return;
+        positioned.current = false;
+        anchor.current = null;
+        landAtLatest.current = target === undefined;
+        queryClient.setQueryData<History>(key, { pages: [data], pageParams: [param] });
+      } catch {
+        if (active) void queryClient.resetQueries({ queryKey: key, exact: true });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [target, queryClient, conversationId, openedAt.unread]);
+
+  // Messages that arrived while a window was detached are fetched once it reaches the newest (a page forward, or the
+  // newest page put in place above): one stored just after that page was read would otherwise be missed.
+  const wasDetached = useRef(detached);
+  useEffect(() => {
+    if (wasDetached.current && !detached) void catchUpHistory(queryClient, conversationId);
+    wasDetached.current = detached;
+  }, [detached, queryClient, conversationId]);
+
+  // The mark on the Message opened at fades after a moment.
+  useEffect(() => {
+    if (!highlighted) return;
+    const timer = setTimeout(() => setHighlighted(undefined), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
 
   /** Goes to a loaded Message (a quote's button), leaving the view where it lands rather than snapping back to the bottom. */
   const jumpTo = useCallback((messageId: string) => {
@@ -142,7 +213,25 @@ export function MessageView({ conversation, myId }: Props) {
   useLayoutEffect(() => {
     const element = scroller.current;
     if (!element || firstKey === undefined) return;
-    if (!positioned.current) {
+    if (!positioned.current && target !== undefined) {
+      positioned.current = true;
+      // The Message itself, or where it would be when it is not shown (hidden, or from before the person joined).
+      const rows = [...element.querySelectorAll<HTMLElement>("[data-message-seq]")];
+      const landing = rows.find((row) => Number(row.dataset.messageSeq) >= target) ?? rows.at(-1);
+      landing?.scrollIntoView({ block: "center" });
+      landing?.focus({ preventScroll: true });
+      if (landing && Number(landing.dataset.messageSeq) === target) setHighlighted(landing.dataset.messageId);
+      keepAtBottom.current = false;
+      setAway(distanceFromBottom(element) > AWAY_FROM_BOTTOM_PX);
+    } else if (!positioned.current && landAtLatest.current) {
+      // Back from a window: the latest, where the person can go on (or where what they just sent is).
+      positioned.current = true;
+      landAtLatest.current = false;
+      element.scrollTop = element.scrollHeight;
+      keepAtBottom.current = true;
+      setAway(false);
+      composer.current?.focus();
+    } else if (!positioned.current) {
       positioned.current = true;
       const unread = element.querySelector("[data-unread-mark]");
       if (unread) unread.scrollIntoView({ block: "start" });
@@ -157,12 +246,22 @@ export function MessageView({ conversation, myId }: Props) {
     } else if (keepAtBottom.current) {
       element.scrollTop = element.scrollHeight;
     }
-  }, [items, firstKey, openedAt.firstUnread]);
+  }, [items, firstKey, openedAt.firstUnread, target]);
 
-  useReportReading(scroller, conversationId, items);
+  useReportReading(
+    scroller,
+    conversationId,
+    items,
+    readingReportable({ detached, target, firstUnread: openedAt.firstUnread, oldestLoaded: confirmed[0]?.seq }),
+  );
 
-  const { fetchNextPage } = history;
-  const olderAvailable = history.hasNextPage && !history.isFetchingNextPage;
+  // One request at a time: a page asked for in one direction would otherwise cancel one under way in the other.
+  const { fetchNextPage, fetchPreviousPage } = history;
+  const olderAvailable = history.hasNextPage && !history.isFetching;
+  const newerAvailable = detached && history.hasPreviousPage && !history.isFetching;
+
+  /** Asks for the next page of newer Messages; they are added below, so what is being read does not move. */
+  const loadNewer = useCallback(() => void fetchPreviousPage(), [fetchPreviousPage]);
 
   /** Asks for the next page of older Messages, remembering the height so the reading position can be kept. */
   const loadOlder = useCallback(() => {
@@ -177,14 +276,23 @@ export function MessageView({ conversation, myId }: Props) {
   function scrolled() {
     const element = scroller.current;
     if (!element) return;
-    keepAtBottom.current = distanceFromBottom(element) < NEAR_BOTTOM_PX;
+    // A detached window never follows the bottom: what is below it is more history, not the latest.
+    keepAtBottom.current = !detached && distanceFromBottom(element) < NEAR_BOTTOM_PX;
     setAway(distanceFromBottom(element) > AWAY_FROM_BOTTOM_PX);
-    if (element.scrollTop < NEAR_TOP_PX && olderAvailable) loadOlder();
+    if (element.scrollTop < NEAR_END_PX && olderAvailable) loadOlder();
+    if (distanceFromBottom(element) < NEAR_END_PX && newerAvailable) loadNewer();
   }
+
+  /** Whether going to the latest means leaving a window: the newest Messages are not loaded, or the address opens at one. */
+  const inWindow = detached || target !== undefined;
 
   function jumpToLatest() {
     const element = scroller.current;
     if (!element) return;
+    if (inWindow) {
+      onLeaveTarget?.(); // the address changes, and the effect above goes to the latest
+      return;
+    }
     element.scrollTo({ top: element.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }
 
@@ -193,6 +301,12 @@ export function MessageView({ conversation, myId }: Props) {
     const element = scroller.current;
     if (element && olderAvailable && element.scrollHeight <= element.clientHeight) loadOlder();
   }, [olderAvailable, loadOlder, items]);
+
+  // The same at the bottom of a detached window that fits on the screen.
+  useEffect(() => {
+    const element = scroller.current;
+    if (element && newerAvailable && element.scrollHeight <= element.clientHeight) loadNewer();
+  }, [newerAvailable, loadNewer, items]);
 
   // Only a failed first load replaces the view; a failed later page leaves what is on screen (and what is unsent) alone.
   if (history.isError && !history.data) {
@@ -262,12 +376,20 @@ export function MessageView({ conversation, myId }: Props) {
                   onReply={startReply}
                   onJump={jumpTo}
                   onImageExpired={refreshLinks}
+                  highlighted={item.kind === "message" && item.messageId !== undefined && item.messageId === highlighted}
                 />
               ))}
             </ol>
           )}
+          {detached && (
+            <div className="flex h-12 items-center justify-center px-4 text-sm sm:px-8">
+              <Button variant="quiet" busy={history.isFetchingPreviousPage} onClick={() => newerAvailable && loadNewer()}>
+                {history.isFetchingPreviousPage ? "Loading later Messages…" : "Later Messages"}
+              </Button>
+            </div>
+          )}
         </div>
-        {away && (
+        {(away || detached) && (
           <Button onClick={jumpToLatest} className="absolute right-4 bottom-4 shadow-sm sm:right-8">
             Jump to latest
           </Button>
@@ -289,6 +411,8 @@ export function MessageView({ conversation, myId }: Props) {
         onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
         onSend={(body, image) => {
           keepAtBottom.current = true;
+          // A new Message goes after the latest, so a window further back gives way to the newest Messages first.
+          if (inWindow) onLeaveTarget?.();
           outbox.submit(body, reply, image);
           setChosen(undefined);
         }}
@@ -310,6 +434,7 @@ function Row({
   onReply,
   onJump,
   onImageExpired,
+  highlighted,
 }: {
   item: TimelineItem;
   conversationId: string;
@@ -323,6 +448,7 @@ function Row({
   onReply: (messageId: string) => void;
   onJump: (messageId: string) => void;
   onImageExpired: () => Promise<void>;
+  highlighted: boolean;
 }) {
   if (item.kind === "day") {
     return (
@@ -352,6 +478,7 @@ function Row({
       onReply={onReply}
       onJump={onJump}
       onImageExpired={onImageExpired}
+      highlighted={highlighted}
     />
   );
 }

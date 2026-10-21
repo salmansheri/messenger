@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, send, setAvatar, signUp, startDirect, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SendData, SendResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchConversation, send, setAvatar, signUp, startDirect, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
 
 export const removeAvatarMutation = (options?: Partial<Options<RemoveAvatarData>>): UseMutationOptions<RemoveAvatarResponse, DefaultError, Options<RemoveAvatarData>> => {
     const mutationOptions: UseMutationOptions<RemoveAvatarResponse, DefaultError, Options<RemoveAvatarData>> = {
@@ -576,6 +576,48 @@ export const presenceOptions = (options: Options<PresenceData>) => queryOptions<
     },
     queryKey: presenceQueryKey(options)
 });
+
+export const searchConversationQueryKey = (options: Options<SearchConversationData>) => createQueryKey('searchConversation', options);
+
+export const searchConversationOptions = (options: Options<SearchConversationData>) => queryOptions<SearchConversationResponse, DefaultError, SearchConversationResponse, ReturnType<typeof searchConversationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await searchConversation({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: searchConversationQueryKey(options)
+});
+
+export const searchConversationInfiniteQueryKey = (options: Options<SearchConversationData>): QueryKey<Options<SearchConversationData>> => createQueryKey('searchConversation', options, true);
+
+export const searchConversationInfiniteOptions = (options: Options<SearchConversationData>) => {
+    const opts = infiniteQueryOptions<SearchConversationResponse, DefaultError, InfiniteData<SearchConversationResponse>, QueryKey<Options<SearchConversationData>>, string | Pick<QueryKey<Options<SearchConversationData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<SearchConversationData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    before: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await searchConversation({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: searchConversationInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 export const unregisterMutation = (options?: Partial<Options<UnregisterData>>): UseMutationOptions<UnregisterResponse, DefaultError, Options<UnregisterData>> => {
     const mutationOptions: UseMutationOptions<UnregisterResponse, DefaultError, Options<UnregisterData>> = {

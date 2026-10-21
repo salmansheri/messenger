@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
+import { targetFrom } from "@/features/messages/window";
 import { GroupPanel } from "@/features/groups/group-panel";
 import { PresenceLine } from "@/features/presence/presence-line";
 import { ConversationMenu } from "./conversation-menu";
@@ -24,6 +25,9 @@ import { useConversationList } from "./queries";
  */
 export function ConversationPane() {
   const { id } = useParams<{ id: string }>();
+  // `?at=120` opens the Conversation at that Message (a search result) instead of the latest.
+  const target = targetFrom(useSearchParams().get("at"));
+  const router = useRouter();
   const list = useConversationList();
   // Which Conversation this screen has already shown, so one that then disappears from the list (the person was removed
   // or left) can be told apart from an address that never was theirs.
@@ -95,7 +99,13 @@ export function ConversationPane() {
       >
         {conversationTitle(conversation, list.myId)}
       </PaneHeader>
-      <MessageView key={conversation.id} conversation={conversation} myId={list.myId} />
+      <MessageView
+        key={conversation.id}
+        conversation={conversation}
+        myId={list.myId}
+        target={target}
+        onLeaveTarget={() => router.replace(`/app/c/${conversation.id}`, { scroll: false })}
+      />
     </>
   );
 }

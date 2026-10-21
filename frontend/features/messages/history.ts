@@ -2,6 +2,7 @@ import type { AttachmentResponse, MessagePage, MessageResponse, ReactionView } f
 import { linkLapsed } from "@/lib/signed-link";
 import { clearUser } from "./reactions";
 import { mergeVersion } from "./versions";
+import { isDetached } from "./window";
 
 /** What `useInfiniteQuery` keeps for a Conversation's history: newest page first. */
 export type History = { pages: MessagePage[]; pageParams: unknown[] };
@@ -13,9 +14,12 @@ export function latestSeq(history: History): number {
   return latest;
 }
 
-/** The history with the Message in its newest page (a Message already there is replaced, never doubled). */
+/**
+ * The history with the Message in its newest page (a Message already there is replaced, never doubled). A detached
+ * history is left as it is: its newest page is not the latest, so the Message would sit after a gap.
+ */
 export function withMessage(history: History, message: MessageResponse): History {
-  if (history.pages.length === 0) return history;
+  if (history.pages.length === 0 || isDetached(history)) return history;
   const [newest, ...older] = history.pages;
   const messages = [...(newest.messages ?? []).filter((known) => known.seq !== message.seq), message];
   return { ...history, pages: [{ ...newest, messages }, ...older] };
