@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -233,11 +234,15 @@ public class MessageServiceImpl implements MessageService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit) {
+	public MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, Long aroundSeq,
+			int limit) {
 		var reader = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(MessageServiceImpl::notFound); // first, so outsiders only see a 404
-		if (beforeSeq != null && afterSeq != null) {
-			throw new BadRequestException("Use either beforeSeq or afterSeq, not both.");
+		if (Stream.of(beforeSeq, afterSeq, aroundSeq).filter(Objects::nonNull).count() > 1) {
+			throw new BadRequestException("Use only one of beforeSeq, afterSeq and aroundSeq.");
+		}
+		if (aroundSeq != null) {
+			return window(reader, aroundSeq);
 		}
 		// One extra row tells whether more exist beyond this page. Nothing at or before the join point is visible.
 		var fetch = Limit.of(limit + 1);
@@ -255,15 +260,43 @@ public class MessageServiceImpl implements MessageService {
 		if (afterSeq == null) {
 			Collections.reverse(page); // fetched newest first, returned oldest first
 		}
+		return new MessagePage(responses(page, reader), hasMore);
+	}
+
+	/**
+	 * The window around {@code aroundSeq}: the {@link #WINDOW_SIDE} visible Messages before it, and the visible ones
+	 * from it on, one more so the Message itself counts with its {@link #WINDOW_SIDE} after. One extra row each way
+	 * tells whether more exist beyond that end. {@code hasMore} is {@code hasOlder}, the direction it means on the
+	 * newest page, so a client that pages back from a window reads it the same way.
+	 */
+	private MessagePage window(Participant reader, long aroundSeq) {
+		var conversationId = reader.getConversationId();
+		var callerId = reader.getUserId();
+		var before = messages.findVisibleBefore(conversationId, callerId, reader.readableAfter(0), aroundSeq,
+				Limit.of(WINDOW_SIDE + 1));
+		var from = messages.findVisibleAfter(conversationId, callerId, reader.readableAfter(aroundSeq - 1),
+				Limit.of(WINDOW_SIDE + 2));
+		var hasOlder = before.size() > WINDOW_SIDE;
+		var hasNewer = from.size() > WINDOW_SIDE + 1;
+		var page = new ArrayList<>(hasOlder ? before.subList(0, WINDOW_SIDE) : before);
+		Collections.reverse(page); // fetched newest first, returned oldest first
+		page.addAll(hasNewer ? from.subList(0, WINDOW_SIDE + 1) : from);
+		return new MessagePage(responses(page, reader), hasOlder, hasOlder, hasNewer);
+	}
+
+	/** A page of Messages as the reader sees them: status of their own, quotes, reactions and images, in few queries. */
+	private List<MessageResponse> responses(List<Message> page, Participant reader) {
+		var conversationId = reader.getConversationId();
+		var callerId = reader.getUserId();
 		var members = page.stream().anyMatch(m -> m.getSenderId().equals(callerId))
 				? participants.findByConversationId(conversationId) : List.<Participant>of();
 		var quoted = quotes.resolve(page, conversation -> reader);
 		var reacted = reactionLoader.of(page);
 		var pictured = attachmentLoader.of(page);
-		return new MessagePage(page.stream()
+		return page.stream()
 				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId()),
 						reacted.getOrDefault(m.getId(), List.of()), pictured.get(m.getId())))
-				.toList(), hasMore);
+				.toList();
 	}
 
 	private MessageStatus statusFor(Message message, UUID callerId) {

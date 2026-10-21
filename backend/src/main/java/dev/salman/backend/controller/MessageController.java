@@ -44,13 +44,17 @@ public class MessageController {
 		return ResponseEntity.status(sent.created() ? HttpStatus.CREATED : HttpStatus.OK).body(sent.message());
 	}
 
-	/** Page back with {@code beforeSeq}, catch up with {@code afterSeq}; see {@link MessageService#history}. */
+	/**
+	 * Page back with {@code beforeSeq}, catch up with {@code afterSeq}, open at a Message with {@code aroundSeq}; see
+	 * {@link MessageService#history}.
+	 */
 	@GetMapping
 	MessagePage history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId,
 			@RequestParam(required = false) @Min(1) Long beforeSeq,
 			@RequestParam(required = false) @Min(0) Long afterSeq,
+			@RequestParam(required = false) @Min(1) Long aroundSeq,
 			@RequestParam(defaultValue = "50") @Min(1) @Max(100) int limit) {
-		return messages.history(Principals.userId(jwt), conversationId, beforeSeq, afterSeq, limit);
+		return messages.history(Principals.userId(jwt), conversationId, beforeSeq, afterSeq, aroundSeq, limit);
 	}
 
 	/** Changes the text of the caller's own Message while the edit window is open. */

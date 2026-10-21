@@ -8,6 +8,10 @@ import dev.salman.backend.dto.SentMessage;
 
 public interface MessageService {
 
+	/** How many Messages a window opened with {@code aroundSeq} holds on each side of its Message. */
+	int WINDOW_SIDE = 25;
+
+
 	/**
 	 * Stores a Message from the caller and gives it the next Sequence number. Sending again with the same Client
 	 * message ID and text returns the stored Message instead of creating another. {@code replyToMessageId}, when given,
@@ -27,13 +31,21 @@ public interface MessageService {
 	 * <ul>
 	 * <li>neither cursor: the newest Messages;</li>
 	 * <li>{@code beforeSeq}: the newest Messages older than it (paging back); {@code hasMore} says older ones remain;</li>
-	 * <li>{@code afterSeq}: the oldest Messages newer than it (catching up); {@code hasMore} says newer ones remain.</li>
+	 * <li>{@code afterSeq}: the oldest Messages newer than it (catching up); {@code hasMore} says newer ones remain;</li>
+	 * <li>{@code aroundSeq}: a window opened at that Message (where a search result lands), {@value #WINDOW_SIDE}
+	 * Messages before it and it with {@value #WINDOW_SIDE} after (fewer where the Conversation ends; {@code limit} does
+	 * not apply). {@code hasOlder} and {@code hasNewer} say whether more exist beyond each end; {@code hasMore} is
+	 * {@code hasOlder}, as on the newest page. The Message itself need not be visible (hidden, before the join point,
+	 * or past the latest): the window is then the one around its place, and its slot goes to one more newer Message
+	 * (a hidden Message has 25 before it and 26 after).</li>
 	 * </ul>
+	 * Every form leaves out Messages the caller hid and those from before they joined, so a page is still full.
 	 *
-	 * @throws dev.salman.backend.exception.BadRequestException when both cursors are given
+	 * @throws dev.salman.backend.exception.BadRequestException when more than one cursor is given
 	 * @throws dev.salman.backend.exception.NotFoundException when the caller is not a Participant
 	 */
-	MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, int limit);
+	MessagePage history(UUID callerId, UUID conversationId, Long beforeSeq, Long afterSeq, Long aroundSeq, int limit);
+
 
 	/**
 	 * Changes the text of the caller's own Message, within the edit window. Its position, Sequence number and status
