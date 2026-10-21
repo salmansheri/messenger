@@ -29,6 +29,7 @@ import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
+import dev.salman.backend.service.AttachmentService;
 import dev.salman.backend.service.MessageService;
 import dev.salman.backend.service.MessageThrottle;
 import dev.salman.backend.service.PushService;
@@ -46,6 +47,7 @@ public class MessageServiceImpl implements MessageService {
 	private final QuoteResolver quotes;
 	private final AttachmentRepository attachments;
 	private final AttachmentLoader attachmentLoader;
+	private final AttachmentService attachmentService;
 	private final ReactionLoader reactionLoader;
 	private final RealtimeEvents events;
 	private final PushService push;
@@ -103,6 +105,7 @@ public class MessageServiceImpl implements MessageService {
 			// Locked, so two sends cannot both claim it. Someone else's, an unknown one and one already sent with a
 			// Message look the same.
 			attachments.findByIdForUpdate(attachmentId).filter(upload -> upload.getOwnerId().equals(callerId))
+					.filter(upload -> upload.getRemovedAt() == null)
 					.filter(upload -> !messages.existsByAttachmentId(upload.getId()))
 					.orElseThrow(() -> new NotFoundException("Attachment not found."));
 		}
@@ -188,7 +191,16 @@ public class MessageServiceImpl implements MessageService {
 		}
 		message.setBody(null);
 		message.setDeletedAt(now);
-		messages.save(message);
+		if (message.getAttachmentId() != null) {
+			// The Message first (it stops referring to the image), then the image: its files go after commit.
+			var image = message.getAttachmentId();
+			message.setAttachmentId(null);
+			messages.saveAndFlush(message);
+			attachmentService.release(image);
+		}
+		else {
+			messages.save(message);
+		}
 		events.messageUpdated(message);
 	}
 

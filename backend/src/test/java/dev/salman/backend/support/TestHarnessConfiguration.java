@@ -42,4 +42,10 @@ public class TestHarnessConfiguration {
 		return new RecordingNotificationSender();
 	}
 
+	@Bean
+	@Primary
+	FaultyObjectStorage faultyObjectStorage(dev.salman.backend.lib.LocalObjectStorage real) {
+		return new FaultyObjectStorage(real);
+	}
+
 }

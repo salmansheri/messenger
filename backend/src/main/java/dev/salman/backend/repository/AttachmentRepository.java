@@ -15,10 +15,14 @@ import jakarta.persistence.LockModeType;
 
 public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
 
-	/** Uploads older than {@code cutoff} that no Message refers to, oldest first. */
+	/**
+	 * Uploads to clean up, oldest first: those whose Message was deleted for everyone, and those older than
+	 * {@code cutoff} that no Message refers to.
+	 */
 	@Query("""
 			select a from Attachment a
-			where a.createdAt < :cutoff and not exists (select m.id from Message m where m.attachmentId = a.id)
+			where a.removedAt is not null
+			   or (a.createdAt < :cutoff and not exists (select m.id from Message m where m.attachmentId = a.id))
 			order by a.createdAt
 			""")
 	List<Attachment> findAbandoned(Instant cutoff, Limit limit);

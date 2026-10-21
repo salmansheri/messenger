@@ -6,10 +6,12 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.dto.AttachmentResponse;
 import dev.salman.backend.entity.Attachment;
+import dev.salman.backend.lib.AfterCommit;
 import dev.salman.backend.lib.Images;
 import dev.salman.backend.lib.ObjectStorage;
 import dev.salman.backend.repository.AttachmentRepository;
@@ -65,18 +67,34 @@ public class AttachmentServiceImpl implements AttachmentService {
 	}
 
 	@Override
+	@Transactional
+	public void release(UUID attachmentId) {
+		attachments.findById(attachmentId).filter(upload -> upload.getRemovedAt() == null).ifPresent(upload -> {
+			upload.setRemovedAt(clock.instant());
+			attachments.save(upload);
+			// Files only: this runs inside the finished transaction, so a row delete here might never be flushed; the
+			// sweep removes the row (and the files again, if these failed).
+			AfterCommit.run(() -> discardFiles(upload));
+		});
+	}
+
+	@Override
 	public void removeAbandoned() {
 		var cutoff = clock.instant().minus(props.uploads().unattachedLifetime());
 		for (var stale : attachments.findAbandoned(cutoff, Limit.of(SWEEP_BATCH))) {
-			try {
-				// Files first, then the row: if this fails half-way the row is still there and the next sweep retries.
-				storage.delete(stale.getStorageKey());
-				storage.delete(stale.getThumbnailKey());
-				attachments.delete(stale);
-			}
-			catch (RuntimeException e) {
-				log.warn("Could not remove abandoned upload {}", stale.getId(), e);
-			}
+			discard(stale);
+		}
+	}
+
+	/** Files first, then the row: if this fails half-way the row is still there and the next sweep retries. */
+	private void discard(Attachment upload) {
+		try {
+			storage.delete(upload.getStorageKey());
+			storage.delete(upload.getThumbnailKey());
+			attachments.delete(upload);
+		}
+		catch (RuntimeException e) {
+			log.warn("Could not remove the files of upload {}", upload.getId(), e);
 		}
 	}
 

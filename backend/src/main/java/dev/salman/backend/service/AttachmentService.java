@@ -17,6 +17,13 @@ public interface AttachmentService {
 	 */
 	AttachmentResponse upload(UUID ownerId, byte[] bytes);
 
+	/**
+	 * Gives up the image of a Message that is being deleted for everyone: from this transaction on it cannot be sent
+	 * again, and once the transaction commits its files are removed. If that fails the Message stays deleted and the
+	 * periodic sweep removes the files later.
+	 */
+	void release(UUID attachmentId);
+
 	/** Removes uploads nobody sent with a Message within the configured lifetime, and their stored files. */
 	void removeAbandoned();
 

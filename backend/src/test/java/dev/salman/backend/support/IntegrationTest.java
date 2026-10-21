@@ -42,6 +42,9 @@ public abstract class IntegrationTest {
 	protected FaultyPushPublisher pushQueue;
 
 	@Autowired
+	protected FaultyObjectStorage storage;
+
+	@Autowired
 	protected JsonMapper json;
 
 	@Autowired
@@ -53,6 +56,7 @@ public abstract class IntegrationTest {
 		emails.clearFailures();
 		pushes.clear();
 		pushQueue.reset();
+		storage.reset();
 	}
 
 	protected AuthClient auth() {

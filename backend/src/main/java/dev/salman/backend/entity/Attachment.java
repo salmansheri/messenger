@@ -46,4 +46,8 @@ public class Attachment {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
+	/** When its Message was deleted for everyone: from then on the image is gone, whatever is left on disk. */
+	@Column(name = "removed_at")
+	private Instant removedAt;
+
 }
