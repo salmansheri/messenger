@@ -35,6 +35,7 @@ public class ReactionServiceImpl implements ReactionService {
 	private final MessageHiddenRepository hidden;
 	private final ReactionRepository reactions;
 	private final ReactionLoader reactionLoader;
+	private final AttachmentLoader attachmentLoader;
 	private final QuoteResolver quotes;
 	private final RealtimeEvents events;
 	private final MessageThrottle throttle;
@@ -107,7 +108,8 @@ public class ReactionServiceImpl implements ReactionService {
 		var status = message.getSenderId().equals(callerId)
 				? MessageStatuses.of(message, callerId, participants.findByConversationId(message.getConversationId())) : null;
 		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()),
-				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()));
+				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()),
+				attachmentLoader.of(List.of(message)).get(message.getId()));
 	}
 
 	private static NotFoundException notFound() {

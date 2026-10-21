@@ -18,6 +18,8 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
 	Optional<Message> findByIdAndConversationId(UUID id, UUID conversationId);
 
+	boolean existsByAttachmentId(UUID attachmentId);
+
 	/**
 	 * The newest Messages after {@code minSeq} (the Participant's join point) that the viewer has not hidden, newest
 	 * first.

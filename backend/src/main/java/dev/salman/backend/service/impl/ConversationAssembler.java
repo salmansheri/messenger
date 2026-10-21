@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
+import dev.salman.backend.dto.AttachmentResponse;
 import dev.salman.backend.dto.ConversationResponse;
 import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.MessageResponse;
@@ -43,6 +44,7 @@ class ConversationAssembler {
 	private final Clock clock;
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
+	private final AttachmentLoader attachmentLoader;
 
 	List<ConversationResponse> assemble(List<Conversation> found, UUID viewerId) {
 		if (found.isEmpty()) {
@@ -55,11 +57,12 @@ class ConversationAssembler {
 		var latestByConversation = latestVisible(found, members, viewerId);
 		var now = clock.instant();
 		var reacted = reactionLoader.of(latestByConversation.values());
+		var pictured = attachmentLoader.of(latestByConversation.values());
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
-						latestByConversation.get(c.getId()), quoted, reacted, now))
+						latestByConversation.get(c.getId()), quoted, reacted, pictured, now))
 				.toList();
 	}
 
@@ -87,7 +90,8 @@ class ConversationAssembler {
 
 	private static ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
-			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted, Instant now) {
+			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
+			Map<UUID, AttachmentResponse> pictured, Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
@@ -102,7 +106,7 @@ class ConversationAssembler {
 				summaries,
 				latest == null ? null
 						: MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members), quoted.get(latest.getId()),
-								reacted.getOrDefault(latest.getId(), List.of())),
+								reacted.getOrDefault(latest.getId(), List.of()), pictured.get(latest.getId())),
 				unread, viewer.map(v -> ConversationSettings.of(v, now)).orElse(new ConversationSettings(false, null, false, false)),
 				conversation.getCreatedAt(), conversation.getUpdatedAt());
 	}

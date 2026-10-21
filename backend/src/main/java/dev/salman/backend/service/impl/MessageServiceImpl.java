@@ -24,6 +24,7 @@ import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.ForbiddenException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.config.AppProperties;
+import dev.salman.backend.repository.AttachmentRepository;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
@@ -43,6 +44,8 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
+	private final AttachmentRepository attachments;
+	private final AttachmentLoader attachmentLoader;
 	private final ReactionLoader reactionLoader;
 	private final RealtimeEvents events;
 	private final PushService push;
@@ -58,7 +61,7 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	@Transactional
 	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body,
-			UUID replyToMessageId) {
+			UUID replyToMessageId, UUID attachmentId) {
 		requireParticipant(callerId, conversationId);
 		// Before the lock, so a User over the limit never queues behind (or in front of) other people's sends. A
 		// retry the server already stored is answered below without counting; two retries racing here at worst
@@ -77,7 +80,8 @@ public class MessageServiceImpl implements MessageService {
 		if (existing.isPresent()) {
 			// Once edited or deleted there is no original text left to compare with: the retry is the same Message.
 			var stored = existing.get();
-			if ((!stored.isDeleted() && stored.getEditedAt() == null && !stored.getBody().equals(body))
+			if ((!stored.isDeleted() && stored.getEditedAt() == null && !Objects.equals(stored.getBody(), body))
+					|| (!stored.isDeleted() && !Objects.equals(stored.getAttachmentId(), attachmentId))
 					|| !Objects.equals(stored.getReplyToId(), replyToMessageId)) {
 				throw new ConflictException("This client message ID was already used for a different message.");
 			}
@@ -95,6 +99,14 @@ public class MessageServiceImpl implements MessageService {
 			}
 		}
 
+		if (attachmentId != null) {
+			// Locked, so two sends cannot both claim it. Someone else's, an unknown one and one already sent with a
+			// Message look the same.
+			attachments.findByIdForUpdate(attachmentId).filter(upload -> upload.getOwnerId().equals(callerId))
+					.filter(upload -> !messages.existsByAttachmentId(upload.getId()))
+					.orElseThrow(() -> new NotFoundException("Attachment not found."));
+		}
+
 		var now = clock.instant();
 		conversation.setLastSeq(conversation.getLastSeq() + 1);
 		conversation.setUpdatedAt(now);
@@ -105,6 +117,7 @@ public class MessageServiceImpl implements MessageService {
 		message.setClientMessageId(clientMessageId);
 		message.setBody(body);
 		message.setReplyToId(replyToMessageId);
+		message.setAttachmentId(attachmentId);
 		message.setCreatedAt(now);
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
@@ -137,7 +150,7 @@ public class MessageServiceImpl implements MessageService {
 			throw new ConflictException("A Message can only be edited for "
 					+ props.messages().editWindow().toMinutes() + " minutes after it is sent.");
 		}
-		if (!message.getBody().equals(body)) {
+		if (!Objects.equals(message.getBody(), body)) {
 			message.setBody(body);
 			message.setEditedAt(clock.instant());
 			messages.save(message);
@@ -154,7 +167,8 @@ public class MessageServiceImpl implements MessageService {
 	/** The Message as {@code viewer} sees it, with the quote if it answers another one. */
 	private MessageResponse responseFor(Message message, MessageStatus status, Participant viewer) {
 		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()),
-				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()));
+				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()),
+				attachmentLoader.of(List.of(message)).get(message.getId()));
 	}
 
 	@Override
@@ -233,9 +247,10 @@ public class MessageServiceImpl implements MessageService {
 				? participants.findByConversationId(conversationId) : List.<Participant>of();
 		var quoted = quotes.resolve(page, conversation -> reader);
 		var reacted = reactionLoader.of(page);
+		var pictured = attachmentLoader.of(page);
 		return new MessagePage(page.stream()
 				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId()),
-						reacted.getOrDefault(m.getId(), List.of())))
+						reacted.getOrDefault(m.getId(), List.of()), pictured.get(m.getId())))
 				.toList(), hasMore);
 	}
 

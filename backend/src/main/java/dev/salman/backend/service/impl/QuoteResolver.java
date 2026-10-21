@@ -78,7 +78,7 @@ class QuoteResolver {
 			return new ReplyQuote(quoted.getId(), quoted.getSenderId(), null, true, false);
 		}
 		return new ReplyQuote(quoted.getId(), quoted.getSenderId(),
-				Previews.firstCharacters(quoted.getBody(), QUOTE_CHARACTERS), false, false);
+				Previews.of(quoted.getBody(), quoted.getAttachmentId() != null, QUOTE_CHARACTERS), false, false);
 	}
 
 }

@@ -38,6 +38,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
+	private final AttachmentLoader attachmentLoader;
 	private final RealtimePublisher publisher;
 
 	@Override
@@ -68,8 +69,9 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 			audiences.computeIfAbsent(quote, q -> new LinkedHashSet<>()).add(member.getUserId());
 		}
 		var reacted = reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of());
+		var picture = attachmentLoader.of(List.of(message)).get(message.getId());
 		audiences.forEach((quote, audience) -> publish(audience, event(type, message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null, quote.orElse(null), reacted)))));
+				Map.of("message", MessageResponse.from(message, null, quote.orElse(null), reacted, picture)))));
 	}
 
 	@Override

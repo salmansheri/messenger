@@ -40,7 +40,7 @@ public class MessageController {
 	ResponseEntity<MessageResponse> send(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId,
 			@Valid @RequestBody SendMessageRequest request) {
 		var sent = messages.send(Principals.userId(jwt), conversationId, request.clientMessageId(),
-				request.body(), request.replyToMessageId());
+				request.body(), request.replyToMessageId(), request.attachmentId());
 		return ResponseEntity.status(sent.created() ? HttpStatus.CREATED : HttpStatus.OK).body(sent.message());
 	}
 

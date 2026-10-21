@@ -19,7 +19,8 @@ public interface MessageService {
 	 * @throws dev.salman.backend.exception.ConflictException when the Client message ID was already used for
 	 *         different text or a different Message to answer, or {@code replyToMessageId} was deleted for everyone
 	 */
-	SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body, UUID replyToMessageId);
+	SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body, UUID replyToMessageId,
+			UUID attachmentId);
 
 	/**
 	 * A page of the Conversation's Messages, always in ascending Sequence order, at most {@code limit} long:

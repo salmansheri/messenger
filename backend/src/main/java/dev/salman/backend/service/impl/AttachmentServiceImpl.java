@@ -31,6 +31,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 	private final RateLimiter rateLimiter;
 	private final AppProperties props;
 	private final Clock clock;
+	private final AttachmentLoader loader;
 
 	@Override
 	public AttachmentResponse upload(UUID ownerId, byte[] bytes) {
@@ -60,13 +61,13 @@ public class AttachmentServiceImpl implements AttachmentService {
 			discardFiles(attachment);
 			throw e;
 		}
-		return response(attachment);
+		return loader.view(attachment);
 	}
 
 	@Override
 	public void removeAbandoned() {
 		var cutoff = clock.instant().minus(props.uploads().unattachedLifetime());
-		for (var stale : attachments.findByMessageIdIsNullAndCreatedAtBefore(cutoff, Limit.of(SWEEP_BATCH))) {
+		for (var stale : attachments.findAbandoned(cutoff, Limit.of(SWEEP_BATCH))) {
 			try {
 				// Files first, then the row: if this fails half-way the row is still there and the next sweep retries.
 				storage.delete(stale.getStorageKey());
@@ -88,12 +89,6 @@ public class AttachmentServiceImpl implements AttachmentService {
 				log.warn("Could not remove stray file {}", key, e);
 			}
 		}
-	}
-
-	private AttachmentResponse response(Attachment attachment) {
-		var ttl = props.storage().urlTtl();
-		return new AttachmentResponse(attachment.getId(), attachment.getWidth(), attachment.getHeight(),
-				storage.signedUrl(attachment.getStorageKey(), ttl), storage.signedUrl(attachment.getThumbnailKey(), ttl));
 	}
 
 }

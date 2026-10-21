@@ -11,7 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** An image a User uploaded: stored in object storage, linked to a Message once it is sent with one. */
+/** An image a User uploaded: stored in object storage, used by a Message once it is sent with one (the Message refers to it). */
 @Entity
 @Table(name = "attachment")
 @Getter
@@ -42,9 +42,6 @@ public class Attachment {
 
 	@Column(nullable = false)
 	private int height;
-
-	@Column(name = "message_id")
-	private UUID messageId;
 
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;

@@ -99,7 +99,7 @@ public class PushServiceImpl implements PushService {
 			return;
 		}
 		var title = titleFor(message);
-		var body = preview(message.getBody());
+		var body = Previews.of(message.getBody(), message.getAttachmentId() != null, PREVIEW_CHARACTERS);
 		for (var device : devices.findByUserIdIn(recipients)) {
 			var key = "push:queued:" + messageId + ":" + device.getId();
 			if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key, "1", QUEUED_MEMORY))) {
@@ -149,10 +149,6 @@ public class PushServiceImpl implements PushService {
 		var senderName = users.findById(message.getSenderId()).map(User::getDisplayName).orElse("New message");
 		return conversations.findById(message.getConversationId()).filter(c -> c.getType() == ConversationType.GROUP)
 				.map(Conversation::getName).map(group -> senderName + " in " + group).orElse(senderName);
-	}
-
-	private static String preview(String body) {
-		return Previews.firstCharacters(body, PREVIEW_CHARACTERS);
 	}
 
 }
