@@ -1,0 +1,23 @@
+"use client";
+
+import type { Ref } from "react";
+
+/** The button in the open Conversation's header that opens and closes its search (focus comes back to it on close). */
+export function SearchToggle({ open, onToggle, ref }: { open: boolean; onToggle: () => void; ref?: Ref<HTMLButtonElement> }) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-label="Search this Conversation"
+      title="Search this Conversation"
+      aria-expanded={open}
+      onClick={onToggle}
+      className="flex size-9 items-center justify-center rounded-sm text-ink-muted hover:text-ink"
+    >
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <circle cx="7" cy="7" r="4.5" />
+        <path d="M10.5 10.5 14 14" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}

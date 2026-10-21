@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
 import { targetFrom } from "@/features/messages/window";
+import { SearchPanel } from "@/features/search/search-panel";
+import { SearchToggle } from "@/features/search/search-toggle";
 import { GroupPanel } from "@/features/groups/group-panel";
 import { PresenceLine } from "@/features/presence/presence-line";
 import { ConversationMenu } from "./conversation-menu";
@@ -29,6 +31,11 @@ export function ConversationPane() {
   const target = targetFrom(useSearchParams().get("at"));
   const router = useRouter();
   const list = useConversationList();
+  // Search in this Conversation: open or not, and what is typed (kept while it is closed, so opening it again shows
+  // the same results); both start afresh for another Conversation.
+  const [search, setSearch] = useState({ id, open: false, text: "" });
+  if (search.id !== id) setSearch({ id, open: false, text: "" });
+  const searchButton = useRef<HTMLButtonElement>(null);
   // Which Conversation this screen has already shown, so one that then disappears from the list (the person was removed
   // or left) can be told apart from an address that never was theirs.
   const [shownId, setShownId] = useState<string>();
@@ -85,7 +92,16 @@ export function ConversationPane() {
     <>
       <PaneHeader
         avatar={<Avatar {...avatar} />}
-        actions={<ConversationMenu conversation={conversation} />}
+        actions={
+          <div className="flex items-center gap-1">
+            <SearchToggle
+              ref={searchButton}
+              open={search.open}
+              onToggle={() => setSearch((state) => ({ ...state, open: !state.open }))}
+            />
+            <ConversationMenu conversation={conversation} />
+          </div>
+        }
         detail={
           <>
             {conversation.type === "GROUP" ? (
@@ -99,6 +115,29 @@ export function ConversationPane() {
       >
         {conversationTitle(conversation, list.myId)}
       </PaneHeader>
+      {search.open && (
+        <SearchPanel
+          conversation={conversation}
+          myId={list.myId}
+          text={search.text}
+          onTextChange={(text) => setSearch((state) => ({ ...state, text }))}
+          onClose={() => {
+            setSearch((state) => ({ ...state, open: false }));
+            searchButton.current?.focus();
+          }}
+          onChoose={(seq) => {
+            setSearch((state) => ({ ...state, open: false }));
+            // The chosen link goes with the search: focus waits on the search button until the Message view puts it on
+            // the row it opens at. Choosing the Message already opened at changes no address, so its row is found here.
+            searchButton.current?.focus();
+            if (seq !== undefined && seq === target) {
+              const row = document.querySelector<HTMLElement>(`[data-message-seq="${seq}"]`);
+              row?.scrollIntoView({ block: "center" });
+              row?.focus({ preventScroll: true });
+            }
+          }}
+        />
+      )}
       <MessageView
         key={conversation.id}
         conversation={conversation}
