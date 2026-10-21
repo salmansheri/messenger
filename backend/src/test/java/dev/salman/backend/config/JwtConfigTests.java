@@ -36,7 +36,9 @@ class JwtConfigTests {
 				new AppProperties.Otp("secret", Duration.ofMinutes(10), 5, 5, 20),
 				new AppProperties.RefreshCookie(true), new AppProperties.Cors(java.util.List.of()), new AppProperties.Lookup(30), new AppProperties.Groups(20), new AppProperties.Messages(60, 120, Duration.ofMinutes(15), Duration.ofHours(1)),
 				new AppProperties.Presence(Duration.ofSeconds(30), Duration.ofSeconds(5), Duration.ofSeconds(2)),
-				new AppProperties.Push(10, Duration.ofSeconds(30), 5));
+				new AppProperties.Push(10, Duration.ofSeconds(30), 5),
+				new AppProperties.Storage("http://localhost:9000", "", "us-east-1", "a", "b", "rubric", Duration.ofMinutes(15)),
+				new AppProperties.Uploads(20, Duration.ofHours(24), Duration.ofMinutes(10)));
 	}
 
 	private static String tokenFor(JwtConfig config, AppProperties props, com.nimbusds.jose.jwk.ECKey key,

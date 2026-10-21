@@ -9,6 +9,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   mvc:
     problemdetails:
       enabled: true
@@ -32,6 +36,18 @@ app:
     max-changes-per-minute: 120
     edit-window: 15m
     delete-window: 1h
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:}
+    region: us-east-1
+    access-key: ${STORAGE_ACCESS_KEY:rubricaccess}
+    secret-key: ${STORAGE_SECRET_KEY:rubricsecretkey}
+    bucket: rubric
+    url-ttl: 15m
+  uploads:
+    max-per-minute: 20
+    unattached-lifetime: 24h
+    cleanup-interval: 10m
   push:
     max-devices-per-user: 10
     retry-delay: 30s

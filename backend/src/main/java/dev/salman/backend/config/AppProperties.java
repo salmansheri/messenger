@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push) {
+public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push, Storage storage, Uploads uploads) {
 
 	public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String privateKey,
 			String publicKey) {
@@ -53,6 +53,22 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	 * refresh does not flicker. {@code sweepInterval}: how often each instance looks for Users who have gone quiet.
 	 */
 	public record Presence(Duration ttl, Duration offlineGrace, Duration sweepInterval) {
+	}
+
+	/**
+	 * The S3-compatible object store holding images. {@code endpoint} is where the server reaches it;
+	 * {@code publicEndpoint} (defaults to {@code endpoint}) is the address put into signed URLs, for when browsers
+	 * reach it by another name. {@code urlTtl}: how long a signed URL works.
+	 */
+	public record Storage(String endpoint, String publicEndpoint, String region, String accessKey, String secretKey,
+			String bucket, Duration urlTtl) {
+	}
+
+	/**
+	 * {@code maxPerMinute}: uploads per User, separate from the Message send limit. {@code unattachedLifetime}: an
+	 * upload not sent with a Message by then is removed. {@code cleanupInterval}: how often to look for those.
+	 */
+	public record Uploads(int maxPerMinute, Duration unattachedLifetime, Duration cleanupInterval) {
 	}
 
 }

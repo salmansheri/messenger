@@ -364,6 +364,14 @@ public class AuthClient {
 		return new Tokens(node.get("accessToken").asString(), refreshCookieValue(result));
 	}
 
+	/** Uploads {@code bytes} as the multipart part {@code file}; the declared type and name are whatever the caller says. */
+	public ResultActions uploadImage(String accessToken, String fileName, String contentType, byte[] bytes)
+			throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.multipart("/api/v1/attachments")
+				.file(new org.springframework.mock.web.MockMultipartFile("file", fileName, contentType, bytes))
+				.header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions postJson(String path, Object body) throws Exception {
 		return mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))
 				.with(request -> {
