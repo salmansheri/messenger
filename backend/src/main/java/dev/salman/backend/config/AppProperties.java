@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push, Storage storage, Uploads uploads) {
+public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push, Storage storage, Uploads uploads, Profile profile) {
 
 	public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String privateKey,
 			String publicKey) {
@@ -53,6 +53,10 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	 * refresh does not flicker. {@code sweepInterval}: how often each instance looks for Users who have gone quiet.
 	 */
 	public record Presence(Duration ttl, Duration offlineGrace, Duration sweepInterval) {
+	}
+
+	/** {@code maxNameChangesPerHour}: how often one User may change their display name (a repeat of the same name is free). */
+	public record Profile(int maxNameChangesPerHour) {
 	}
 
 	/**

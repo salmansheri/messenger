@@ -123,6 +123,16 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "presence.changed", userId: "u1" }))).toBeUndefined();
   });
 
+  it("reads a name change, and drops one that does not say who or what", () => {
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", displayName: "Ada King" }))).toEqual({
+      type: "profile.changed",
+      userId: "u1",
+      displayName: "Ada King",
+    });
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", displayName: "Ada King" }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1" }))).toBeUndefined();
+  });
+
   it("knows about kinds it does not act on, and about kinds it has never heard of, without failing", () => {
     for (const type of ["something.new", "auth.revoked"]) {
       expect(parseEvent(JSON.stringify({ type, conversationId: "c1" }))).toEqual({ type: "ignored" });

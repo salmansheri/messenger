@@ -42,6 +42,8 @@ app:
     public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}
     signing-secret: ${STORAGE_SIGNING_SECRET:dev-only-change-me-too}
     url-ttl: 15m
+  profile:
+    max-name-changes-per-hour: 5
   uploads:
     max-per-minute: 20
     unattached-lifetime: 24h

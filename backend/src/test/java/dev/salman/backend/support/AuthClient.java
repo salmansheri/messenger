@@ -187,6 +187,14 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Changes the caller's display name. */
+	public ResultActions changeDisplayName(String accessToken, Object displayName) throws Exception {
+		var body = new LinkedHashMap<String, Object>();
+		body.put("displayName", displayName);
+		return mvc.perform(MockMvcRequestBuilders.patch("/api/v1/users/me").contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
+	}
+
 	public ResultActions editMessage(String accessToken, String conversationId, String messageId, String body)
 			throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.patch("/api/v1/conversations/{id}/messages/{messageId}",

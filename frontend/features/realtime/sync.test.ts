@@ -12,7 +12,7 @@ import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
-import { catchUp, handleEvent, recordSettings } from "./sync";
+import { catchUp, handleEvent, recordProfile, recordSettings } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
   id: "c1",
@@ -299,6 +299,28 @@ describe("typing and presence events", () => {
     handleEvent(client, newMessage(3), tracker); // sent by grace
 
     expect(tracker.typing("c1")).toEqual(["linus"]);
+  });
+
+  it("puts a changed name into the list, and into the profile when it is the signed-in person's own", () => {
+    const { client } = withList([{ ...conversation(2, 0), participants: [{ userId: "me", displayName: "Ada", role: "MEMBER" }, { userId: "grace", displayName: "Grace", role: "MEMBER" }] }]);
+    client.setQueryData(meQueryKey(), { id: "me", displayName: "Ada" });
+
+    handleEvent(client, JSON.stringify({ type: "profile.changed", userId: "grace", displayName: "Grace Hopper" }), createTypingTracker());
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[1].displayName).toBe("Grace Hopper");
+    expect(client.getQueryData<{ displayName: string }>(meQueryKey())?.displayName).toBe("Ada");
+
+    handleEvent(client, JSON.stringify({ type: "profile.changed", userId: "me", displayName: "Augusta Ada King" }), createTypingTracker());
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[0].displayName).toBe("Augusta Ada King");
+    expect(client.getQueryData<{ displayName: string }>(meQueryKey())?.displayName).toBe("Augusta Ada King");
+  });
+
+  it("records the answer to the person's own name change the same way", () => {
+    const { client } = withList([{ ...conversation(2, 0), participants: [{ userId: "me", displayName: "Ada", role: "MEMBER" }] }]);
+    client.setQueryData(meQueryKey(), { id: "me", displayName: "Ada" });
+
+    recordProfile(client, "me", "Ada King");
+
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].participants?.[0].displayName).toBe("Ada King");
   });
 
   it("shows a person online or offline in every Conversation's presence that has loaded", () => {

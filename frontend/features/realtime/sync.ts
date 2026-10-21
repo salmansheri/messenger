@@ -65,6 +65,16 @@ export function recordSettings(queryClient: QueryClient, conversationId: string,
 }
 
 /**
+ * Someone's new name, from the event or from the answer to the person's own change: put into the Conversation list
+ * (where every Participant's name is read from) and, when it is the signed-in person's own, into their profile.
+ */
+export function recordProfile(queryClient: QueryClient, userId: string, displayName: string) {
+  const me = queryClient.getQueryData<UserProfile>(meQueryKey());
+  if (me?.id === userId && me.displayName !== displayName) queryClient.setQueryData<UserProfile>(meQueryKey(), { ...me, displayName });
+  patchList(queryClient, { type: "profile.changed", userId, displayName });
+}
+
+/**
  * A reaction put on a Message, or everyone's reactions of one person taken away. Reactions are only in the loaded
  * history, never the list. A word older than one already heard for the same person and Message is ignored, and, as
  * for other events, a history whose request is under way is asked for again instead of being patched.
@@ -101,6 +111,10 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
       if (query.state.fetchStatus === "fetching") void queryClient.invalidateQueries({ queryKey: query.queryKey });
       else queryClient.setQueryData<PresenceView[]>(query.queryKey, (views) => applyPresence(views, event));
     }
+    return;
+  }
+  if (event.type === "profile.changed") {
+    recordProfile(queryClient, event.userId, event.displayName);
     return;
   }
   if (event.type === "reaction.changed" || event.type === "reactions.cleared") {

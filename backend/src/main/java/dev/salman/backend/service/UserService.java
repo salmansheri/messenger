@@ -20,4 +20,13 @@ public interface UserService {
 	 */
 	UserSummary findVerifiedByEmail(UUID callerId, String email);
 
+	/**
+	 * Changes the signed-in User's display name (surrounding spaces are dropped). The same name changes nothing, sends
+	 * nothing and does not count against the allowance; a real change does, and is announced to everyone who shares a
+	 * Conversation with them and to their own other sessions.
+	 *
+	 * @throws dev.salman.backend.exception.RateLimitedException when the User changed their name too often this hour
+	 */
+	UserProfile updateDisplayName(UUID userId, String displayName);
+
 }

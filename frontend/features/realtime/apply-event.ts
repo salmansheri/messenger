@@ -8,6 +8,24 @@ import { orderConversations, withSettings } from "@/features/conversations/setti
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
 
 /**
+ * The list with one person's name changed wherever they are a Participant (list rows, headers, the names above runs of
+ * Messages and the Group panel all read it from here). The same list when nobody has that name already, so a repeat
+ * (or an event about someone in none of these Conversations) changes nothing.
+ */
+export function withDisplayName(list: ConversationResponse[], userId: string, displayName: string): ConversationResponse[] {
+  let changed = false;
+  const next = list.map((conversation) => {
+    if (!conversation.participants?.some((p) => p.userId === userId && p.displayName !== displayName)) return conversation;
+    changed = true;
+    return {
+      ...conversation,
+      participants: conversation.participants.map((p) => (p.userId === userId ? { ...p, displayName } : p)),
+    };
+  });
+  return changed ? next : list;
+}
+
+/**
  * How an event changes the Conversation list, without touching the old one. Events are best effort: they can arrive
  * twice or late, so a Message that is not newer than the latest one shown changes nothing. When something cannot be
  * worked out from the event alone (an unknown Conversation, a skipped Message, who you are, a Conversation that
@@ -19,6 +37,7 @@ export function applyToList(
   myId: string | undefined,
 ): { list: ConversationResponse[]; refetch: boolean } {
   if (event.type === "conversation.changed") return { list, refetch: true };
+  if (event.type === "profile.changed") return { list: withDisplayName(list, event.userId, event.displayName), refetch: false };
   if (event.type === "message.updated") return applyUpdateToList(list, event);
   if (event.type === "settings.changed") {
     const next = withSettings(list, event.conversationId, event.settings);

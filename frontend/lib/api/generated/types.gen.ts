@@ -161,6 +161,17 @@ export type LoginRequest = {
     password: string;
 };
 
+export type UpdateProfileRequest = {
+    displayName?: string;
+};
+
+export type UserProfile = {
+    id?: string;
+    email?: string;
+    displayName?: string;
+    emailVerified?: boolean;
+};
+
 export type RenameGroupRequest = {
     name?: string;
 };
@@ -173,13 +184,6 @@ export type UpdateSettingsRequest = {
 
 export type EditMessageRequest = {
     body?: string;
-};
-
-export type UserProfile = {
-    id?: string;
-    email?: string;
-    displayName?: string;
-    emailVerified?: boolean;
 };
 
 export type PresenceView = {
@@ -571,6 +575,38 @@ export type UploadResponses = {
 
 export type UploadResponse = UploadResponses[keyof UploadResponses];
 
+export type MeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me';
+};
+
+export type MeResponses = {
+    /**
+     * OK
+     */
+    200: UserProfile;
+};
+
+export type MeResponse = MeResponses[keyof MeResponses];
+
+export type UpdateMeData = {
+    body: UpdateProfileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me';
+};
+
+export type UpdateMeResponses = {
+    /**
+     * OK
+     */
+    200: UserProfile;
+};
+
+export type UpdateMeResponse = UpdateMeResponses[keyof UpdateMeResponses];
+
 export type GetData = {
     body?: never;
     path: {
@@ -662,22 +698,6 @@ export type EditResponses = {
 };
 
 export type EditResponse = EditResponses[keyof EditResponses];
-
-export type MeData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/me';
-};
-
-export type MeResponses = {
-    /**
-     * OK
-     */
-    200: UserProfile;
-};
-
-export type MeResponse = MeResponses[keyof MeResponses];
 
 export type FileData = {
     body?: never;

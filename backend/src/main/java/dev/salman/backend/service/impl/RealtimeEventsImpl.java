@@ -146,6 +146,17 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	}
 
 	@Override
+	public void profileChanged(UUID userId, String displayName) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "profile.changed");
+		payload.put("userId", userId);
+		payload.put("displayName", displayName);
+		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
+		recipients.add(userId);
+		publish(recipients, payload);
+	}
+
+	@Override
 	public void credentialsRevoked(UUID userId) {
 		publish(Set.of(userId), Map.of("type", RealtimeListener.AUTH_REVOKED));
 	}

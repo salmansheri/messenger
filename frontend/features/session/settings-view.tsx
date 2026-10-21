@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { logoutMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { messageFor } from "@/lib/api/messages";
+import { ProfileForm } from "./profile-form";
 import { useMe } from "./use-me";
 
 export function SettingsView() {
@@ -48,6 +49,15 @@ export function SettingsView() {
           </dl>
         )}
       </section>
+
+      {me.data?.id && (
+        <section aria-labelledby="profile" className="mt-10 border-t border-rule pt-6">
+          <h2 id="profile" className="font-serif text-lg font-semibold">
+            Your name
+          </h2>
+          <ProfileForm userId={me.data.id} current={me.data.displayName ?? ""} />
+        </section>
+      )}
 
       <section aria-labelledby="session" className="mt-10 border-t border-rule pt-6">
         <h2 id="session" className="font-serif text-lg font-semibold">

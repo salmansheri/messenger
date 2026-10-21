@@ -82,6 +82,9 @@ public interface RealtimeEvents {
 	/** The User went online or offline; heard by everyone who shares a Conversation with them. */
 	void presenceChanged(UUID userId, boolean online, Instant lastSeenAt);
 
+	/** The User changed their display name; heard by everyone who shares a Conversation with them, and their own sessions. */
+	void profileChanged(UUID userId, String displayName);
+
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);
 

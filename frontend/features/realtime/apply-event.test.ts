@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 import type { History } from "@/features/messages/history";
-import { applyToHistory, applyToList, applyUnread } from "./apply-event";
+import { applyToHistory, applyToList, applyUnread, withDisplayName } from "./apply-event";
 
 const ME = "me";
 
@@ -358,5 +358,27 @@ describe("applyUnread", () => {
   it("does nothing about a Conversation it does not show", () => {
     const result = applyUnread(list, undefined, report(1, 0, "nope"));
     expect(result.list).toBe(list);
+  });
+});
+
+describe("a name change", () => {
+  const withPeople = (id: string, ...names: [string, string][]) =>
+    conversation(id, { participants: names.map(([userId, displayName]) => ({ userId, displayName, role: "MEMBER" as const })) });
+  const list = [withPeople("c1", ["ada", "Ada Lovelace"], ["grace", "Grace Hopper"]), withPeople("c2", ["ada", "Ada Lovelace"]), withPeople("c3", ["linus", "Linus"])];
+  const renamed: RealtimeEvent = { type: "profile.changed", userId: "ada", displayName: "Augusta Ada King" };
+
+  it("renames the person in every Conversation they are in and leaves the others as they were", () => {
+    const result = applyToList(list, renamed, ME);
+
+    expect(result.refetch).toBe(false);
+    expect(result.list[0].participants?.map((p) => p.displayName)).toEqual(["Augusta Ada King", "Grace Hopper"]);
+    expect(result.list[1].participants?.[0].displayName).toBe("Augusta Ada King");
+    expect(result.list[2]).toBe(list[2]);
+  });
+
+  it("changes nothing for a repeat, or for someone who is in none of the loaded Conversations", () => {
+    const once = applyToList(list, renamed, ME).list;
+    expect(applyToList(once, renamed, ME).list).toBe(once);
+    expect(withDisplayName(list, "stranger", "Anyone")).toBe(list);
   });
 });

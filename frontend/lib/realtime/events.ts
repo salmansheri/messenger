@@ -23,6 +23,8 @@ export type RealtimeEvent =
   | { type: "typing.changed"; conversationId: string; userId: string; typing: boolean }
   /** Someone who shares a Conversation with this person came online or went offline. */
   | { type: "presence.changed"; userId: string; online: boolean; lastSeenAt: string | undefined }
+  /** Someone who shares a Conversation with this person (or this person, in another session) changed their name. */
+  | { type: "profile.changed"; userId: string; displayName: string }
   | { type: "ignored" };
 
 /** The named fields of an object as numbers, or nothing if any is missing or not a number. */
@@ -105,6 +107,10 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
         online: payload.online,
         lastSeenAt: typeof payload.lastSeenAt === "string" ? payload.lastSeenAt : undefined,
       };
+    case "profile.changed":
+      return typeof payload.userId === "string" && typeof payload.displayName === "string"
+        ? { type: "profile.changed", userId: payload.userId, displayName: payload.displayName }
+        : undefined;
     default:
       return { type: "ignored" };
   }
