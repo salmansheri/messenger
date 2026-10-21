@@ -69,6 +69,11 @@ describe("searchFailureMessage", () => {
   it("says the Conversation is gone rather than repeat the server's not-found wording", () => {
     expect(searchFailureMessage(problem(404))).toBe("This Conversation is no longer yours to search.");
   });
+
+  it("names searching all Conversations the same way, and has no Conversation to lose there", () => {
+    expect(searchFailureMessage(problem(429, 600), "all")).toBe("You are searching too often. Try again in 10 minutes.");
+    expect(searchFailureMessage(new ApiProblem(404, "Not Found", "Not found.", {}, undefined), "all")).toBe("Not found.");
+  });
 });
 
 describe("resultTime", () => {

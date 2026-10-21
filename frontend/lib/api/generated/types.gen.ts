@@ -188,19 +188,6 @@ export type EditMessageRequest = {
     body?: string;
 };
 
-export type PresenceView = {
-    userId?: string;
-    online?: boolean;
-    lastSeenAt?: string;
-};
-
-export type MessagePage = {
-    messages?: Array<MessageResponse>;
-    hasMore?: boolean;
-    hasOlder?: boolean;
-    hasNewer?: boolean;
-};
-
 export type SearchPage = {
     results?: Array<SearchResult>;
     hasMore?: boolean;
@@ -213,6 +200,19 @@ export type SearchResult = {
     senderId?: string;
     createdAt?: string;
     snippet?: string;
+};
+
+export type PresenceView = {
+    userId?: string;
+    online?: boolean;
+    lastSeenAt?: string;
+};
+
+export type MessagePage = {
+    messages?: Array<MessageResponse>;
+    hasMore?: boolean;
+    hasOlder?: boolean;
+    hasNewer?: boolean;
 };
 
 export type RemoveAvatarData = {
@@ -751,6 +751,25 @@ export type EditResponses = {
 };
 
 export type EditResponse = EditResponses[keyof EditResponses];
+
+export type SearchAllData = {
+    body?: never;
+    path?: never;
+    query: {
+        q: string;
+        before?: string;
+    };
+    url: '/api/v1/messages/search';
+};
+
+export type SearchAllResponses = {
+    /**
+     * OK
+     */
+    200: SearchPage;
+};
+
+export type SearchAllResponse = SearchAllResponses[keyof SearchAllResponses];
 
 export type FileData = {
     body?: never;

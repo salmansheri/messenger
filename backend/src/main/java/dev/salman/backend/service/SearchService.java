@@ -25,4 +25,16 @@ public interface SearchService {
 	 */
 	SearchPage searchConversation(UUID callerId, UUID conversationId, String query, UUID before);
 
+	/**
+	 * The same search across every Conversation the caller is a Participant of now, each with its own join point;
+	 * results carry their {@code conversationId}. Conversations they left or were removed from are not searched. It
+	 * shares the search allowance with {@link #searchConversation}.
+	 *
+	 * @param before the {@code messageId} of the last result already shown, for the next page; null for the first
+	 * @throws dev.salman.backend.exception.BadRequestException when {@code before} is not a Message of one of the
+	 *         caller's Conversations
+	 * @throws dev.salman.backend.exception.RateLimitedException when the caller searches too often
+	 */
+	SearchPage searchAll(UUID callerId, String query, UUID before);
+
 }

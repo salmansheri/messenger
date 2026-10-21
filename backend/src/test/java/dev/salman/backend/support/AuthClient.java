@@ -273,6 +273,16 @@ public class AuthClient {
 		return mvc.perform(request);
 	}
 
+	/** Searches every Conversation of the caller; {@code before} (a result's message id) asks for the next page. */
+	public ResultActions searchAll(String accessToken, String q, String before) throws Exception {
+		var request = MockMvcRequestBuilders.get("/api/v1/messages/search").param("q", q)
+				.header("Authorization", "Bearer " + accessToken);
+		if (before != null) {
+			request.param("before", before);
+		}
+		return mvc.perform(request);
+	}
+
 	public ResultActions historyWithoutToken(String conversationId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/conversations/{id}/messages", conversationId));
 	}

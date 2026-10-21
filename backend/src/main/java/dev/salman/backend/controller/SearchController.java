@@ -31,4 +31,14 @@ public class SearchController {
 		return search.searchConversation(Principals.userId(jwt), conversationId, q, before);
 	}
 
+	/**
+	 * Messages of every Conversation the caller is in matching {@code q}, newest first, each saying its Conversation.
+	 * See {@link SearchService#searchAll}.
+	 */
+	@GetMapping("/api/v1/messages/search")
+	SearchPage searchAll(@AuthenticationPrincipal Jwt jwt, @RequestParam @ValidSearchQuery String q,
+			@RequestParam(required = false) UUID before) {
+		return search.searchAll(Principals.userId(jwt), q, before);
+	}
+
 }

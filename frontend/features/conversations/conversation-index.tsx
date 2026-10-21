@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { toProblem } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { Avatar } from "@/features/people/person-avatar";
+import { SearchPanel } from "@/features/search/search-panel";
+import { SearchToggle } from "@/features/search/search-toggle";
 import { conversationAvatar, conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
 import { useConversationList } from "./queries";
 import { archivedHasUnread, isMuted } from "./settings";
@@ -15,7 +17,8 @@ import { archivedHasUnread, isMuted } from "./settings";
 /**
  * The list of Conversations: name, latest line, time and unread count, the open one marked, pinned ones first and
  * marked, muted ones marked. Archived Conversations are a view of their own, reached from a button that has a dot when
- * one of them has unread Messages; opening a Conversation shows the view it belongs to.
+ * one of them has unread Messages; opening a Conversation shows the view it belongs to. A search across all
+ * Conversations opens above the list (what is typed is kept while it is closed).
  */
 export function ConversationIndex() {
   const list = useConversationList();
@@ -39,17 +42,45 @@ export function ConversationIndex() {
   const now = new Date();
   // One top-level heading per screen: the list's own when nothing is open, the open screen's otherwise.
   const Heading = openPath === "/app" ? "h1" : "h2";
+  const [search, setSearch] = useState({ open: false, text: "" });
+  const searchButton = useRef<HTMLButtonElement>(null);
 
   return (
     <nav aria-labelledby="conversations-heading" className="flex flex-col">
-      <div className="flex items-baseline justify-between gap-3 px-4 pt-5 pb-2 sm:px-6">
+      <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-2 sm:px-6">
         <Heading id="conversations-heading" className="font-serif text-sm tracking-wide text-ink-muted uppercase">
           Conversations
         </Heading>
-        <Link href="/app/new" className="text-sm underline underline-offset-4 decoration-rule hover:decoration-ink">
-          New
-        </Link>
+        <span className="flex items-center gap-2">
+          <SearchToggle
+            ref={searchButton}
+            label="Search all Conversations"
+            open={search.open}
+            onToggle={() => setSearch((state) => ({ ...state, open: !state.open }))}
+          />
+          <Link href="/app/new" className="text-sm underline underline-offset-4 decoration-rule hover:decoration-ink">
+            New
+          </Link>
+        </span>
       </div>
+
+      {search.open && (
+        <SearchPanel
+          scope={{ kind: "all", conversations: items }}
+          myId={list.status === "ready" ? list.myId : undefined}
+          text={search.text}
+          onTextChange={(text) => setSearch((state) => ({ ...state, text }))}
+          onClose={() => {
+            setSearch((state) => ({ ...state, open: false }));
+            searchButton.current?.focus();
+          }}
+          onChoose={() => {
+            // The chosen link goes with the search; the Message view then focuses the row it opens at.
+            setSearch((state) => ({ ...state, open: false }));
+            searchButton.current?.focus();
+          }}
+        />
+      )}
 
       {list.status === "pending" && (
         <p className="px-4 py-6 text-ink-muted sm:px-6" role="status" aria-busy="true">

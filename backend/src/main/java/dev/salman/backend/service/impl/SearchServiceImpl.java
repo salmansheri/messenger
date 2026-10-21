@@ -35,9 +35,12 @@ public class SearchServiceImpl implements SearchService {
 
 	private static final UUID LAST_ID = new UUID(-1L, -1L);
 
-	/** Up to two dozen words around the first match; a short text comes back whole. */
+	/**
+	 * Up to two dozen words from about the first match; a short text comes back whole. PostgreSQL's default headline mode
+	 * (no fragments): its fragment mode drops a number at the very end of the text ("note 12" became "note").
+	 */
 	private static final String SNIPPET_OPTIONS = "StartSel=\"" + SearchResult.MATCH_START + "\", StopSel=\""
-			+ SearchResult.MATCH_END + "\", MaxWords=24, MinWords=10, ShortWord=0, MaxFragments=1";
+			+ SearchResult.MATCH_END + "\", MaxWords=24, MinWords=10, ShortWord=0";
 
 	private final MessageRepository messages;
 	private final ParticipantRepository participants;
@@ -59,9 +62,28 @@ public class SearchServiceImpl implements SearchService {
 		var found = messages.searchConversation(conversationId, callerId, reader.readableAfter(0), parsed.words(),
 				parsed.prefix(), cursor == null ? END_OF_TIME : cursor.getCreatedAt(),
 				cursor == null ? LAST_ID : cursor.getId(), PAGE_SIZE + 1); // one extra tells whether more remain
+		return page(found, parsed);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public SearchPage searchAll(UUID callerId, String query, UUID before) {
+		rateLimiter.hit("rl:search:" + callerId, props.search().maxPerMinute(), SEARCH_WINDOW);
+		var cursor = before == null ? null : messages.findById(before)
+				.filter(m -> participants.existsByConversationIdAndUserId(m.getConversationId(), callerId))
+				.orElseThrow(() -> new BadRequestException("before must be the id of a result of this search."));
+
+		var parsed = SearchQuery.parse(query);
+		var found = messages.searchAll(callerId, parsed.words(), parsed.prefix(),
+				cursor == null ? END_OF_TIME : cursor.getCreatedAt(), cursor == null ? LAST_ID : cursor.getId(),
+				PAGE_SIZE + 1);
+		return page(found, parsed);
+	}
+
+	/** A page of results from what was found with one row too many (which tells whether more remain). */
+	private SearchPage page(List<Message> found, SearchQuery query) {
 		var hasMore = found.size() > PAGE_SIZE;
-		var page = hasMore ? found.subList(0, PAGE_SIZE) : found;
-		return new SearchPage(results(page, parsed), hasMore);
+		return new SearchPage(results(hasMore ? found.subList(0, PAGE_SIZE) : found, query), hasMore);
 	}
 
 	private List<SearchResult> results(List<Message> page, SearchQuery query) {

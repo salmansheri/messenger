@@ -75,6 +75,24 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 	List<Message> searchConversation(UUID conversationId, UUID viewerId, long minSeq, String words, String prefix,
 			Instant beforeAt, UUID beforeId, int limit);
 
+	/**
+	 * Search in every Conversation the viewer is a Participant of now (a Conversation left or removed from has no row,
+	 * so it is not searched), each from after that Conversation's own join point, with the same exclusions, query and
+	 * order as {@link #searchConversation}.
+	 */
+	@Query(value = """
+			select m.* from message m
+			join participant p on p.conversation_id = m.conversation_id and p.user_id = :viewerId
+			cross join message_search_query(:words, :prefix) q
+			where m.seq > p.joined_after_seq and m.deleted_at is null
+			and m.body is not null and querytree(q) <> 'T' and m.search_vector @@ q
+			and not exists (select 1 from message_hidden h where h.message_id = m.id and h.user_id = :viewerId)
+			and (m.created_at, m.id) < (:beforeAt, :beforeId)
+			order by m.created_at desc, m.id desc
+			limit :limit
+			""", nativeQuery = true)
+	List<Message> searchAll(UUID viewerId, String words, String prefix, Instant beforeAt, UUID beforeId, int limit);
+
 	/** A found Message's snippet: its text around the matches, marked as {@code options} say. */
 	interface Snippet {
 

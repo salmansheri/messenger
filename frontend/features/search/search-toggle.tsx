@@ -2,14 +2,27 @@
 
 import type { Ref } from "react";
 
-/** The button in the open Conversation's header that opens and closes its search (focus comes back to it on close). */
-export function SearchToggle({ open, onToggle, ref }: { open: boolean; onToggle: () => void; ref?: Ref<HTMLButtonElement> }) {
+/**
+ * The button that opens and closes a search (focus comes back to it on close): in the open Conversation's header, and
+ * on the Conversation list for all of them; `label` says which.
+ */
+export function SearchToggle({
+  open,
+  onToggle,
+  label = "Search this Conversation",
+  ref,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label?: string;
+  ref?: Ref<HTMLButtonElement>;
+}) {
   return (
     <button
       ref={ref}
       type="button"
-      aria-label="Search this Conversation"
-      title="Search this Conversation"
+      aria-label={label}
+      title={label}
       aria-expanded={open}
       onClick={onToggle}
       className="flex size-9 items-center justify-center rounded-sm text-ink-muted hover:text-ink"

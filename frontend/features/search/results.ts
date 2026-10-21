@@ -32,12 +32,12 @@ export function resultCountText(count: number, hasMore: boolean): string {
 
 /**
  * Why a search failed: searching is limited to a number a minute, so a 429 says how long to wait (the general wording
- * would not say it was searching); a Conversation the person no longer belongs to is a 404; anything else keeps the
- * general wording (a busy server, a lost connection).
+ * would not say it was searching); in one Conversation, a 404 means the person no longer belongs to it; anything else
+ * keeps the general wording (a busy server, a lost connection).
  */
-export function searchFailureMessage(problem: ApiProblem): string {
+export function searchFailureMessage(problem: ApiProblem, scope: "conversation" | "all" = "conversation"): string {
   if (problem.status === 429) return `You are searching too often. Try again ${whenToRetry(problem)}.`;
-  if (problem.status === 404) return "This Conversation is no longer yours to search.";
+  if (problem.status === 404 && scope === "conversation") return "This Conversation is no longer yours to search.";
   return messageFor(problem);
 }
 

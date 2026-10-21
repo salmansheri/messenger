@@ -117,7 +117,7 @@ export function ConversationPane() {
       </PaneHeader>
       {search.open && (
         <SearchPanel
-          conversation={conversation}
+          scope={{ kind: "conversation", conversation }}
           myId={list.myId}
           text={search.text}
           onTextChange={(text) => setSearch((state) => ({ ...state, text }))}
@@ -125,7 +125,7 @@ export function ConversationPane() {
             setSearch((state) => ({ ...state, open: false }));
             searchButton.current?.focus();
           }}
-          onChoose={(seq) => {
+          onChoose={({ seq }) => {
             setSearch((state) => ({ ...state, open: false }));
             // The chosen link goes with the search: focus waits on the search button until the Message view puts it on
             // the row it opens at. Choosing the Message already opened at changes no address, so its row is found here.
