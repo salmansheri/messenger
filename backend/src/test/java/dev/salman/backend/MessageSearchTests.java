@@ -150,7 +150,7 @@ class MessageSearchTests extends IntegrationTest {
 	}
 
 	@Test
-	void aLongMessageGivesAShortSnippetAroundTheMatch() throws Exception {
+	void aLongMessageGivesAShortSnippetFromAboutTheMatch() throws Exception {
 		var words = new StringBuilder();
 		for (int i = 0; i < 150; i++) { // about 1700 characters each side, inside the 4000 allowed
 			words.append("filler").append(i).append(' ');
@@ -161,6 +161,17 @@ class MessageSearchTests extends IntegrationTest {
 
 		assertThat(snippet).contains(START + "needle" + END);
 		assertThat(snippet.split(" ").length).isLessThan(40);
+	}
+
+	@Test
+	void aNumberAtTheEndOfTheTextStaysInTheSnippet() throws Exception {
+		say(ada, direct, "see you at 5");
+		say(grace, direct, "note 12");
+
+		assertThat(search(ada, direct, "see", null).get("results").get(0).get("snippet").asString())
+				.isEqualTo(START + "see" + END + " you at 5");
+		assertThat(search(ada, direct, "note", null).get("results").get(0).get("snippet").asString())
+				.isEqualTo(START + "note" + END + " 12");
 	}
 
 	@Test

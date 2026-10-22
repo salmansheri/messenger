@@ -153,6 +153,18 @@ class AllConversationsSearchTests extends IntegrationTest {
 	}
 
 	@Test
+	void anEditInAnyConversationIsFoundByItsNewTextOnly() throws Exception {
+		var withGrace = direct(ada, grace);
+		var withLinus = direct(ada, linus);
+		var edited = say(linus, withLinus, "lunch plan");
+		say(grace, withGrace, "lunch with grace");
+		client.editMessage(linus.accessToken(), withLinus, edited, "dinner plan").andExpect(status().isOk());
+
+		assertThat(found(ada, "lunch")).containsExactly("lunch with grace");
+		assertThat(found(ada, "dinner")).containsExactly("dinner plan");
+	}
+
+	@Test
 	void resultsPageAcrossConversationsWithACursor() throws Exception {
 		var withGrace = direct(ada, grace);
 		var withLinus = direct(ada, linus);
@@ -170,11 +182,20 @@ class AllConversationsSearchTests extends IntegrationTest {
 	}
 
 	@Test
-	void aCursorFromAConversationTheCallerIsNotInIsRefused() throws Exception {
-		var theirs = direct(grace, linus);
-		var elsewhere = say(grace, theirs, "note");
+	void aCursorIsOnlyAPositionSoPagingGoesOnAfterLeavingItsConversation() throws Exception {
+		var engines = group("Engines", grace, linus);
+		var withLinus = direct(ada, linus);
+		say(ada, withLinus, "note 1");
+		say(ada, withLinus, "note 2");
+		var last = say(grace, engines, "note 3");
+		say(ada, withLinus, "note 4");
+		client.removeParticipant(ada.accessToken(), engines, linus.id()).andExpect(status().isNoContent());
 
-		client.searchAll(ada.accessToken(), "note", elsewhere).andExpect(status().isBadRequest());
+		// Linus saw "note 3" before he was removed; the next page still comes, from his own Conversations only.
+		var next = search(linus, "note", last);
+		assertThat(next.get("results")).hasSize(2);
+		assertThat(next.get("results").get(0).get("snippet").asString()).contains("2");
+
 		client.searchAll(ada.accessToken(), "note", UUID.randomUUID().toString()).andExpect(status().isBadRequest());
 	}
 

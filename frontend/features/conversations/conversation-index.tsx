@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -10,6 +10,8 @@ import { messageFor } from "@/lib/api/messages";
 import { Avatar } from "@/features/people/person-avatar";
 import { SearchPanel } from "@/features/search/search-panel";
 import { SearchToggle } from "@/features/search/search-toggle";
+import { focusMessageRow } from "@/features/messages/focus-row";
+import { targetFrom } from "@/features/messages/window";
 import { conversationAvatar, conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
 import { useConversationList } from "./queries";
 import { archivedHasUnread, isMuted } from "./settings";
@@ -23,6 +25,7 @@ import { archivedHasUnread, isMuted } from "./settings";
 export function ConversationIndex() {
   const list = useConversationList();
   const openPath = usePathname();
+  const openTarget = targetFrom(useSearchParams().get("at"));
   const items = list.status === "ready" ? list.items : [];
   const openId = openPath.startsWith("/app/c/") ? openPath.slice("/app/c/".length).split("/")[0] : undefined;
   const openIsArchived = Boolean(items.find((conversation) => conversation.id === openId)?.settings?.archived);
@@ -64,7 +67,8 @@ export function ConversationIndex() {
         </span>
       </div>
 
-      {search.open && (
+      {/* Only once the list is there: results are named from it (who said it, which Conversation, "You"). */}
+      {search.open && list.status === "ready" && (
         <SearchPanel
           scope={{ kind: "all", conversations: items }}
           myId={list.status === "ready" ? list.myId : undefined}
@@ -74,10 +78,12 @@ export function ConversationIndex() {
             setSearch((state) => ({ ...state, open: false }));
             searchButton.current?.focus();
           }}
-          onChoose={() => {
-            // The chosen link goes with the search; the Message view then focuses the row it opens at.
+          onChoose={({ conversationId, seq }) => {
+            // The chosen link goes with the search; the Message view then focuses the row it opens at. Choosing the
+            // Message the address already opens at changes nothing in the address, so its row is found here.
             setSearch((state) => ({ ...state, open: false }));
             searchButton.current?.focus();
+            if (conversationId === openId && seq !== undefined && seq === openTarget) focusMessageRow(seq);
           }}
         />
       )}

@@ -50,9 +50,7 @@ public class SearchServiceImpl implements SearchService {
 	@Override
 	@Transactional(readOnly = true)
 	public SearchPage searchConversation(UUID callerId, UUID conversationId, String query, UUID before) {
-		// Every accepted call counts, found or not, like lookup: searching is the most expensive read there is (a query
-		// the validation refuses never reaches here).
-		rateLimiter.hit("rl:search:" + callerId, props.search().maxPerMinute(), SEARCH_WINDOW);
+		countSearch(callerId);
 		var reader = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(() -> new NotFoundException("Conversation not found.")); // first, so outsiders only see a 404
 		var cursor = before == null ? null : messages.findByIdAndConversationId(before, conversationId)
@@ -68,9 +66,10 @@ public class SearchServiceImpl implements SearchService {
 	@Override
 	@Transactional(readOnly = true)
 	public SearchPage searchAll(UUID callerId, String query, UUID before) {
-		rateLimiter.hit("rl:search:" + callerId, props.search().maxPerMinute(), SEARCH_WINDOW);
+		countSearch(callerId);
+		// The cursor is only a position (its time and id): results still come only from the caller's own
+		// Conversations, so a result's Conversation that they have since left does not stop the paging.
 		var cursor = before == null ? null : messages.findById(before)
-				.filter(m -> participants.existsByConversationIdAndUserId(m.getConversationId(), callerId))
 				.orElseThrow(() -> new BadRequestException("before must be the id of a result of this search."));
 
 		var parsed = SearchQuery.parse(query);
@@ -78,6 +77,14 @@ public class SearchServiceImpl implements SearchService {
 				cursor == null ? END_OF_TIME : cursor.getCreatedAt(), cursor == null ? LAST_ID : cursor.getId(),
 				PAGE_SIZE + 1);
 		return page(found, parsed);
+	}
+
+	/**
+	 * Every accepted call of either search counts against one allowance, found or not, like lookup: searching is the most
+	 * expensive read there is (a query the validation refuses never reaches here).
+	 */
+	private void countSearch(UUID callerId) {
+		rateLimiter.hit("rl:search:" + callerId, props.search().maxPerMinute(), SEARCH_WINDOW);
 	}
 
 	/** A page of results from what was found with one row too many (which tells whether more remain). */

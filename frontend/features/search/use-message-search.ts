@@ -20,6 +20,9 @@ export function useMessageSearch(scope: SearchScope, q: string | undefined) {
       ? { ...searchAllInfiniteOptions({ query }), initialPageParam: { query } }
       : { ...searchConversationInfiniteOptions({ path: { conversationId: scope.conversationId }, query }), initialPageParam: { path: { conversationId: scope.conversationId }, query } };
   return useInfiniteQuery({
+    // The two generated options differ only in their key and request (the one-Conversation kind has a `path`); they
+    // return the same `SearchPage`, so one type stands for both here. Each keeps its own key, so changing the scope
+    // never mixes their results.
     ...(options as ReturnType<typeof searchAllInfiniteOptions> & { initialPageParam: { query: { q: string } } }),
     getNextPageParam: (page: SearchPage) => nextBefore(page),
     enabled: q !== undefined,

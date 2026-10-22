@@ -8,6 +8,7 @@ import { Notice } from "@/components/ui/notice";
 import { toProblem, type ConversationResponse } from "@/lib/api";
 import { messageFor } from "@/lib/api/messages";
 import { MessageView } from "@/features/messages/message-view";
+import { focusMessageRow } from "@/features/messages/focus-row";
 import { targetFrom } from "@/features/messages/window";
 import { SearchPanel } from "@/features/search/search-panel";
 import { SearchToggle } from "@/features/search/search-toggle";
@@ -130,11 +131,7 @@ export function ConversationPane() {
             // The chosen link goes with the search: focus waits on the search button until the Message view puts it on
             // the row it opens at. Choosing the Message already opened at changes no address, so its row is found here.
             searchButton.current?.focus();
-            if (seq !== undefined && seq === target) {
-              const row = document.querySelector<HTMLElement>(`[data-message-seq="${seq}"]`);
-              row?.scrollIntoView({ block: "center" });
-              row?.focus({ preventScroll: true });
-            }
+            if (seq !== undefined && seq === target) focusMessageRow(seq);
           }}
         />
       )}

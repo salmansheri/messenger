@@ -31,8 +31,8 @@ public interface SearchService {
 	 * shares the search allowance with {@link #searchConversation}.
 	 *
 	 * @param before the {@code messageId} of the last result already shown, for the next page; null for the first
-	 * @throws dev.salman.backend.exception.BadRequestException when {@code before} is not a Message of one of the
-	 *         caller's Conversations
+	 * @throws dev.salman.backend.exception.BadRequestException when {@code before} is not a Message (it is used only as
+	 *         a position, so one from a Conversation the caller has since left keeps the paging going)
 	 * @throws dev.salman.backend.exception.RateLimitedException when the caller searches too often
 	 */
 	SearchPage searchAll(UUID callerId, String query, UUID before);
