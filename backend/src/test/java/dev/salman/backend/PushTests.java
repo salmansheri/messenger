@@ -222,6 +222,9 @@ class PushTests extends RealtimeIntegrationTest {
 
 		client.history(grace.accessToken(), conversation, "").andExpect(jsonPath("$.messages[0].body")
 				.value("still arrives"));
+		// Wait until the delivery has used its attempts: one still retrying would succeed in the next test, once its
+		// reset has cleared the failures, and show up there as an unexpected push.
+		assertThat(buried().getMessageProperties().<String>getHeader("kind")).isEqualTo("delivery");
 	}
 
 	@Test
