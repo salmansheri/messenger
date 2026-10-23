@@ -48,6 +48,39 @@ bun run api       # regenerate lib/api/generated from the running backend's /v3/
 
 GitHub Actions (`.github/workflows/ci.yml`, badge in `README.md`) runs on every push to `main` and every pull request; a newer run on the same branch or PR cancels the older one. A `changes` job (`dorny/paths-filter`) reports whether `backend/**`, `frontend/**` or the workflow file changed (a workflow change counts as both) and the jobs run on that: the backend job only when `backend/**` or the workflow changed, so a documentation-only change runs nothing else. Two quick pushes to `main` cancel the first run, so the green run to wait for before closing is the one of the latest push. The backend job is `./mvnw -B -ntp verify` on Temurin 25 with the Maven cache; Testcontainers uses the runner's Docker, as locally (its images, Grafana LGTM included, are `:latest`, so an upstream release can turn CI red with no commit here). On failure the surefire reports are uploaded as the `surefire-reports` artifact (7 days). The image job runs on the same changes as the backend job and builds `backend/Dockerfile` (context `backend/`) with Buildx, never pushing and never logging in to a registry; its layers are kept between runs in GitHub's Actions cache (`type=gha`, `mode=max`), so a code-only change reuses the Maven dependency layer. The frontend job runs only when `frontend/**` or the workflow changed: Bun from `package.json`'s `packageManager` (`oven-sh/setup-bun` with `bun-version-file`), Bun's install cache keyed on `bun.lock`, `bun install --frozen-lockfile` (a lockfile out of step with `package.json` fails it), then `lint`, `typecheck`, `test` (Vitest) and `build`, with no environment beyond `NEXT_TELEMETRY_DISABLED` (the API address stays the default `http://localhost:8080`; the build never calls the backend). The build downloads the fonts through `next/font/google`, so an outage there turns the job red with no commit here. No secrets, no Playwright, no required checks (CI reports, it does not gate), and **failed tests are never retried**: a test that is flaky on the slower runner (the timing-based ones: code TTL, lock timeout, presence sweeps) is fixed. An issue is closed only after its push's run is green. Lint the workflow with `actionlint` after changing it.
 
+## Running in production
+
+The backend ships as the image built from `backend/Dockerfile` (Render or any Docker host). It listens on 8080, turns compose support off, and keeps uploads under `/app/data/uploads`. Everything else comes from environment variables (Spring's relaxed binding: `app.otp.secret` is `APP_OTP_SECRET`). The defaults in `application.yaml` are for development only.
+
+- **Must set:**
+  - **Database:** `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`. PostgreSQL 15 or later, and the user must be able to create the `unaccent` extension (migration `V16`).
+  - **Redis and RabbitMQ:** `SPRING_DATA_REDIS_URL` (e.g. `rediss://user:pass@host:6379`) and `SPRING_RABBITMQ_ADDRESSES` (e.g. `amqps://user:pass@host/vhost`).
+  - **Mail:** `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, plus `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true` and `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` as the provider needs, and `APP_MAIL_FROM`.
+  - **JWT keys:** `APP_JWT_PRIVATE_KEY` and `APP_JWT_PUBLIC_KEY`, PEM, EC P-256.
+    - Generate them with `openssl ecparam -genkey -name prime256v1 -noout | openssl pkcs8 -topk8 -nocrypt > private.pem` and `openssl ec -in private.pem -pubout > public.pem`.
+    - Without them every restart signs with a new key, which signs everyone out within 15 minutes.
+  - **Secrets:**
+    - `APP_OTP_SECRET`, the HMAC for verification codes.
+    - `STORAGE_SIGNING_SECRET` for image links. Changing it breaks the links already handed out.
+  - **URLs:**
+    - `STORAGE_PUBLIC_BASE_URL`: the backend's public `https://` address, which goes into image links.
+    - `APP_CORS_ALLOWED_ORIGINS`: the frontend's origin, comma-separated if there are several.
+  - **Client IP:** `SERVER_FORWARD_HEADERS_STRATEGY=native`.
+    - Behind a proxy (Render's included) the remote address is otherwise the proxy's, so the per-IP code limit (20 an hour) is shared by every user at once.
+    - Tomcat then takes the client from `X-Forwarded-For`, trusting only private-range proxies.
+- **Storage:**
+  - Mount a persistent disk at `/app/data`, or uploads and Avatars are lost on every deploy.
+  - Several instances need the same disk (a network disk), as described under Image uploads.
+- **Cookies:**
+  - The refresh cookie is `Secure; SameSite=Strict`, so the frontend and backend must be served over HTTPS from the **same site**, e.g. `app.example.com` and `api.example.com`.
+  - Two `*.onrender.com` addresses are different sites, because `onrender.com` is on the Public Suffix List. On them the cookie is never sent, and nobody stays signed in after a reload.
+  - Leave `REFRESH_COOKIE_SECURE` at its default `true`.
+- **Telemetry:** the OpenTelemetry starter exports traces, metrics and logs over OTLP to `localhost`.
+  - With a collector, set `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`, `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` and `MANAGEMENT_OTLP_METRICS_EXPORT_URL`.
+  - Without one, turn export off: `MANAGEMENT_TRACING_EXPORT_ENABLED=false`, `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false`, `MANAGEMENT_OTLP_LOGGING_EXPORT_ENABLED=false`. Otherwise the logs fill with failed exports.
+- **Optional:** `FCM_CREDENTIALS_FILE`, the path to a Firebase service-account file mounted as a secret file. Without it, pushes are only logged.
+- **Frontend:** `NEXT_PUBLIC_API_URL` is inlined into the bundle **at build time**, so set it to the backend's public address before `bun run build`, not at run time.
+
 ## Architecture notes
 
 Backend design (partly implemented; see issue #1 for the full spec):

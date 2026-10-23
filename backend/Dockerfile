@@ -1,5 +1,5 @@
 # The backend as a container image (for Render or any Docker host). Configuration comes from environment variables;
-# see the production notes in the root CLAUDE.md for the ones that must be set (database, Redis, RabbitMQ, SMTP, keys).
+# "Running in production" in the root CLAUDE.md lists the ones that must be set (database, Redis, RabbitMQ, SMTP, keys).
 
 # --- Build: compile and package the jar --------------------------------------------------------------------------
 FROM eclipse-temurin:25-jdk AS build
