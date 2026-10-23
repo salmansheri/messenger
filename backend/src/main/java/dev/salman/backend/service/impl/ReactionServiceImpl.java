@@ -70,7 +70,10 @@ public class ReactionServiceImpl implements ReactionService {
 				.filter(candidate -> viewer.canRead(candidate.getSeq()))
 				.filter(candidate -> hidden.findHiddenAmong(callerId, List.of(candidate.getId())).isEmpty())
 				.orElseThrow(() -> new NotFoundException("Message not found."));
-		blocks.requireMayChange(callerId, conversation);
+		if (emoji != null) {
+			// Taking a reaction back is like deleting one's own Message: allowed even while blocking.
+			blocks.requireMayChange(callerId, conversation);
+		}
 		if (message.isDeleted()) {
 			throw new ConflictException("You cannot react to a deleted Message.");
 		}

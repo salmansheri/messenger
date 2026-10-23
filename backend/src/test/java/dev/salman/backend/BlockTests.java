@@ -140,9 +140,10 @@ class BlockTests extends RealtimeIntegrationTest {
 	// ---- the blocker's own actions while the Block lasts
 
 	@Test
-	void theBlockerCannotSendReplyEditOrReactButCanHideAndDelete() throws Exception {
+	void theBlockerCannotSendReplyEditOrReactButCanTakeBackAReactionHideAndDelete() throws Exception {
 		var mine = client.sendNew(ada.accessToken(), withGrace, "Before the Block").get("id").asString();
 		var hers = client.sendNew(grace.accessToken(), withGrace, "Also before").get("id").asString();
+		client.react(ada.accessToken(), withGrace, hers, "❤️").andExpect(status().isOk());
 		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
 
 		client.send(ada.accessToken(), withGrace, UUID.randomUUID(), "Hello?").andExpect(status().isConflict())
@@ -155,8 +156,9 @@ class BlockTests extends RealtimeIntegrationTest {
 		client.editMessage(ada.accessToken(), withGrace, mine, "Changed").andExpect(status().isConflict())
 				.andExpect(jsonPath("$.detail").value("Unblock this person to change Messages."));
 		client.react(ada.accessToken(), withGrace, hers, "👍").andExpect(status().isConflict());
-		client.unreact(ada.accessToken(), withGrace, hers).andExpect(status().isConflict());
 
+		client.unreact(ada.accessToken(), withGrace, hers).andExpect(status().isOk())
+				.andExpect(jsonPath("$.reactions.length()").value(0));
 		client.hideMessage(ada.accessToken(), withGrace, hers).andExpect(status().isNoContent());
 		client.deleteMessage(ada.accessToken(), withGrace, mine).andExpect(status().isNoContent());
 
