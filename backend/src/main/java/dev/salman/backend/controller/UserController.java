@@ -1,5 +1,8 @@
 package dev.salman.backend.controller;
 
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -7,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -16,11 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import dev.salman.backend.dto.BlockedUser;
 import dev.salman.backend.dto.LookupRequest;
 import dev.salman.backend.dto.UpdateProfileRequest;
 import dev.salman.backend.dto.UserProfile;
 import dev.salman.backend.dto.UserSummary;
 import dev.salman.backend.service.AvatarService;
+import dev.salman.backend.service.BlockService;
 import dev.salman.backend.lib.Principals;
 import java.io.IOException;
 import dev.salman.backend.service.UserService;
@@ -34,6 +40,7 @@ public class UserController {
 
 	private final UserService users;
 	private final AvatarService avatars;
+	private final BlockService blocks;
 
 	@GetMapping("/me")
 	UserProfile me(@AuthenticationPrincipal Jwt jwt) {
@@ -57,6 +64,26 @@ public class UserController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void removeAvatar(@AuthenticationPrincipal Jwt jwt) {
 		avatars.remove(Principals.userId(jwt));
+	}
+
+	/** Blocks the User (ADR 0006); 204 also when they were already blocked. See {@link BlockService#block}. */
+	@PutMapping("/{userId}/block")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void block(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID userId) {
+		blocks.block(Principals.userId(jwt), userId);
+	}
+
+	/** Lifts the caller's Block of the User; 204 also when there was none. */
+	@DeleteMapping("/{userId}/block")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void unblock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID userId) {
+		blocks.unblock(Principals.userId(jwt), userId);
+	}
+
+	/** The caller's Blocked Users, newest first. */
+	@GetMapping("/me/blocks")
+	List<BlockedUser> blocks(@AuthenticationPrincipal Jwt jwt) {
+		return blocks.blockedBy(Principals.userId(jwt));
 	}
 
 	/**

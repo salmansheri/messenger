@@ -47,4 +47,11 @@ public class Conversation {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	/** Both User ids in a fixed order, so the key of a pair's Direct conversation is the same whoever starts it. */
+	public static String directKey(UUID first, UUID second) {
+		var a = first.toString();
+		var b = second.toString();
+		return a.compareTo(b) < 0 ? a + ":" + b : b + ":" + a;
+	}
+
 }

@@ -143,3 +143,20 @@ _Avoid_: Client, endpoint, subscription
 **Push notification**:
 A short notice (who wrote, and the start of the Message) sent to a Device of a Participant who has no open connection when a Message arrives. Never sent to the sender or to someone already receiving the Message live.
 _Avoid_: Alert, notification (alone, which is ambiguous with live events)
+
+### Blocking
+
+**Block**:
+A User's private decision to stop another User reaching them. The other User is never told. Their Messages in the Direct conversation become Withheld Messages, the two no longer see each other's presence anywhere, and the Blocked User cannot add the blocker to a Group. The blocker cannot send in that Direct conversation either while the Block lasts. Messages in Groups they share are unaffected.
+_Avoid_: Ban, mute (a different thing), report
+
+**Withheld Message**:
+A Message a Blocked User sends in the Direct conversation while the Block lasts. The sender sees it as sent; it never reaches the blocker, does not count as unread for them, and stays Sent for ever, even after Unblock.
+
+**Blocked User**:
+The User on the receiving end of a Block, as seen by the User who blocked them.
+_Avoid_: Blocked contact
+
+**Unblock**:
+Lifting a Block. From then on new Messages flow both ways again; Withheld Messages stay withheld.
+_Avoid_: Allow, restore

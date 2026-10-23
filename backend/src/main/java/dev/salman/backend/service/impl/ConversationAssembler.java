@@ -22,6 +22,7 @@ import dev.salman.backend.dto.ParticipantSummary;
 import dev.salman.backend.dto.ReactionView;
 import dev.salman.backend.dto.ReplyQuote;
 import dev.salman.backend.entity.Conversation;
+import dev.salman.backend.entity.ConversationType;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
 import dev.salman.backend.entity.ParticipantRole;
@@ -29,10 +30,11 @@ import dev.salman.backend.entity.User;
 import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
+import dev.salman.backend.repository.UserBlockRepository;
 import dev.salman.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
-/** Builds {@link ConversationResponse}s as one viewer sees them, with four queries however many there are. */
+/** Builds {@link ConversationResponse}s as one viewer sees them, with a fixed number of queries however many there are. */
 @Component
 @RequiredArgsConstructor
 class ConversationAssembler {
@@ -46,6 +48,7 @@ class ConversationAssembler {
 	private final ReactionLoader reactionLoader;
 	private final AttachmentLoader attachmentLoader;
 	private final AvatarLinks avatars;
+	private final UserBlockRepository blocks;
 
 	List<ConversationResponse> assemble(List<Conversation> found, UUID viewerId) {
 		if (found.isEmpty()) {
@@ -61,10 +64,30 @@ class ConversationAssembler {
 		var pictured = attachmentLoader.of(latestByConversation.values());
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));
+		var blocked = blockedConversations(found, membersByConversation, viewerId);
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
-						latestByConversation.get(c.getId()), quoted, reacted, pictured, now))
+						latestByConversation.get(c.getId()), quoted, reacted, pictured, blocked.contains(c.getId()), now))
 				.toList();
+	}
+
+	/** The Direct conversations whose other Participant the viewer has blocked (one query, or none). */
+	private Set<UUID> blockedConversations(List<Conversation> found, Map<UUID, List<Participant>> membersByConversation,
+			UUID viewerId) {
+		var otherByConversation = new HashMap<UUID, UUID>();
+		for (var conversation : found) {
+			if (conversation.getType() == ConversationType.DIRECT) {
+				membersByConversation.get(conversation.getId()).stream().map(Participant::getUserId)
+						.filter(id -> !id.equals(viewerId)).findFirst()
+						.ifPresent(other -> otherByConversation.put(conversation.getId(), other));
+			}
+		}
+		if (otherByConversation.isEmpty()) {
+			return Set.of();
+		}
+		var blockedUsers = Set.copyOf(blocks.findBlockedAmong(viewerId, Set.copyOf(otherByConversation.values())));
+		return otherByConversation.entrySet().stream().filter(e -> blockedUsers.contains(e.getValue()))
+				.map(Map.Entry::getKey).collect(Collectors.toSet());
 	}
 
 	/**
@@ -92,7 +115,7 @@ class ConversationAssembler {
 	private ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
 			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
-			Map<UUID, AttachmentResponse> pictured, Instant now) {
+			Map<UUID, AttachmentResponse> pictured, boolean blocked, Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
@@ -109,7 +132,7 @@ class ConversationAssembler {
 						: MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members), quoted.get(latest.getId()),
 								reacted.getOrDefault(latest.getId(), List.of()), pictured.get(latest.getId())),
 				unread, viewer.map(v -> ConversationSettings.of(v, now)).orElse(new ConversationSettings(false, null, false, false)),
-				conversation.getCreatedAt(), conversation.getUpdatedAt());
+				blocked, conversation.getCreatedAt(), conversation.getUpdatedAt());
 	}
 
 }

@@ -409,6 +409,24 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Blocks the User. */
+	public ResultActions block(String accessToken, Object userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.put("/api/v1/users/{id}/block", userId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
+	/** Lifts the caller's Block of the User. */
+	public ResultActions unblock(String accessToken, Object userId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/users/{id}/block", userId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
+	/** The caller's Blocked Users. */
+	public ResultActions blocks(String accessToken) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/users/me/blocks").header("Authorization",
+				"Bearer " + accessToken));
+	}
+
 	public ResultActions removeAvatar(String accessToken) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/users/me/avatar").header("Authorization",
 				"Bearer " + accessToken));

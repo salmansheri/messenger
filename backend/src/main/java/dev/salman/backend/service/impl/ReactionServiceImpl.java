@@ -20,6 +20,7 @@ import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.ReactionRepository;
+import dev.salman.backend.service.BlockService;
 import dev.salman.backend.service.MessageThrottle;
 import dev.salman.backend.service.ReactionService;
 import dev.salman.backend.service.RealtimeEvents;
@@ -38,6 +39,7 @@ public class ReactionServiceImpl implements ReactionService {
 	private final AttachmentLoader attachmentLoader;
 	private final QuoteResolver quotes;
 	private final RealtimeEvents events;
+	private final BlockService blocks;
 	private final MessageThrottle throttle;
 	private final Clock clock;
 
@@ -61,13 +63,14 @@ public class ReactionServiceImpl implements ReactionService {
 			throw notFound();
 		}
 		throttle.change(callerId); // before the lock, like the other changes
-		conversations.findByIdForUpdate(conversationId).orElseThrow(ReactionServiceImpl::notFound);
+		var conversation = conversations.findByIdForUpdate(conversationId).orElseThrow(ReactionServiceImpl::notFound);
 		// Again, under the lock: a removal may have just committed, and the reaction must not outlive it.
 		var viewer = participants.findByConversationIdAndUserId(conversationId, callerId).orElseThrow(ReactionServiceImpl::notFound);
 		var message = messages.findByIdAndConversationId(messageId, conversationId)
 				.filter(candidate -> viewer.canRead(candidate.getSeq()))
 				.filter(candidate -> hidden.findHiddenAmong(callerId, List.of(candidate.getId())).isEmpty())
 				.orElseThrow(() -> new NotFoundException("Message not found."));
+		blocks.requireMayChange(callerId, conversation);
 		if (message.isDeleted()) {
 			throw new ConflictException("You cannot react to a deleted Message.");
 		}

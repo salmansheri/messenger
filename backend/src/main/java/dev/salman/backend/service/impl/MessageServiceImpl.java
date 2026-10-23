@@ -31,6 +31,7 @@ import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.AttachmentService;
+import dev.salman.backend.service.BlockService;
 import dev.salman.backend.service.MessageService;
 import dev.salman.backend.service.MessageThrottle;
 import dev.salman.backend.service.PushService;
@@ -55,6 +56,7 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageThrottle throttle;
 	private final AppProperties props;
 	private final Clock clock;
+	private final BlockService blocks;
 
 	/**
 	 * The Conversation row is locked while the Message is stored, so concurrent sends run one after another: the
@@ -90,6 +92,9 @@ public class MessageServiceImpl implements MessageService {
 			}
 			return new SentMessage(responseFor(stored, statusFor(stored, callerId), viewer(conversationId, callerId)), false);
 		}
+
+		// Under the lock, which a Block also takes: a send is either before the Block or refused by it.
+		blocks.requireMaySend(callerId, conversation);
 
 		if (replyToMessageId != null) {
 			// Only what the replier may read can be answered; anything else looks like it does not exist.
@@ -145,8 +150,9 @@ public class MessageServiceImpl implements MessageService {
 	public MessageResponse edit(UUID callerId, UUID conversationId, UUID messageId, String body) {
 		requireParticipant(callerId, conversationId);
 		throttle.change(callerId); // before the lock, like sending
-		conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
+		var conversation = conversations.findByIdForUpdate(conversationId).orElseThrow(MessageServiceImpl::notFound);
 		var message = ownMessage(callerId, conversationId, messageId);
+		blocks.requireMayChange(callerId, conversation);
 		if (message.isDeleted()) {
 			throw new ConflictException("This Message was deleted.");
 		}

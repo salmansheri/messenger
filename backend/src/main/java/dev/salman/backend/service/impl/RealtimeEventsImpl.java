@@ -129,6 +129,15 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	}
 
 	@Override
+	public void blockChanged(UUID blockerId, UUID userId, boolean blocked) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "block.changed");
+		payload.put("userId", userId);
+		payload.put("blocked", blocked);
+		publish(Set.of(blockerId), payload);
+	}
+
+	@Override
 	public void typingChanged(UUID conversationId, UUID typistId, boolean typing) {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.remove(typistId);

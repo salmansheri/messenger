@@ -73,6 +73,9 @@ public interface RealtimeEvents {
 	/** The reactions of {@code userId} in the Conversation were deleted (they left or were removed); heard by those who remain. */
 	void reactionsCleared(UUID conversationId, UUID userId);
 
+	/** The User blocked or unblocked someone; heard only by the blocker's sessions, never by the other User. */
+	void blockChanged(UUID blockerId, UUID userId, boolean blocked);
+
 	/** The User changed their private settings for a Conversation; heard only by that User's sessions. */
 	void settingsChanged(UUID userId, UUID conversationId, ConversationSettings settings);
 

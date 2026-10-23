@@ -46,7 +46,7 @@ public class ConversationServiceImpl implements ConversationService {
 		users.findById(otherUserId).filter(User::isEmailVerified)
 				.orElseThrow(() -> new NotFoundException("No user found."));
 
-		var key = directKey(callerId, otherUserId);
+		var key = Conversation.directKey(callerId, otherUserId);
 		conversations.lockDirectKey(key);
 		var existing = conversations.findByDirectKey(key);
 		if (existing.isPresent()) {
@@ -84,13 +84,6 @@ public class ConversationServiceImpl implements ConversationService {
 		var conversation = conversations.findById(conversationId)
 				.orElseThrow(() -> new NotFoundException("Conversation not found."));
 		return assembler.assemble(List.of(conversation), callerId).getFirst();
-	}
-
-	/** Both User ids in a fixed order, so the key is the same whichever User starts the conversation. */
-	private static String directKey(UUID first, UUID second) {
-		var a = first.toString();
-		var b = second.toString();
-		return a.compareTo(b) < 0 ? a + ":" + b : b + ":" + a;
 	}
 
 }
