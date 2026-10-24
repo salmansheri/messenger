@@ -246,7 +246,10 @@ class UploadImageTests extends IntegrationTest {
 		var two = upload("two.png", "image/png", image("png", 12, 12));
 		var url = one.get("url").asString();
 
-		assertThat(statusOf(url.replaceAll("signature=(.)", "signature=X"))).isEqualTo(404);
+		// Change the signature's first character to a different one (always X would leave one already starting with X alone).
+		var at = url.indexOf("signature=") + "signature=".length();
+		var tampered = url.substring(0, at) + (url.charAt(at) == 'X' ? 'Y' : 'X') + url.substring(at + 1);
+		assertThat(statusOf(tampered)).isEqualTo(404);
 		assertThat(statusOf(url.replaceAll("expires=\\d+", "expires=9999999999"))).isEqualTo(404);
 		assertThat(statusOf(url.substring(0, url.indexOf("?")))).isEqualTo(404);
 		var otherFile = two.get("url").asString().replaceAll("\\?.*", "") + url.substring(url.indexOf("?"));
