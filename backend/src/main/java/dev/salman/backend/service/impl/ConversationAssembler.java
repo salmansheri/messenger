@@ -65,14 +65,34 @@ class ConversationAssembler {
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));
 		var blocked = blockedConversations(found, membersByConversation, viewerId);
-		var withheld = messages.countWithheldUnread(viewerId, found.stream().map(Conversation::getId).toList()).stream()
+		var ids = found.stream().map(Conversation::getId).toList();
+		var withheld = messages.countWithheldUnread(viewerId, ids).stream()
 				.collect(Collectors.toMap(MessageRepository.WithheldCount::getConversationId,
 						MessageRepository.WithheldCount::getCount));
+		var activity = visibleActivity(found, viewerId);
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
 						latestByConversation.get(c.getId()), quoted, reacted, pictured, blocked.contains(c.getId()),
-						withheld.getOrDefault(c.getId(), 0L), now))
+						withheld.getOrDefault(c.getId(), 0L), activity.getOrDefault(c.getId(), c.getUpdatedAt()), now))
 				.toList();
+	}
+
+	/**
+	 * When each Conversation holding Messages withheld from the viewer last had activity they can see: its latest
+	 * Message not withheld from them, or its start when there is none (one query, and only those Conversations are
+	 * in the answer; every other one's activity is its {@code updated_at}). Only Direct conversations withhold, and
+	 * their {@code updated_at} moves only on a send, so this is what it would read had the Withheld Messages not been
+	 * sent.
+	 */
+	private Map<UUID, Instant> visibleActivity(List<Conversation> found, UUID viewerId) {
+		var startedAt = found.stream().collect(Collectors.toMap(Conversation::getId, Conversation::getCreatedAt));
+		var activity = new HashMap<UUID, Instant>();
+		for (var visible : messages.findVisibleActivity(viewerId, startedAt.keySet())) {
+			var latest = visible.getLatestVisibleAt();
+			activity.put(visible.getConversationId(),
+					latest != null ? latest : startedAt.get(visible.getConversationId()));
+		}
+		return activity;
 	}
 
 	/** The Direct conversations whose other Participant the viewer has blocked (one query, or none). */
@@ -120,7 +140,8 @@ class ConversationAssembler {
 	private ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
 			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
-			Map<UUID, AttachmentResponse> pictured, boolean blocked, long withheldUnread, Instant now) {
+			Map<UUID, AttachmentResponse> pictured, boolean blocked, long withheldUnread, Instant activityAt,
+			Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
@@ -137,7 +158,7 @@ class ConversationAssembler {
 						: MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members), quoted.get(latest.getId()),
 								reacted.getOrDefault(latest.getId(), List.of()), pictured.get(latest.getId())),
 				unread, viewer.map(v -> ConversationSettings.of(v, now)).orElse(new ConversationSettings(false, null, false, false)),
-				blocked, conversation.getCreatedAt(), conversation.getUpdatedAt());
+				blocked, conversation.getCreatedAt(), activityAt);
 	}
 
 }

@@ -99,6 +99,32 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 			""")
 	long findLatestSeqNotWithheldFrom(UUID conversationId, UUID userId);
 
+	/** When a Conversation last had activity the viewer can see (null: none of its Messages). */
+	interface VisibleActivity {
+
+		UUID getConversationId();
+
+		Instant getLatestVisibleAt();
+
+	}
+
+	/**
+	 * For each given Conversation holding Messages withheld from the viewer (only those, through the partial index),
+	 * when the latest Message not withheld from them was sent. Withheld Messages are not activity for the blocker.
+	 * The latest one is found by Sequence number, so the {@code (conversation_id, seq)} index is read backwards from
+	 * the end rather than the whole history.
+	 */
+	@Query("""
+			select w.conversationId as conversationId,
+			       (select m.createdAt from Message m where m.conversationId = w.conversationId
+			        and m.seq = (select max(n.seq) from Message n where n.conversationId = w.conversationId
+			                     and (n.withheldFrom is null or n.withheldFrom <> :viewerId))) as latestVisibleAt
+			from Message w
+			where w.withheldFrom = :viewerId and w.conversationId in :conversationIds
+			group by w.conversationId
+			""")
+	List<VisibleActivity> findVisibleActivity(UUID viewerId, Collection<UUID> conversationIds);
+
 	/** The latest Message of each given Conversation that has one, in a single query. */
 	@Query("""
 			select m from Message m join Conversation c on c.id = m.conversationId

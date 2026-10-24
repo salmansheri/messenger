@@ -449,6 +449,74 @@ class BlockTests extends RealtimeIntegrationTest {
 		client.history(ada.accessToken(), group, "").andExpect(jsonPath("$.messages[0].body").value("In the Group"));
 	}
 
+	// ---- list order (#60)
+
+	private List<String> listOrderOf(Account who) throws Exception {
+		var ids = new ArrayList<String>();
+		read(client.conversations(who.accessToken())).forEach(c -> ids.add(c.get("id").asString()));
+		return ids;
+	}
+
+	@Test
+	void withheldMessagesDoNotLiftTheConversationInTheBlockersList() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var adaWithLinus = idOf(client.startDirect(ada.accessToken(), linus.id()));
+		var graceWithLinus = idOf(client.startDirect(grace.accessToken(), linus.id()));
+		var seen = client.sendNew(grace.accessToken(), withGrace, "Before the Block");
+		client.sendNew(linus.accessToken(), adaWithLinus, "Hello Ada");
+		client.sendNew(linus.accessToken(), graceWithLinus, "Hello Grace");
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.sendNew(grace.accessToken(), withGrace, "Withheld");
+
+		assertThat(listOrderOf(ada)).containsExactly(adaWithLinus, withGrace);
+		client.conversation(ada.accessToken(), withGrace)
+				.andExpect(jsonPath("$.updatedAt").value(seen.get("createdAt").asString()));
+		client.conversations(ada.accessToken())
+				.andExpect(jsonPath("$[1].updatedAt").value(seen.get("createdAt").asString()));
+		assertThat(listOrderOf(grace)).containsExactly(withGrace, graceWithLinus);
+	}
+
+	@Test
+	void aConversationWithOnlyWithheldMessagesKeepsItsStartingTimeForTheBlocker() throws Exception {
+		var started = read(client.conversation(ada.accessToken(), withGrace)).get("createdAt").asString();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.sendNew(grace.accessToken(), withGrace, "Withheld");
+
+		client.conversation(ada.accessToken(), withGrace).andExpect(jsonPath("$.updatedAt").value(started));
+	}
+
+	@Test
+	void afterUnblockANewMessageLiftsTheConversationAgain() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var adaWithLinus = idOf(client.startDirect(ada.accessToken(), linus.id()));
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		client.sendNew(grace.accessToken(), withGrace, "Withheld");
+		client.sendNew(linus.accessToken(), adaWithLinus, "Hello Ada");
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		var after = client.sendNew(grace.accessToken(), withGrace, "After");
+
+		assertThat(listOrderOf(ada)).containsExactly(withGrace, adaWithLinus);
+		client.conversation(ada.accessToken(), withGrace)
+				.andExpect(jsonPath("$.updatedAt").value(after.get("createdAt").asString()));
+	}
+
+	@Test
+	void aPinnedConversationStaysFirstForTheBlocker() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var adaWithLinus = idOf(client.startDirect(ada.accessToken(), linus.id()));
+		client.sendNew(grace.accessToken(), withGrace, "Before the Block");
+		client.updateSettings(ada.accessToken(), withGrace, Map.of("pinned", true)).andExpect(status().isOk());
+		client.sendNew(linus.accessToken(), adaWithLinus, "Hello Ada");
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.sendNew(grace.accessToken(), withGrace, "Withheld");
+
+		assertThat(listOrderOf(ada)).containsExactly(withGrace, adaWithLinus);
+	}
+
 	// ---- throttle
 
 	@Test

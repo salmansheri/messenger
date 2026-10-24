@@ -70,9 +70,13 @@ public class ConversationServiceImpl implements ConversationService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<ConversationResponse> listFor(UUID callerId) {
-		// Already most recently active first; pinned ones move to the front, keeping that order among themselves.
+		// Pinned ones first, then by the latest activity the caller can see, which is the response's updatedAt: a
+		// Conversation's own updated_at, except where Messages withheld from the caller moved it (ADR 0006). The
+		// sort is stable, so ties keep the database's order.
 		return assembler.assemble(conversations.findAllForUser(callerId), callerId).stream()
-				.sorted(Comparator.comparing((ConversationResponse c) -> !c.settings().pinned())).toList();
+				.sorted(Comparator.comparing((ConversationResponse c) -> !c.settings().pinned())
+						.thenComparing(ConversationResponse::updatedAt, Comparator.reverseOrder()))
+				.toList();
 	}
 
 	@Override
