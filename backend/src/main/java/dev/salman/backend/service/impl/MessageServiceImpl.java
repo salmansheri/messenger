@@ -95,11 +95,15 @@ public class MessageServiceImpl implements MessageService {
 
 		// Under the lock, which a Block also takes: a send is either before the Block or refused by it.
 		blocks.requireMaySend(callerId, conversation);
+		// Decided once, under the same lock: a Message stored while the other Participant blocks the sender is
+		// withheld from them for good, whatever happens to the Block later (ADR 0006).
+		var withheldFrom = blocks.withholderOf(callerId, conversation);
 
 		if (replyToMessageId != null) {
 			// Only what the replier may read can be answered; anything else looks like it does not exist.
 			var answered = messages.findByIdAndConversationId(replyToMessageId, conversationId)
 					.filter(candidate -> candidate.getSeq() > joinedAfter)
+					.filter(candidate -> !candidate.isWithheldFrom(callerId))
 					.filter(candidate -> hidden.findHiddenAmong(callerId, List.of(candidate.getId())).isEmpty())
 					.orElseThrow(() -> new NotFoundException("Message not found."));
 			if (answered.isDeleted()) {
@@ -127,6 +131,7 @@ public class MessageServiceImpl implements MessageService {
 		message.setBody(body);
 		message.setReplyToId(replyToMessageId);
 		message.setAttachmentId(attachmentId);
+		message.setWithheldFrom(withheldFrom);
 		message.setCreatedAt(now);
 		messages.save(message);
 		// Sending shows the sender has seen the conversation up to here, so their own message is never "unread".
@@ -218,19 +223,21 @@ public class MessageServiceImpl implements MessageService {
 				.orElseThrow(MessageServiceImpl::notFound);
 		throttle.change(callerId);
 		messages.findByIdAndConversationId(messageId, conversationId).filter(m -> member.canRead(m.getSeq()))
+				.filter(m -> !m.isWithheldFrom(callerId))
 				.orElseThrow(() -> new NotFoundException("Message not found."));
 		hidden.hide(callerId, messageId, conversationId, clock.instant());
 	}
 
 	/**
-	 * The caller's own Message in this Conversation, under the lock. One that is not in the Conversation, or is from
-	 * before the caller joined, looks the same as one that does not exist.
+	 * The caller's own Message in this Conversation, under the lock. One that is not in the Conversation, is from
+	 * before the caller joined or is withheld from them looks the same as one that does not exist.
 	 */
 	private Message ownMessage(UUID callerId, UUID conversationId, UUID messageId) {
 		var member = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(MessageServiceImpl::notFound); // again, under the lock: a removal may have just committed
 		var message = messages.findByIdAndConversationId(messageId, conversationId)
 				.filter(m -> member.canRead(m.getSeq()))
+				.filter(m -> !m.isWithheldFrom(callerId))
 				.orElseThrow(() -> new NotFoundException("Message not found."));
 		if (!message.getSenderId().equals(callerId)) {
 			throw new ForbiddenException("Only the sender can do that.");

@@ -68,6 +68,7 @@ public class ReactionServiceImpl implements ReactionService {
 		var viewer = participants.findByConversationIdAndUserId(conversationId, callerId).orElseThrow(ReactionServiceImpl::notFound);
 		var message = messages.findByIdAndConversationId(messageId, conversationId)
 				.filter(candidate -> viewer.canRead(candidate.getSeq()))
+				.filter(candidate -> !candidate.isWithheldFrom(callerId))
 				.filter(candidate -> hidden.findHiddenAmong(callerId, List.of(candidate.getId())).isEmpty())
 				.orElseThrow(() -> new NotFoundException("Message not found."));
 		if (emoji != null) {

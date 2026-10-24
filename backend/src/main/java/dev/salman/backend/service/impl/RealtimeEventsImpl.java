@@ -2,6 +2,7 @@ package dev.salman.backend.service.impl;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import dev.salman.backend.lib.AfterCommit;
 import dev.salman.backend.lib.RealtimeListener;
 import dev.salman.backend.lib.RealtimePublisher;
 import dev.salman.backend.repository.MessageHiddenRepository;
+import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class RealtimeEventsImpl implements RealtimeEvents {
 
 	private final ParticipantRepository participants;
+	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
@@ -43,14 +46,16 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 
 	@Override
 	public void messageCreated(Message message) {
-		publishMessage("message.created", message, participants.findByConversationId(message.getConversationId()));
+		publishMessage("message.created", message, participants.findByConversationId(message.getConversationId())
+				.stream().filter(m -> !message.isWithheldFrom(m.getUserId())).toList());
 	}
 
 	@Override
 	public void messageUpdated(Message message) {
-		// Only people who can still read it: not someone who joined after it, nor who hid it for themselves.
+		// Only people who can still read it: not someone who joined after it, who hid it for themselves or from whom it
+		// is withheld.
 		var members = participants.findByConversationId(message.getConversationId()).stream()
-				.filter(m -> m.canRead(message.getSeq())).toList();
+				.filter(m -> m.canRead(message.getSeq())).filter(m -> !message.isWithheldFrom(m.getUserId())).toList();
 		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
 		publishMessage("message.updated", message, members.stream().filter(m -> !hiders.contains(m.getUserId())).toList());
 	}
@@ -78,13 +83,15 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	public void receiptsChanged(UUID conversationId, UUID reporterId, ReceiptPositions before,
 			ReceiptResponse after) {
 		var members = participants.findByConversationId(conversationId);
+		var limits = frontierLimits(conversationId);
 		// Each Participant is told how far everyone ELSE has got, but only if the report moved it for them;
 		// recipients with the same answer share one event.
 		Map<ReceiptFrontier, Set<UUID>> moved = new LinkedHashMap<>();
 		for (var member : members) {
-			var now = ReceiptFrontier.ofOthers(member.getUserId(), members);
+			var limit = limits.getOrDefault(member.getUserId(), Long.MAX_VALUE);
+			var now = ReceiptFrontier.ofOthers(member.getUserId(), members).atMost(limit);
 			var earlier = ReceiptFrontier.ofOthers(member.getUserId(), members, reporterId, before.deliveredSeq(),
-					before.readSeq());
+					before.readSeq()).atMost(limit);
 			if (!now.equals(earlier)) {
 				moved.computeIfAbsent(now, f -> new LinkedHashSet<>()).add(member.getUserId());
 			}
@@ -93,6 +100,26 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 				Map.of("deliveredUpTo", frontier.deliveredUpTo(), "readUpTo", frontier.readUpTo()))));
 		publish(Set.of(reporterId), event("unread.updated", conversationId, Map.of("deliveredSeq",
 				after.deliveredSeq(), "readSeq", after.readSeq(), "unreadCount", after.unreadCount())));
+	}
+
+	/**
+	 * How far each Participant touched by Withheld Messages may be told the others have got (ADR 0006); everyone else
+	 * has no limit. A sender of Withheld Messages stops just before the first of them, or their client would mark it
+	 * Delivered or Read and give the Block away. The blocker stops at the latest Message they can see, so the
+	 * Blocked User's positions moving onto a Withheld Message (sending one reads up to it) tell them nothing.
+	 */
+	private Map<UUID, Long> frontierLimits(UUID conversationId) {
+		var limits = new HashMap<UUID, Long>();
+		for (var first : messages.findFirstWithheldBySender(conversationId)) {
+			limits.put(first.getSenderId(), first.getSeq() - 1);
+		}
+		if (limits.isEmpty()) {
+			return limits; // nothing withheld here (always so in a Group): no more queries
+		}
+		for (var blocker : messages.findWithheldFrom(conversationId)) {
+			limits.merge(blocker, messages.findLatestSeqNotWithheldFrom(conversationId, blocker), Math::min);
+		}
+		return limits;
 	}
 
 	@Override
@@ -105,7 +132,8 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	@Override
 	public void reactionChanged(Message message, UUID userId, String emoji, Instant at) {
 		var readers = participants.findByConversationId(message.getConversationId()).stream()
-				.filter(m -> m.canRead(message.getSeq())).collect(Collectors.toList());
+				.filter(m -> m.canRead(message.getSeq())).filter(m -> !message.isWithheldFrom(m.getUserId()))
+				.collect(Collectors.toList());
 		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
 		var details = new LinkedHashMap<String, Object>();
 		details.put("messageId", message.getId());

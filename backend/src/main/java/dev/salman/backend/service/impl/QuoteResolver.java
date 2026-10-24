@@ -68,10 +68,11 @@ class QuoteResolver {
 
 	/**
 	 * How the viewer sees the quoted Message: its text, a deleted marker, or nothing at all when it is from before they
-	 * joined or they hid it from their own view (a quote must not bring back what they chose not to see).
+	 * joined, they hid it from their own view (a quote must not bring back what they chose not to see) or it is
+	 * withheld from them.
 	 */
 	static ReplyQuote quoteFor(Message quoted, Participant viewer, boolean hiddenByViewer) {
-		if (hiddenByViewer || !viewer.canRead(quoted.getSeq())) {
+		if (hiddenByViewer || quoted.isWithheldFrom(viewer.getUserId()) || !viewer.canRead(quoted.getSeq())) {
 			return new ReplyQuote(quoted.getId(), null, null, false, true);
 		}
 		if (quoted.isDeleted()) {

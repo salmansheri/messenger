@@ -31,4 +31,11 @@ public interface BlockService {
 	/** As {@link #requireMaySend}, for editing a Message or reacting to one. */
 	void requireMayChange(UUID callerId, Conversation conversation);
 
+	/**
+	 * Who a Message the sender stores now in this Conversation is withheld from: the other Participant of a Direct
+	 * conversation when they have blocked the sender, otherwise null (a Group never withholds). Call it holding the
+	 * Conversation's lock, so the answer cannot change before the Message is stored.
+	 */
+	UUID withholderOf(UUID senderId, Conversation conversation);
+
 }

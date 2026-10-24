@@ -65,9 +65,13 @@ class ConversationAssembler {
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));
 		var blocked = blockedConversations(found, membersByConversation, viewerId);
+		var withheld = messages.countWithheldUnread(viewerId, found.stream().map(Conversation::getId).toList()).stream()
+				.collect(Collectors.toMap(MessageRepository.WithheldCount::getConversationId,
+						MessageRepository.WithheldCount::getCount));
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
-						latestByConversation.get(c.getId()), quoted, reacted, pictured, blocked.contains(c.getId()), now))
+						latestByConversation.get(c.getId()), quoted, reacted, pictured, blocked.contains(c.getId()),
+						withheld.getOrDefault(c.getId(), 0L), now))
 				.toList();
 	}
 
@@ -91,15 +95,16 @@ class ConversationAssembler {
 	}
 
 	/**
-	 * The latest Message of each Conversation that the viewer has not hidden. Almost always that is simply the
-	 * latest one; only when the viewer hid it is the Conversation asked again for the one before.
+	 * The latest Message of each Conversation that the viewer has not hidden and that is not withheld from them.
+	 * Almost always that is simply the latest one; only when it is not is the Conversation asked again for the one
+	 * before.
 	 */
 	private Map<UUID, Message> latestVisible(List<Conversation> found, List<Participant> members, UUID viewerId) {
 		var latest = messages.findLatestIn(found.stream().map(Conversation::getId).toList());
 		var hiddenIds = Set.copyOf(hidden.findHiddenAmong(viewerId, latest.stream().map(Message::getId).toList()));
 		var visible = new HashMap<UUID, Message>();
 		for (var message : latest) {
-			if (!hiddenIds.contains(message.getId())) {
+			if (!hiddenIds.contains(message.getId()) && !message.isWithheldFrom(viewerId)) {
 				visible.put(message.getConversationId(), message);
 				continue;
 			}
@@ -115,11 +120,11 @@ class ConversationAssembler {
 	private ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
 			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
-			Map<UUID, AttachmentResponse> pictured, boolean blocked, Instant now) {
+			Map<UUID, AttachmentResponse> pictured, boolean blocked, long withheldUnread, Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
 				.map(v -> latestMessage).orElse(null);
-		var unread = viewer.map(v -> v.unreadCount(conversation.getLastSeq())).orElse(0L);
+		var unread = viewer.map(v -> v.unreadCount(conversation.getLastSeq(), withheldUnread)).orElse(0L);
 		var summaries = members.stream()
 				.sorted(Comparator.comparing((Participant m) -> m.getRole() != ParticipantRole.ADMIN)
 						.thenComparing(Participant::getJoinedAt).thenComparing(m -> m.getUserId().toString()))

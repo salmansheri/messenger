@@ -127,7 +127,8 @@ class ReactionTests extends RealtimeIntegrationTest {
 		for (var emoji : new String[] { "👎", "a", "", "  ", THUMBS_UP + THUMBS_UP, "thumbs up" }) {
 			client.react(grace.accessToken(), conversationId, message, emoji).andExpect(status().isBadRequest());
 		}
-		assertThat(jdbc.queryForObject("select count(*) from reaction", Integer.class)).isZero();
+		assertThat(jdbc.queryForObject("select count(*) from reaction where message_id = ?::uuid", Integer.class,
+				message)).isZero();
 	}
 
 	@Test

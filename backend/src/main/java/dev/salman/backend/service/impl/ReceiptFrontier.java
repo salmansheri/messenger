@@ -36,6 +36,11 @@ record ReceiptFrontier(long deliveredUpTo, long readUpTo) {
 		return others ? new ReceiptFrontier(delivered, read) : new ReceiptFrontier(0, 0);
 	}
 
+	/** The same frontier, but never beyond {@code seq}. */
+	ReceiptFrontier atMost(long seq) {
+		return new ReceiptFrontier(Math.min(deliveredUpTo, seq), Math.min(readUpTo, seq));
+	}
+
 	MessageStatus statusOf(long seq) {
 		if (readUpTo >= seq) {
 			return MessageStatus.READ;

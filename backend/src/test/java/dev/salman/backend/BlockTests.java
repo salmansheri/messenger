@@ -1,14 +1,24 @@
 package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import org.springframework.test.web.servlet.ResultActions;
 
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
@@ -16,7 +26,10 @@ import dev.salman.backend.support.RealtimeIntegrationTest;
 import dev.salman.backend.support.StompTestClient;
 import tools.jackson.databind.JsonNode;
 
-/** Ada blocks Grace in their Direct conversation (#58 of #57); what a Block withholds comes in later tickets. */
+/**
+ * Ada blocks Grace in their Direct conversation (#57): the Block itself (#58) and the Withheld Messages it makes of
+ * what Grace sends while it lasts (#59).
+ */
 class BlockTests extends RealtimeIntegrationTest {
 
 	private AuthClient client;
@@ -151,7 +164,7 @@ class BlockTests extends RealtimeIntegrationTest {
 		client.sendReply(ada.accessToken(), withGrace, UUID.randomUUID(), "Re", hers).andExpect(status().isConflict());
 		var picture = json.readTree(client.uploadImage(ada.accessToken(), "a.png", "image/png",
 				UploadImageTests.image("png", 64, 48)).andReturn().getResponse().getContentAsString()).get("id").asString();
-		client.sendBody(ada.accessToken(), withGrace, java.util.Map.of("clientMessageId", UUID.randomUUID(),
+		client.sendBody(ada.accessToken(), withGrace, Map.of("clientMessageId", UUID.randomUUID(),
 				"attachmentId", picture)).andExpect(status().isConflict());
 		client.editMessage(ada.accessToken(), withGrace, mine, "Changed").andExpect(status().isConflict())
 				.andExpect(jsonPath("$.detail").value("Unblock this person to change Messages."));
@@ -179,6 +192,261 @@ class BlockTests extends RealtimeIntegrationTest {
 		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
 
 		client.send(grace.accessToken(), withGrace, UUID.randomUUID(), "Hello?").andExpect(status().isCreated());
+	}
+
+	// ---- Withheld Messages (#59)
+
+	/** The Messages {@code who} sees in the Conversation, by body, for the given history query. */
+	private List<String> bodiesSeenBy(Account who, String query) throws Exception {
+		var page = json.readTree(client.history(who.accessToken(), withGrace, query).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString());
+		var bodies = new ArrayList<String>();
+		page.get("messages").forEach(m -> bodies.add(m.path("body").asString(null)));
+		return bodies;
+	}
+
+	private JsonNode read(ResultActions result) throws Exception {
+		return json.readTree(result.andReturn().getResponse().getContentAsString());
+	}
+
+	private JsonNode messageSeenBy(Account who, String messageId) throws Exception {
+		for (var message : read(client.history(who.accessToken(), withGrace, "")).get("messages")) {
+			if (message.get("id").asString().equals(messageId)) {
+				return message;
+			}
+		}
+		throw new AssertionError("Not in the history: " + messageId);
+	}
+
+	@Test
+	void aMessageSentWhileBlockedIsAcceptedForTheSenderButNeverShownToTheBlocker() throws Exception {
+		client.sendNew(grace.accessToken(), withGrace, "Before the Block");
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		var clientMessageId = UUID.randomUUID();
+		var withheld = read(client.send(grace.accessToken(), withGrace, clientMessageId, "Withheld words")
+				.andExpect(status().isCreated()).andExpect(jsonPath("$.seq").value(2))
+				.andExpect(jsonPath("$.status").value("SENT")));
+		client.send(grace.accessToken(), withGrace, clientMessageId, "Withheld words").andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(withheld.get("id").asString()));
+		client.sendNew(grace.accessToken(), withGrace, "More withheld words");
+
+		assertThat(bodiesSeenBy(grace, "")).containsExactly("Before the Block", "Withheld words", "More withheld words");
+		assertThat(bodiesSeenBy(ada, "")).containsExactly("Before the Block");
+		assertThat(bodiesSeenBy(ada, "afterSeq=0")).containsExactly("Before the Block");
+		assertThat(bodiesSeenBy(ada, "beforeSeq=10")).containsExactly("Before the Block");
+		assertThat(bodiesSeenBy(ada, "aroundSeq=2")).containsExactly("Before the Block");
+		client.conversation(ada.accessToken(), withGrace)
+				.andExpect(jsonPath("$.lastMessage.body").value("Before the Block"))
+				.andExpect(jsonPath("$.unreadCount").value(1));
+		client.conversations(ada.accessToken()).andExpect(jsonPath("$[0].lastMessage.body").value("Before the Block"))
+				.andExpect(jsonPath("$[0].unreadCount").value(1));
+		client.conversation(grace.accessToken(), withGrace)
+				.andExpect(jsonPath("$.lastMessage.body").value("More withheld words"));
+	}
+
+	@Test
+	void neitherSearchFindsAWithheldMessageForTheBlocker() throws Exception {
+		client.sendNew(grace.accessToken(), withGrace, "zebra before");
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		client.sendNew(grace.accessToken(), withGrace, "zebra during");
+
+		client.searchConversation(ada.accessToken(), withGrace, "zebra", null)
+				.andExpect(jsonPath("$.results.length()").value(1));
+		client.searchAll(ada.accessToken(), "zebra", null).andExpect(jsonPath("$.results.length()").value(1));
+		client.searchConversation(grace.accessToken(), withGrace, "zebra", null)
+				.andExpect(jsonPath("$.results.length()").value(2));
+		client.searchAll(grace.accessToken(), "zebra", null).andExpect(jsonPath("$.results.length()").value(2));
+	}
+
+	@Test
+	void aWithheldMessageStaysWithheldAfterUnblockWhileNewMessagesFlowAgain() throws Exception {
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var withheld = client.sendNew(grace.accessToken(), withGrace, "Withheld").get("id").asString();
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		var reply = client.sendReply(grace.accessToken(), withGrace, UUID.randomUUID(), "Did you see it?", withheld)
+				.andExpect(status().isCreated());
+		client.sendNew(ada.accessToken(), withGrace, "Hello again");
+
+		assertThat(bodiesSeenBy(ada, "")).containsExactly("Did you see it?", "Hello again");
+		var quote = messageSeenBy(ada, idOf(reply)).get("replyTo");
+		assertThat(quote.get("unavailable").asBoolean()).isTrue();
+		assertThat(quote.path("text").asString(null)).isNull();
+		assertThat(quote.path("senderId").asString(null)).isNull();
+		assertThat(messageSeenBy(grace, idOf(reply)).at("/replyTo/text").asString()).isEqualTo("Withheld");
+	}
+
+	@Test
+	void theBlockerCannotReachAWithheldMessageByItsId() throws Exception {
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var withheld = client.sendNew(grace.accessToken(), withGrace, "Withheld").get("id").asString();
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.react(ada.accessToken(), withGrace, withheld, "👍").andExpect(status().isNotFound());
+		client.unreact(ada.accessToken(), withGrace, withheld).andExpect(status().isNotFound());
+		client.hideMessage(ada.accessToken(), withGrace, withheld).andExpect(status().isNotFound());
+		client.deleteMessage(ada.accessToken(), withGrace, withheld).andExpect(status().isNotFound());
+		client.editMessage(ada.accessToken(), withGrace, withheld, "Mine now").andExpect(status().isNotFound());
+		client.sendReply(ada.accessToken(), withGrace, UUID.randomUUID(), "What?", withheld)
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.detail").value("Message not found."));
+	}
+
+	@Test
+	void noEventAboutAWithheldMessageReachesTheBlocker() throws Exception {
+		var forAda = listening(ada);
+		var gracesOtherTab = listening(grace);
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		var withheld = client.sendNew(grace.accessToken(), withGrace, "Withheld").get("id").asString();
+		gracesOtherTab.await(e -> isType(e, "message.created", withGrace));
+		client.react(grace.accessToken(), withGrace, withheld, "❤️").andExpect(status().isOk());
+		client.deleteMessage(grace.accessToken(), withGrace, withheld).andExpect(status().isNoContent());
+		gracesOtherTab.await(e -> isType(e, "message.updated", withGrace));
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		client.sendNew(grace.accessToken(), withGrace, "After");
+
+		var after = forAda.await(e -> isType(e, "message.created", withGrace));
+		assertThat(after.at("/message/body").asString()).isEqualTo("After");
+		assertThat(forAda.history()).noneMatch(e -> withheld.equals(e.at("/message/id").asString(null))
+				|| withheld.equals(e.path("messageId").asString(null)));
+	}
+
+	@Test
+	void theBlockerIsNotToldOfReceiptsMovingOntoAWithheldMessage() throws Exception {
+		var mine = client.sendNew(ada.accessToken(), withGrace, "Hi").get("seq").asLong();
+		client.receipts(grace.accessToken(), withGrace, null, mine).andExpect(status().isOk());
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var forAda = listening(ada);
+
+		var withheld = client.sendNew(grace.accessToken(), withGrace, "Withheld").get("seq").asLong();
+		client.receipts(grace.accessToken(), withGrace, withheld, withheld).andExpect(status().isOk());
+
+		assertThat(forAda.receivesNothingMatching(e -> isType(e, "receipts.updated", withGrace), 800)).isTrue();
+	}
+
+	@Test
+	void noPushForAWithheldMessageReachesTheBlocker() throws Exception {
+		client.registerDevice(ada.accessToken(), "ada-phone", "ANDROID").andExpect(status().isCreated());
+		var linus = client.account("Linus Torvalds");
+		var withLinus = idOf(client.startDirect(linus.accessToken(), ada.id()));
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.sendNew(grace.accessToken(), withGrace, "Withheld");
+		client.sendNew(linus.accessToken(), withLinus, "The control");
+
+		await().atMost(Duration.ofSeconds(10))
+				.until(() -> pushes.all().stream().anyMatch(p -> p.body().equals("The control")));
+		Thread.sleep(500); // the two jobs may be handled in either order
+		assertThat(pushes.all()).noneMatch(p -> p.body().equals("Withheld"));
+
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		client.sendNew(grace.accessToken(), withGrace, "After");
+		await().atMost(Duration.ofSeconds(10))
+				.until(() -> pushes.all().stream().anyMatch(p -> p.body().equals("After")));
+	}
+
+	@Test
+	void theBlockersUnreadCountLeavesWithheldMessagesOut() throws Exception {
+		var before = client.sendNew(grace.accessToken(), withGrace, "Before").get("seq").asLong();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		client.sendNew(grace.accessToken(), withGrace, "Withheld one");
+		client.sendNew(grace.accessToken(), withGrace, "Withheld two");
+		client.conversation(ada.accessToken(), withGrace).andExpect(jsonPath("$.unreadCount").value(1));
+
+		client.receipts(ada.accessToken(), withGrace, null, before).andExpect(status().isOk())
+				.andExpect(jsonPath("$.unreadCount").value(0));
+		client.conversation(ada.accessToken(), withGrace).andExpect(jsonPath("$.unreadCount").value(0));
+
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var after = client.sendNew(grace.accessToken(), withGrace, "After").get("seq").asLong();
+		client.conversation(ada.accessToken(), withGrace).andExpect(jsonPath("$.unreadCount").value(1));
+		client.receipts(ada.accessToken(), withGrace, null, after).andExpect(jsonPath("$.unreadCount").value(0));
+	}
+
+	@Test
+	void aWithheldMessageStaysSentForEverAndTheSendersFrontierNeverPassesIt() throws Exception {
+		var before = client.sendNew(grace.accessToken(), withGrace, "Before").get("id").asString();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var withheld = client.sendNew(grace.accessToken(), withGrace, "Withheld");
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var after = client.sendNew(grace.accessToken(), withGrace, "After");
+		var forGrace = listening(grace);
+
+		client.receipts(ada.accessToken(), withGrace, null, after.get("seq").asLong()).andExpect(status().isOk());
+
+		var frontier = forGrace.await(e -> isType(e, "receipts.updated", withGrace));
+		assertThat(frontier.get("deliveredUpTo").asLong()).isLessThan(withheld.get("seq").asLong());
+		assertThat(frontier.get("readUpTo").asLong()).isLessThan(withheld.get("seq").asLong());
+		assertThat(messageSeenBy(grace, before).get("status").asString()).isEqualTo("READ");
+		assertThat(messageSeenBy(grace, withheld.get("id").asString()).get("status").asString()).isEqualTo("SENT");
+		assertThat(messageSeenBy(grace, after.get("id").asString()).get("status").asString()).isEqualTo("READ");
+		client.conversation(grace.accessToken(), withGrace).andExpect(jsonPath("$.lastMessage.status").value("READ"));
+	}
+
+	@Test
+	void aMessageStoredJustBeforeTheBlockIsOrdinary() throws Exception {
+		var forAda = listening(ada);
+		var before = client.sendNew(grace.accessToken(), withGrace, "Just in time");
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		forAda.await(e -> isType(e, "message.created", withGrace));
+		assertThat(bodiesSeenBy(ada, "")).containsExactly("Just in time");
+		client.receipts(ada.accessToken(), withGrace, null, before.get("seq").asLong()).andExpect(status().isOk());
+		assertThat(messageSeenBy(grace, before.get("id").asString()).get("status").asString()).isEqualTo("READ");
+	}
+
+	@Test
+	void sendsRacingABlockAreEachUnambiguouslyBeforeOrAfterIt() throws Exception {
+		var pool = Executors.newFixedThreadPool(5);
+		try {
+			var start = new CountDownLatch(1);
+			var sends = new ArrayList<Future<Integer>>();
+			for (int t = 0; t < 4; t++) {
+				var thread = t;
+				sends.add(pool.submit(() -> {
+					start.await();
+					for (int i = 0; i < 5; i++) {
+						client.send(grace.accessToken(), withGrace, UUID.randomUUID(), "m" + thread + "-" + i)
+								.andExpect(status().isCreated());
+					}
+					return 5;
+				}));
+			}
+			var block = pool.submit(() -> {
+				start.await();
+				Thread.sleep(20);
+				return client.block(ada.accessToken(), grace.id()).andReturn().getResponse().getStatus();
+			});
+			start.countDown();
+			for (var send : sends) {
+				send.get();
+			}
+			assertThat(block.get()).isEqualTo(204);
+		}
+		finally {
+			pool.shutdownNow();
+		}
+
+		var seen = new ArrayList<Long>();
+		read(client.history(ada.accessToken(), withGrace, "limit=100")).get("messages")
+				.forEach(m -> seen.add(m.get("seq").asLong()));
+		// What Ada sees is exactly the Messages stored before the Block: an unbroken run from the first.
+		for (int i = 0; i < seen.size(); i++) {
+			assertThat(seen.get(i)).isEqualTo(i + 1L);
+		}
+		assertThat(read(client.history(grace.accessToken(), withGrace, "limit=100")).get("messages").size())
+				.isEqualTo(20);
+	}
+
+	@Test
+	void aBlockDoesNotWithholdMessagesInAGroupTheyShare() throws Exception {
+		var group = idOf(client.createGroup(ada.accessToken(), "Book club", grace.id()));
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.sendNew(grace.accessToken(), group, "In the Group");
+
+		client.history(ada.accessToken(), group, "").andExpect(jsonPath("$.messages[0].body").value("In the Group"));
 	}
 
 	// ---- throttle

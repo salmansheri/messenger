@@ -8,7 +8,8 @@ import dev.salman.backend.entity.ConversationType;
 
 /**
  * A Conversation as one Participant sees it. {@code lastMessage} is null until something has been sent;
- * {@code unreadCount} is the latest Sequence number minus the viewer's read position. {@code settings} are the
+ * {@code unreadCount} is the latest Sequence number minus the viewer's read position, leaving out Messages withheld
+ * from the viewer (ADR 0006). {@code settings} are the
  * viewer's own mute, archive and pin; nobody else sees them. {@code blocked} is true only for a Direct conversation whose
  * other Participant the viewer has blocked (the Blocked User never learns of it).
  */

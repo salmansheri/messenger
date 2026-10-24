@@ -92,6 +92,7 @@ public class PushServiceImpl implements PushService {
 		var now = clock.instant();
 		participants.findByConversationId(message.getConversationId()).stream()
 				.filter(p -> !p.getUserId().equals(message.getSenderId()))
+				.filter(p -> !message.isWithheldFrom(p.getUserId())) // a Withheld Message never reaches the blocker
 				.filter(p -> !p.isMuted(now)) // a muted Conversation stays quiet; unread and live events carry on
 				.map(Participant::getUserId).forEach(recipients::add);
 		recipients.removeAll(presence.onlineAmong(recipients));

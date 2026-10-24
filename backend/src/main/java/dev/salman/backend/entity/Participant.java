@@ -99,9 +99,13 @@ public class Participant {
 		return seq > joinedAfterSeq;
 	}
 
-	/** How many Messages up to {@code lastSeq} this Participant has not read yet (see the glossary). */
-	public long unreadCount(long lastSeq) {
-		return Math.max(0, lastSeq - lastReadSeq);
+	/**
+	 * How many Messages up to {@code lastSeq} this Participant has not read yet (see the glossary), leaving out the
+	 * {@code withheld} ones after their read position that are withheld from them (ADR 0006). Messages they hid for
+	 * themselves still count.
+	 */
+	public long unreadCount(long lastSeq, long withheld) {
+		return Math.max(0, lastSeq - lastReadSeq - withheld);
 	}
 
 	/** The cursor to read after: the caller's own cursor, but never before their join point. */

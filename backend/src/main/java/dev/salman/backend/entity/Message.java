@@ -59,8 +59,25 @@ public class Message {
 	@Column(name = "attachment_id")
 	private UUID attachmentId;
 
+	/**
+	 * The User this Message is withheld from (a Withheld Message: its sender was blocked by them when it was stored),
+	 * or null. Set once, never cleared.
+	 */
+	@Column(name = "withheld_from")
+	private UUID withheldFrom;
+
 	public boolean isDeleted() {
 		return deletedAt != null;
+	}
+
+	/** Whether this is a Withheld Message that {@code userId} must never see. */
+	public boolean isWithheldFrom(UUID userId) {
+		return withheldFrom != null && withheldFrom.equals(userId);
+	}
+
+	/** Whether this is a Withheld Message (from anyone). */
+	public boolean isWithheld() {
+		return withheldFrom != null;
 	}
 
 }

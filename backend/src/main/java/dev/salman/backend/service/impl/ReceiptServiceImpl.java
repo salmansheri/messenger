@@ -1,5 +1,6 @@
 package dev.salman.backend.service.impl;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import dev.salman.backend.dto.ReceiptResponse;
 import dev.salman.backend.exception.BadRequestException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.repository.ConversationRepository;
+import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.service.RealtimeEvents;
 import dev.salman.backend.service.ReceiptService;
@@ -21,6 +23,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
 	private final ConversationRepository conversations;
 	private final ParticipantRepository participants;
+	private final MessageRepository messages;
 	private final RealtimeEvents events;
 
 	/**
@@ -43,8 +46,10 @@ public class ReceiptServiceImpl implements ReceiptService {
 		participants.advanceReceipts(conversationId, callerId, delivered, read);
 		var me = participants.findByConversationIdAndUserId(conversationId, callerId)
 				.orElseThrow(ReceiptServiceImpl::notFound);
+		var withheld = messages.countWithheldUnread(callerId, List.of(conversationId)).stream()
+				.mapToLong(MessageRepository.WithheldCount::getCount).sum();
 		var response = new ReceiptResponse(me.getLastDeliveredSeq(), me.getLastReadSeq(),
-				me.unreadCount(conversation.getLastSeq()));
+				me.unreadCount(conversation.getLastSeq(), withheld));
 		if (me.getLastDeliveredSeq() != before.getDeliveredSeq() || me.getLastReadSeq() != before.getReadSeq()) {
 			events.receiptsChanged(conversationId, callerId,
 					new ReceiptPositions(before.getDeliveredSeq(), before.getReadSeq()), response);
