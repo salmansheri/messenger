@@ -100,14 +100,15 @@ export function ConversationPane() {
               open={search.open}
               onToggle={() => setSearch((state) => ({ ...state, open: !state.open }))}
             />
-            <ConversationMenu conversation={conversation} />
+            <ConversationMenu conversation={conversation} myId={list.myId} />
           </div>
         }
         detail={
           <>
             {conversation.type === "GROUP" ? (
               <GroupPanel conversation={conversation} myId={list.myId} />
-            ) : (
+            ) : conversation.blocked ? null : (
+              // A Block hides presence both ways, so there is nothing to show while it lasts.
               <PresenceLine conversationId={conversation.id ?? ""} userId={otherParticipantId(conversation, list.myId)} />
             )}
             <SettingsLine settings={conversation.settings} />

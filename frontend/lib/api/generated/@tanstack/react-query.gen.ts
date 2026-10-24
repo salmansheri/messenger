@@ -3,8 +3,36 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvatar, signUp, startDirect, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, block, blocks, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvatar, signUp, startDirect, unblock, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, BlockData, BlockResponse, BlocksData, BlocksResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnblockData, UnblockResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+
+export const unblockMutation = (options?: Partial<Options<UnblockData>>): UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> => {
+    const mutationOptions: UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await unblock({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const blockMutation = (options?: Partial<Options<BlockData>>): UseMutationOptions<BlockResponse, DefaultError, Options<BlockData>> => {
+    const mutationOptions: UseMutationOptions<BlockResponse, DefaultError, Options<BlockData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await block({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const removeAvatarMutation = (options?: Partial<Options<RemoveAvatarData>>): UseMutationOptions<RemoveAvatarResponse, DefaultError, Options<RemoveAvatarData>> => {
     const mutationOptions: UseMutationOptions<RemoveAvatarResponse, DefaultError, Options<RemoveAvatarData>> = {
@@ -531,6 +559,21 @@ export const editMutation = (options?: Partial<Options<EditData>>): UseMutationO
     };
     return mutationOptions;
 };
+
+export const blocksQueryKey = (options?: Options<BlocksData>) => createQueryKey('blocks', options);
+
+export const blocksOptions = (options?: Options<BlocksData>) => queryOptions<BlocksResponse, DefaultError, BlocksResponse, ReturnType<typeof blocksQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await blocks({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: blocksQueryKey(options)
+});
 
 export const searchAllQueryKey = (options: Options<SearchAllData>) => createQueryKey('searchAll', options);
 

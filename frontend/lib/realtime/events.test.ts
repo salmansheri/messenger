@@ -168,4 +168,19 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "message.created", conversationId: "c1", message: { id: "m1" } }))).toBeUndefined();
     expect(parseEvent(JSON.stringify({ type: "conversation.changed" }))).toBeUndefined();
   });
+
+  it("reads a Block or Unblock made by this person in any of their tabs or devices", () => {
+    expect(parseEvent(JSON.stringify({ type: "block.changed", userId: "grace", blocked: true }))).toEqual({
+      type: "block.changed",
+      userId: "grace",
+      blocked: true,
+    });
+    expect(parseEvent(JSON.stringify({ type: "block.changed", userId: "grace", blocked: false }))).toEqual({
+      type: "block.changed",
+      userId: "grace",
+      blocked: false,
+    });
+    expect(parseEvent(JSON.stringify({ type: "block.changed", blocked: true }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "block.changed", userId: "grace", blocked: "yes" }))).toBeUndefined();
+  });
 });

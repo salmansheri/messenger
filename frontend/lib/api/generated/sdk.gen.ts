@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddParticipantData, AddParticipantResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
+import type { AddParticipantData, AddParticipantResponses, BlockData, BlockResponses, BlocksData, BlocksResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnblockData, UnblockResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,18 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+export const unblock = <ThrowOnError extends boolean = true>(options: Options<UnblockData, ThrowOnError>): RequestResult<UnblockResponses, unknown, ThrowOnError> => (options.client ?? client).delete<UnblockResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/{userId}/block',
+    ...options
+});
+
+export const block = <ThrowOnError extends boolean = true>(options: Options<BlockData, ThrowOnError>): RequestResult<BlockResponses, unknown, ThrowOnError> => (options.client ?? client).put<BlockResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/{userId}/block',
+    ...options
+});
 
 export const removeAvatar = <ThrowOnError extends boolean = true>(options?: Options<RemoveAvatarData, ThrowOnError>): RequestResult<RemoveAvatarResponses, unknown, ThrowOnError> => (options?.client ?? client).delete<RemoveAvatarResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -288,6 +300,12 @@ export const edit = <ThrowOnError extends boolean = true>(options: Options<EditD
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const blocks = <ThrowOnError extends boolean = true>(options?: Options<BlocksData, ThrowOnError>): RequestResult<BlocksResponses, unknown, ThrowOnError> => (options?.client ?? client).get<BlocksResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/me/blocks',
+    ...options
 });
 
 export const searchAll = <ThrowOnError extends boolean = true>(options: Options<SearchAllData, ThrowOnError>): RequestResult<SearchAllResponses, unknown, ThrowOnError> => (options.client ?? client).get<SearchAllResponses, unknown, ThrowOnError>({

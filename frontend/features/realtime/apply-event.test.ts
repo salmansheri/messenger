@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConversationResponse, MessagePage, MessageResponse } from "@/lib/api";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 import type { History } from "@/features/messages/history";
-import { applyToHistory, applyToList, applyUnread, withProfile } from "./apply-event";
+import { applyToHistory, applyToList, applyUnread, withBlocked, withProfile } from "./apply-event";
 
 const ME = "me";
 
@@ -466,5 +466,38 @@ describe("an Avatar change", () => {
     const once = applyToList(list, changed(NEW), ME).list;
     expect(applyToList(once, changed(NEW), ME).list).toBe(once);
     expect(withProfile(list, "linus", { avatarUrl: null })).toBe(list);
+  });
+});
+
+describe("withBlocked", () => {
+  const withGrace = conversation("c1", { participants: [{ userId: ME }, { userId: "grace" }], blocked: false });
+  const group = conversation("g1", { type: "GROUP", participants: [{ userId: ME }, { userId: "grace" }, { userId: "linus" }] });
+  const list = [withGrace, group];
+
+  it("marks the Direct conversation with that person as blocked, and only that one (a Group is never blocked)", () => {
+    const next = withBlocked(list, "grace", true, ME);
+
+    expect(next?.[0].blocked).toBe(true);
+    expect(next?.[1]).toBe(group);
+    expect(withGrace.blocked, "the old list is not changed").toBe(false);
+  });
+
+  it("lifts it again, and gives back the same list when it already says so", () => {
+    const blocked = withBlocked(list, "grace", true, ME)!;
+    expect(withBlocked(blocked, "grace", false, ME)?.[0].blocked).toBe(false);
+    expect(withBlocked(blocked, "grace", true, ME)).toBe(blocked);
+  });
+
+  it("says nothing when there is no Direct conversation with that person here (the list must be asked for again)", () => {
+    expect(withBlocked(list, "linus", true, ME)).toBeUndefined();
+    expect(withBlocked(list, "grace", true, undefined)).toBeUndefined();
+  });
+
+  it("is what applyToList does with block.changed, asking for the list again when the Conversation is unknown", () => {
+    expect(applyToList(list, { type: "block.changed", userId: "grace", blocked: true }, ME)).toEqual({
+      list: withBlocked(list, "grace", true, ME),
+      refetch: false,
+    });
+    expect(applyToList(list, { type: "block.changed", userId: "linus", blocked: true }, ME)).toEqual({ list, refetch: true });
   });
 });

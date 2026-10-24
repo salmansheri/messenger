@@ -8,6 +8,7 @@ import { listQueryKey, sdk, toProblem, type ConversationResponse, type MessageRe
 import { messageFor } from "@/lib/api/messages";
 import { useFrontier } from "@/features/receipts/queries";
 import type { Frontier } from "@/features/receipts/status";
+import { BlockedNotice } from "@/features/conversations/blocked-notice";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
@@ -69,6 +70,10 @@ export function MessageView({ conversation, myId, target, onLeaveTarget }: Props
   const publishTyping = useTypingPublisher(conversationId);
   const typingSender = useMemo(() => createTypingSender({ publish: publishTyping }), [publishTyping]);
   useEffect(() => () => typingSender.stop(), [typingSender]);
+  // A Block takes the composer away mid-sentence: stop telling the other person that someone is typing.
+  useEffect(() => {
+    if (conversation.blocked) typingSender.stop();
+  }, [conversation.blocked, typingSender]);
 
   const [outbox] = useState(() =>
     createOutbox({
@@ -116,6 +121,14 @@ export function MessageView({ conversation, myId, target, onLeaveTarget }: Props
   const [chosen, setChosen] = useState<ReplyQuote>();
   const reply = replyTarget(chosen, loaded);
   const composer = useRef<HTMLTextAreaElement>(null);
+  // Unblocking from the notice that takes the composer's place puts focus in the composer once it is back.
+  const focusComposer = useRef(false);
+  useLayoutEffect(() => {
+    if (!conversation.blocked && focusComposer.current) {
+      focusComposer.current = false;
+      composer.current?.focus();
+    }
+  }, [conversation.blocked]);
   const nameOf = useCallback((id: string | undefined) => (id === myId ? "You" : (names.get(id) ?? "Someone who left")), [myId, names]);
   const replyStrip = (() => {
     if (!reply) return undefined;
@@ -368,6 +381,7 @@ export function MessageView({ conversation, myId, target, onLeaveTarget }: Props
                   conversationId={conversationId}
                   myId={myId}
                   group={conversation.type === "GROUP"}
+                  blocked={Boolean(conversation.blocked)}
                   names={names}
                   avatars={avatars}
                   frontier={frontier}
@@ -401,22 +415,28 @@ export function MessageView({ conversation, myId, target, onLeaveTarget }: Props
         ))}
       </div>
       <TypingLine conversationId={conversationId} names={names} />
-      <Composer
-        textareaRef={composer}
-        reply={replyStrip}
-        onCancelReply={() => {
-          setChosen(undefined);
-          composer.current?.focus();
-        }}
-        onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
-        onSend={(body, image) => {
-          keepAtBottom.current = true;
-          // A new Message goes after the latest, so a window further back gives way to the newest Messages first.
-          if (inWindow) onLeaveTarget?.();
-          outbox.submit(body, reply, image);
-          setChosen(undefined);
-        }}
-      />
+      {conversation.blocked ? (
+        <BlockedNotice conversation={conversation} myId={myId} onUnblocked={() => {
+            focusComposer.current = true;
+          }} />
+      ) : (
+        <Composer
+          textareaRef={composer}
+          reply={replyStrip}
+          onCancelReply={() => {
+            setChosen(undefined);
+            composer.current?.focus();
+          }}
+          onTyping={(hasText) => (hasText ? typingSender.keystroke() : typingSender.stop())}
+          onSend={(body, image) => {
+            keepAtBottom.current = true;
+            // A new Message goes after the latest, so a window further back gives way to the newest Messages first.
+            if (inWindow) onLeaveTarget?.();
+            outbox.submit(body, reply, image);
+            setChosen(undefined);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -426,6 +446,7 @@ function Row({
   conversationId,
   myId,
   group,
+  blocked,
   names,
   avatars,
   frontier,
@@ -440,6 +461,7 @@ function Row({
   conversationId: string;
   myId: string | undefined;
   group: boolean;
+  blocked: boolean;
   names: Map<string | undefined, string | undefined>;
   avatars: Map<string | undefined, string | undefined>;
   frontier: Frontier | undefined;
@@ -470,6 +492,7 @@ function Row({
       conversationId={conversationId}
       myId={myId}
       group={group}
+      blocked={blocked}
       names={names}
       avatars={avatars}
       frontier={frontier}

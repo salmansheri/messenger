@@ -60,13 +60,18 @@ type Props = {
   below?: ReactNode;
   /** Called when the menu closes, however it closes. */
   onClose?: () => void;
+  /**
+   * Shown instead of the choices while it is set: a question about the choice just made (Block asks first), whose
+   * buttons are ordinary buttons, not menu items. It moves focus itself.
+   */
+  replacement?: ReactNode;
 };
 
 /**
  * A button that opens a menu. The first choice takes focus when it opens; the arrow keys (wrapping), Home and End move
  * through the choices, Escape closes it and gives focus back to the button, and so does a click anywhere else.
  */
-export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
+export function DropdownMenu({ label, icon, children, below, onClose, replacement }: Props) {
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -98,7 +103,7 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
     const area = trigger.current.closest<HTMLElement>('[role="region"]')?.getBoundingClientRect();
     const room = (area?.bottom ?? window.innerHeight) - trigger.current.getBoundingClientRect().bottom;
     setUpward(room < panel.current.offsetHeight + 8);
-  }, [open]);
+  }, [open, replacement]);
 
   useEffect(() => {
     if (open) panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -111,6 +116,7 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
       close(true);
       return;
     }
+    if (replacement) return;
     const items = [...(panel.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
     const next = nextMenuIndex(items.length, items.indexOf(document.activeElement as HTMLElement), event.key);
     if (next !== undefined) {
@@ -140,9 +146,11 @@ export function DropdownMenu({ label, icon, children, below, onClose }: Props) {
           className={`absolute right-0 z-10 w-64 rounded-sm border border-rule bg-paper p-1 shadow-sm ${upward ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           <CloseMenu.Provider value={close}>
-            <div role="menu" aria-label={label} className="flex flex-col">
-              {children}
-            </div>
+            {replacement ?? (
+              <div role="menu" aria-label={label} className="flex flex-col">
+                {children}
+              </div>
+            )}
           </CloseMenu.Provider>
           {below}
         </div>

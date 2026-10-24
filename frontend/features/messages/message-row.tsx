@@ -12,6 +12,7 @@ import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
 import { QuoteBlock } from "./quote-block";
 import { quoteView } from "./quote";
+import { messageActions, type MessageActions } from "./actions";
 import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
 import { changeFailureMessage, imageLabel, sendFailureMessage, uploadFailureMessage } from "./wording";
@@ -25,6 +26,8 @@ type Props = {
   /** Who is looking, and whether this is a Group (where it matters who reacted). */
   myId: string | undefined;
   group: boolean;
+  /** The person has blocked the other one in this Direct conversation: only what the server still allows is offered. */
+  blocked: boolean;
   names: Map<string | undefined, string | undefined>;
   /** Each Participant's Avatar link, shown beside the name at the start of a run. */
   avatars: Map<string | undefined, string | undefined>;
@@ -41,18 +44,21 @@ type Props = {
 };
 
 /** One Message in the history: when, who, its text (or the placeholder of a deleted one), how far it has got, and what can be done to it. */
-export function MessageRow({ item, conversationId, myId, group, names, avatars, frontier, onRetry, loaded, onReply, onJump, onImageExpired, highlighted = false }: Props) {
+export function MessageRow({ item, conversationId, myId, group, blocked, names, avatars, frontier, onRetry, loaded, onReply, onJump, onImageExpired, highlighted = false }: Props) {
   const { mine, pending } = item;
+  const actions = messageActions({ mine, deleted: Boolean(item.deleted), blocked });
   const sender = mine ? "You" : (names.get(item.senderId) ?? "Someone who left");
   const senderId = mine ? myId : item.senderId;
   const [editing, setEditing] = useState(false);
+  // An edit already open when a Block arrives closes: the server would refuse to save it.
+  const editingNow = editing && actions.edit;
   // After editing ends, focus goes back to where the person started it: this Message's menu button.
   const trigger = useRef<HTMLButtonElement>(null);
   const wasEditing = useRef(false);
   useEffect(() => {
-    if (wasEditing.current && !editing) trigger.current?.focus();
-    wasEditing.current = editing;
-  }, [editing]);
+    if (wasEditing.current && !editingNow) trigger.current?.focus();
+    wasEditing.current = editingNow;
+  }, [editingNow]);
 
   return (
     <li
@@ -91,7 +97,7 @@ export function MessageRow({ item, conversationId, myId, group, names, avatars, 
             refresh={pending ? undefined : onImageExpired}
           />
         )}
-        {editing && item.messageId && !item.deleted ? (
+        {editingNow && item.messageId ? (
           <MessageEditor
             conversationId={conversationId}
             messageId={item.messageId}
@@ -128,9 +134,9 @@ export function MessageRow({ item, conversationId, myId, group, names, avatars, 
             </Button>
           </p>
         )}
-        {item.messageId && !pending && !editing && (
+        {item.messageId && !pending && !editingNow && (
           <div className="absolute top-0 right-0 flex">
-            {!item.deleted && (
+            {actions.react && (
               <ReactMenu
                 target={{ conversationId, messageId: item.messageId }}
                 whose={mine ? "your" : `${sender}'s`}
@@ -142,12 +148,12 @@ export function MessageRow({ item, conversationId, myId, group, names, avatars, 
             <MessageMenu
               conversationId={conversationId}
               messageId={item.messageId}
-              own={mine && !item.deleted}
+              actions={actions}
               whose={mine ? "your" : `${sender}'s`}
               when={formatClock(item.createdAt)}
               triggerRef={trigger}
               onEdit={() => setEditing(true)}
-              onReply={item.deleted ? undefined : () => onReply(item.messageId ?? "")}
+              onReply={() => onReply(item.messageId ?? "")}
             />
           </div>
         )}
@@ -165,7 +171,7 @@ export function MessageRow({ item, conversationId, myId, group, names, avatars, 
 function MessageMenu({
   conversationId,
   messageId,
-  own,
+  actions,
   whose,
   when,
   triggerRef,
@@ -174,13 +180,13 @@ function MessageMenu({
 }: {
   conversationId: string;
   messageId: string;
-  own: boolean;
+  /** What this Message offers (`messageActions`): a deleted one, or one in a blocked Direct conversation, offers less. */
+  actions: MessageActions;
   whose: string;
   when: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   onEdit: () => void;
-  /** Answer this Message; not offered for a deleted one. */
-  onReply?: () => void;
+  onReply: () => void;
 }) {
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -315,7 +321,7 @@ function MessageMenu({
             </div>
           ) : (
             <div role="menu" aria-label={`Options for ${whose} Message at ${when}`} className="flex flex-col">
-              {onReply && (
+              {actions.reply && (
                 <MenuItem
                   onSelect={() => {
                     close(false);
@@ -325,7 +331,7 @@ function MessageMenu({
                   Reply
                 </MenuItem>
               )}
-              {own && (
+              {actions.edit && (
                 <MenuItem
                   onSelect={() => {
                     close(false);
@@ -335,29 +341,31 @@ function MessageMenu({
                   Edit
                 </MenuItem>
               )}
-              {own && (
+              {actions.deleteForEveryone && (
                 <MenuItem ref={focusAsk} onSelect={() => setAsking(true)}>
                   Delete for everyone
                 </MenuItem>
               )}
-              <MenuItem
-                busy={hide.isPending}
-                onSelect={() => {
-                  setProblem(undefined);
-                  hide.mutate(
-                    { path: { conversationId, messageId } },
-                    {
-                      onSuccess: () => {
-                        focusNeighbour();
-                        close(false);
+              {actions.deleteForMe && (
+                <MenuItem
+                  busy={hide.isPending}
+                  onSelect={() => {
+                    setProblem(undefined);
+                    hide.mutate(
+                      { path: { conversationId, messageId } },
+                      {
+                        onSuccess: () => {
+                          focusNeighbour();
+                          close(false);
+                        },
+                        onError: fail,
                       },
-                      onError: fail,
-                    },
-                  );
-                }}
-              >
-                Delete for me
-              </MenuItem>
+                    );
+                  }}
+                >
+                  Delete for me
+                </MenuItem>
+              )}
             </div>
           )}
           {problem && !working && (

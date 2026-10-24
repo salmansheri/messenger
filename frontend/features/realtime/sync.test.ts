@@ -12,7 +12,7 @@ import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
-import { catchUp, handleEvent, recordProfile, recordSettings } from "./sync";
+import { catchUp, handleEvent, recordBlock, recordProfile, recordSettings } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
   id: "c1",
@@ -424,6 +424,34 @@ describe("catchUp", () => {
     catchUp(client);
     await Promise.resolve();
 
+    expect(answers).toHaveLength(1);
+  });
+});
+
+describe("recordBlock", () => {
+  const direct = { ...conversation(2, 0), blocked: false, participants: [{ userId: "me" }, { userId: "grace" }] };
+
+  it("marks the Direct conversation blocked from the event, and asks again for its Messages and presence", () => {
+    const { client } = withList([direct]);
+    client.setQueryData(messagesKey("c1"), { pages: [{ messages: [], hasMore: false }], pageParams: [{}] });
+    client.setQueryData(presenceQueryKey({ path: { conversationId: "c1" } }), []);
+
+    handleEvent(client, JSON.stringify({ type: "block.changed", userId: "grace", blocked: true }), createTypingTracker());
+
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].blocked).toBe(true);
+    // The other person's reactions are hidden or shown again, and presence goes or comes back, only on the server.
+    expect(client.getQueryState(messagesKey("c1"))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(presenceQueryKey({ path: { conversationId: "c1" } }))?.isInvalidated).toBe(true);
+  });
+
+  it("does the same with the answer to the person's own change, and asks for the list when the Conversation is unknown", () => {
+    const { client, answers } = withList([direct]);
+
+    recordBlock(client, "grace", true);
+    expect(client.getQueryData<ConversationResponse[]>(listQueryKey())?.[0].blocked).toBe(true);
+    expect(answers).toHaveLength(0);
+
+    recordBlock(client, "linus", true);
     expect(answers).toHaveLength(1);
   });
 });

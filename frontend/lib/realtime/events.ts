@@ -28,6 +28,8 @@ export type RealtimeEvent =
    * Avatar. Only what changed is there: a name change says nothing about the picture, and `avatarUrl: null` is a removal.
    */
   | { type: "profile.changed"; userId: string; changes: ProfileChanges }
+  /** This person blocked (`blocked: true`) or unblocked someone, in any of their tabs or devices. Never sent to the other. */
+  | { type: "block.changed"; userId: string; blocked: boolean }
   | { type: "ignored" };
 
 /** What a `profile.changed` event changes; a key that is absent was not changed. */
@@ -126,6 +128,10 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
       }
       return Object.keys(changes).length > 0 ? { type: "profile.changed", userId: payload.userId, changes } : undefined;
     }
+    case "block.changed":
+      return typeof payload.userId === "string" && typeof payload.blocked === "boolean"
+        ? { type: "block.changed", userId: payload.userId, blocked: payload.blocked }
+        : undefined;
     default:
       return { type: "ignored" };
   }

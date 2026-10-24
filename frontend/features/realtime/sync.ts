@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  blocksQueryKey,
   listQueryKey,
   meQueryKey,
   presenceQueryKey,
@@ -9,6 +10,7 @@ import {
   type UserProfile,
 } from "@/lib/api";
 import { parseEvent, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
+import { directWith } from "@/features/conversations/present";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey, reactionTimesKey } from "@/features/messages/queries";
@@ -80,6 +82,23 @@ export function recordProfile(queryClient: QueryClient, userId: string, changes:
 }
 
 /**
+ * A Block or Unblock made by this person, from the event or from the answer to their own change: the Direct
+ * conversation is marked in the list, and what the server now shows differently is asked for again: that
+ * Conversation's Messages (the other person's reactions are hidden while the Block lasts and shown again after it),
+ * its presence (gone while it lasts) and the list of Blocked Users.
+ */
+export function recordBlock(queryClient: QueryClient, userId: string, blocked: boolean) {
+  patchList(queryClient, { type: "block.changed", userId, blocked });
+  const myId = queryClient.getQueryData<UserProfile>(meQueryKey())?.id;
+  const direct = directWith(queryClient.getQueryData<ConversationResponse[]>(listQueryKey()) ?? [], userId, myId);
+  if (direct?.id) {
+    void queryClient.invalidateQueries({ queryKey: messagesKey(direct.id) });
+    void queryClient.invalidateQueries({ queryKey: presenceQueryKey({ path: { conversationId: direct.id } }) });
+  }
+  void queryClient.invalidateQueries({ queryKey: blocksQueryKey() });
+}
+
+/**
  * A reaction put on a Message, or everyone's reactions of one person taken away. Reactions are only in the loaded
  * history, never the list. A word older than one already heard for the same person and Message is ignored, and, as
  * for other events, a history whose request is under way is asked for again instead of being patched.
@@ -120,6 +139,10 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
   }
   if (event.type === "profile.changed") {
     recordProfile(queryClient, event.userId, event.changes);
+    return;
+  }
+  if (event.type === "block.changed") {
+    recordBlock(queryClient, event.userId, event.blocked);
     return;
   }
   if (event.type === "reaction.changed" || event.type === "reactions.cleared") {

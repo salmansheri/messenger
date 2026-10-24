@@ -4,6 +4,7 @@ import { applyReaction } from "@/features/messages/reactions";
 import { clearReactionsOf, latestSeq, replaceMessage, updateReactions, withMessage, type History } from "@/features/messages/history";
 import { mergeVersion } from "@/features/messages/versions";
 import { isDetached } from "@/features/messages/window";
+import { directWith } from "@/features/conversations/present";
 import { orderConversations, withSettings } from "@/features/conversations/settings";
 
 const seqOf = (message: MessageResponse) => message.seq ?? 0;
@@ -45,6 +46,23 @@ export function withProfile(list: ConversationResponse[], userId: string, change
 }
 
 /**
+ * The list with the Direct conversation with that person marked as blocked or not (a Group is never blocked). The same
+ * list when it already says so; nothing when there is no Direct conversation with them here, or it is not known who is
+ * looking, so the list must be asked for again.
+ */
+export function withBlocked(
+  list: ConversationResponse[],
+  userId: string,
+  blocked: boolean,
+  myId: string | undefined,
+): ConversationResponse[] | undefined {
+  const known = directWith(list, userId, myId);
+  if (!known) return undefined;
+  if (Boolean(known.blocked) === blocked) return list;
+  return list.map((conversation) => (conversation === known ? { ...known, blocked } : conversation));
+}
+
+/**
  * How an event changes the Conversation list, without touching the old one. Events are best effort: they can arrive
  * twice or late, so a Message that is not newer than the latest one shown changes nothing. When something cannot be
  * worked out from the event alone (an unknown Conversation, a skipped Message, who you are, a Conversation that
@@ -58,6 +76,10 @@ export function applyToList(
   if (event.type === "conversation.changed") return { list, refetch: true };
   if (event.type === "profile.changed") return { list: withProfile(list, event.userId, event.changes), refetch: false };
   if (event.type === "message.updated") return applyUpdateToList(list, event);
+  if (event.type === "block.changed") {
+    const next = withBlocked(list, event.userId, event.blocked, myId);
+    return next ? { list: next, refetch: false } : { list, refetch: true };
+  }
   if (event.type === "settings.changed") {
     const next = withSettings(list, event.conversationId, event.settings);
     return next ? { list: next, refetch: false } : { list, refetch: true };

@@ -96,6 +96,7 @@ export type ConversationResponse = {
     lastMessage?: MessageResponse;
     unreadCount?: number;
     settings?: ConversationSettings;
+    blocked?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };
@@ -188,6 +189,13 @@ export type EditMessageRequest = {
     body?: string;
 };
 
+export type BlockedUser = {
+    userId?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    blockedAt?: string;
+};
+
 export type SearchPage = {
     results?: Array<SearchResult>;
     hasMore?: boolean;
@@ -214,6 +222,42 @@ export type MessagePage = {
     hasOlder?: boolean;
     hasNewer?: boolean;
 };
+
+export type UnblockData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}/block';
+};
+
+export type UnblockResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnblockResponse = UnblockResponses[keyof UnblockResponses];
+
+export type BlockData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}/block';
+};
+
+export type BlockResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type BlockResponse = BlockResponses[keyof BlockResponses];
 
 export type RemoveAvatarData = {
     body?: never;
@@ -751,6 +795,22 @@ export type EditResponses = {
 };
 
 export type EditResponse = EditResponses[keyof EditResponses];
+
+export type BlocksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/blocks';
+};
+
+export type BlocksResponses = {
+    /**
+     * OK
+     */
+    200: Array<BlockedUser>;
+};
+
+export type BlocksResponse = BlocksResponses[keyof BlocksResponses];
 
 export type SearchAllData = {
     body?: never;

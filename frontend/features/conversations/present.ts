@@ -24,6 +24,16 @@ export function conversationAvatar(conversation: ConversationResponse, myId: str
 }
 
 /** The other person in a Direct conversation (the first Participant who is not the viewer). */
+/** The Direct conversation the signed-in person has with that person, if it is in the list. */
+export function directWith(
+  list: ConversationResponse[],
+  userId: string,
+  myId: string | undefined,
+): ConversationResponse | undefined {
+  if (!myId || userId === myId) return undefined;
+  return list.find((conversation) => conversation.type === "DIRECT" && conversation.participants?.some((p) => p.userId === userId));
+}
+
 export function otherParticipantId(conversation: ConversationResponse, myId: string | undefined): string | undefined {
   return conversation.participants?.find((participant) => participant.userId !== myId)?.userId;
 }
