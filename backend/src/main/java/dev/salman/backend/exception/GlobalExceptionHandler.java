@@ -1,7 +1,9 @@
 package dev.salman.backend.exception;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
@@ -10,6 +12,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -26,6 +29,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 /**
  * Renders every error as an RFC 9457 problem detail: Spring MVC's standard exceptions (malformed bodies, unknown
@@ -60,6 +64,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		});
 		ex.getBody().setProperty(ERRORS, errors);
 		return super.handleHandlerMethodValidationException(ex, headers, status, request);
+	}
+
+	/**
+	 * A body that could not be read stays a plain 400, except a value that is not one of an enum's choices (an unknown
+	 * Availability, say): that is a field error like any other, under the field's name.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		var response = super.handleHttpMessageNotReadable(ex, headers, status, request);
+		if (response != null && response.getBody() instanceof ProblemDetail problem
+				&& ex.getCause() instanceof InvalidFormatException invalid && invalid.getTargetType() != null
+				&& invalid.getTargetType().isEnum() && !invalid.getPath().isEmpty()) {
+			var field = invalid.getPath().getLast().getPropertyName();
+			var choices = Arrays.stream(invalid.getTargetType().getEnumConstants()).map(String::valueOf)
+					.collect(Collectors.joining(", "));
+			if (field != null) {
+				problem.setProperty(ERRORS, Map.of(field, "must be one of " + choices));
+			}
+		}
+		return response;
 	}
 
 	/** The servlet container's multipart limit tripped before the upload reached us: same answer as our own check. */

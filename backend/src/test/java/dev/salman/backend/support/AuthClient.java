@@ -409,6 +409,14 @@ public class AuthClient {
 				.header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Sets the caller's Availability. */
+	public ResultActions setAvailability(String accessToken, Object availability) throws Exception {
+		var body = new LinkedHashMap<String, Object>();
+		body.put("availability", availability);
+		return mvc.perform(MockMvcRequestBuilders.put("/api/v1/users/me/availability").contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
+	}
+
 	/** Blocks the User. */
 	public ResultActions block(String accessToken, Object userId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.put("/api/v1/users/{id}/block", userId).header("Authorization",

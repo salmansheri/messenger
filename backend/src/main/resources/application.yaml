@@ -49,6 +49,8 @@ app:
     max-per-minute: 30
   blocks:
     max-changes-per-hour: 20
+  availability:
+    max-changes-per-hour: 20
   uploads:
     max-per-minute: 20
     unattached-lifetime: 24h

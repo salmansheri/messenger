@@ -22,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import dev.salman.backend.dto.BlockedUser;
 import dev.salman.backend.dto.LookupRequest;
+import dev.salman.backend.dto.UpdateAvailabilityRequest;
 import dev.salman.backend.dto.UpdateProfileRequest;
 import dev.salman.backend.dto.UserProfile;
 import dev.salman.backend.dto.UserSummary;
+import dev.salman.backend.service.AvailabilityService;
 import dev.salman.backend.service.AvatarService;
 import dev.salman.backend.service.BlockService;
 import dev.salman.backend.lib.Principals;
@@ -41,6 +43,7 @@ public class UserController {
 	private final UserService users;
 	private final AvatarService avatars;
 	private final BlockService blocks;
+	private final AvailabilityService availability;
 
 	@GetMapping("/me")
 	UserProfile me(@AuthenticationPrincipal Jwt jwt) {
@@ -51,6 +54,12 @@ public class UserController {
 	@PatchMapping("/me")
 	UserProfile updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
 		return users.updateDisplayName(Principals.userId(jwt), request.displayName());
+	}
+
+	/** Sets the caller's Availability; see {@link AvailabilityService#set}. */
+	@PutMapping("/me/availability")
+	UserProfile setAvailability(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateAvailabilityRequest request) {
+		return availability.set(Principals.userId(jwt), request.availability());
 	}
 
 	/** Sets the caller's avatar from a PNG, JPEG, WebP or GIF (up to 10 MB); see {@link AvatarService#set}. */

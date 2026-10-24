@@ -80,6 +80,15 @@ _Avoid_: Username, nickname
 One square image a User chooses to represent them, shown to the people who share a Conversation with them. Without one, their initials are shown.
 _Avoid_: Profile picture, photo
 
+### Stories
+
+**Story**:
+A photo (with an optional caption) or a short text that a User posts for everyone they share a Direct conversation with. It can be viewed for 24 hours and is then gone, unless its poster deletes it sooner. A Block hides Stories both ways. Replying to one sends a Message in the Direct conversation.
+_Avoid_: Status (that is a Message status), post, update
+
+**Story view**:
+The record that a particular person has seen a particular Story. Only the poster sees who viewed.
+
 ### Search
 
 **Search**:
@@ -102,7 +111,7 @@ _Avoid_: Badge, pending
 
 **Message status**:
 How far a Message has got, shown only to its sender: sent, delivered once every other Participant's Delivered position has reached it, read once every other Participant's Read position has.
-_Avoid_: Receipt state, tick
+_Avoid_: Receipt state, tick, status (alone: a Story is a different thing)
 
 ### Conversation settings
 
@@ -124,7 +133,7 @@ _Avoid_: Favourite, star
 
 **Online**:
 A User is online while at least one of their connections is open. Closing one of several connections does not change it; it ends a short grace period after the last one closes.
-_Avoid_: Active, available, logged in
+_Avoid_: Active, logged in, available (that is an Availability)
 
 **Last seen**:
 When an offline User's last connection ended. Shown only while they are offline.
@@ -133,6 +142,10 @@ _Avoid_: Last online, last active
 **Typing indicator**:
 A live notice that a Participant is typing in a Conversation. It is passed on to the other Participants and never stored.
 _Avoid_: Typing status, composing
+
+**Availability**:
+How a User says they can be reached, chosen by hand: available (the default), busy or away. It stays until they change it and only informs others; it silences nothing. It is seen by the same people, and hidden by the same Blocks, as their presence, also while they are offline.
+_Avoid_: Status, do not disturb (silencing is Mute), mood
 
 ### Push
 

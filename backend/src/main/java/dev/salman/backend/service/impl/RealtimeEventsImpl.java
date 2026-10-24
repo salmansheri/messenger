@@ -22,6 +22,7 @@ import dev.salman.backend.dto.RealtimeEvent;
 import dev.salman.backend.dto.ReplyQuote;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
+import dev.salman.backend.entity.Availability;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
 import dev.salman.backend.lib.AfterCommit;
@@ -193,9 +194,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		payload.put("userId", userId);
 		payload.put("online", online);
 		payload.put("lastSeenAt", online ? null : lastSeenAt);
-		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
-		recipients.removeAll(userBlocks.findBlockedEitherWayWith(userId)); // a Block hides presence both ways
-		publish(recipients, payload);
+		publish(presenceAudience(userId), payload);
 	}
 
 	@Override
@@ -218,6 +217,24 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
 		recipients.add(userId);
 		publish(recipients, payload);
+	}
+
+	@Override
+	public void availabilityChanged(UUID userId, Availability availability) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "availability.changed");
+		payload.put("userId", userId);
+		payload.put("availability", availability);
+		var recipients = presenceAudience(userId); // seen by whoever sees the presence
+		recipients.add(userId);
+		publish(recipients, payload);
+	}
+
+	/** Everyone who sees the User's presence: who shares a Conversation with them, less a Block either way. */
+	private Set<UUID> presenceAudience(UUID userId) {
+		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
+		recipients.removeAll(userBlocks.findBlockedEitherWayWith(userId));
+		return recipients;
 	}
 
 	@Override

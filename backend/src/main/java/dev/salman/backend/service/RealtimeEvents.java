@@ -8,6 +8,7 @@ import java.util.UUID;
 import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
+import dev.salman.backend.entity.Availability;
 import dev.salman.backend.entity.Message;
 
 /**
@@ -93,6 +94,12 @@ public interface RealtimeEvents {
 	 * The link is the one those people would be given anyway.
 	 */
 	void avatarChanged(UUID userId, String avatarUrl);
+
+	/**
+	 * The User changed their Availability; heard by the same people as {@link #presenceChanged} (so not across a Block)
+	 * and by their own sessions.
+	 */
+	void availabilityChanged(UUID userId, Availability availability);
 
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);

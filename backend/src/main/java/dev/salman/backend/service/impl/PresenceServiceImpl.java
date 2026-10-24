@@ -213,12 +213,13 @@ public class PresenceServiceImpl implements PresenceService {
 		var others = participants.findByConversationId(conversationId).stream().map(Participant::getUserId)
 				.filter(id -> !id.equals(callerId)).filter(id -> !blockedEitherWay.contains(id)).toList();
 		var online = liveSocketCounts(others);
-		var lastSeen = users.findAllById(others).stream().filter(u -> u.getLastSeenAt() != null)
-				.collect(Collectors.toMap(User::getId, User::getLastSeenAt));
+		var byId = users.findAllById(others).stream().collect(Collectors.toMap(User::getId, user -> user));
 		var views = new ArrayList<PresenceView>();
 		for (int i = 0; i < others.size(); i++) {
 			var isOnline = online.get(i) > 0;
-			views.add(new PresenceView(others.get(i), isOnline, isOnline ? null : lastSeen.get(others.get(i))));
+			var user = byId.get(others.get(i)); // a Participant's User row always exists (cascading foreign key)
+			views.add(new PresenceView(others.get(i), isOnline, isOnline ? null : user.getLastSeenAt(),
+					user.getAvailability()));
 		}
 		return views;
 	}
