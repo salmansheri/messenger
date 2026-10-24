@@ -417,6 +417,30 @@ public class AuthClient {
 				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Posts a text Story. */
+	public ResultActions postTextStory(String accessToken, Object text, Object tone) throws Exception {
+		var body = new LinkedHashMap<String, Object>();
+		body.put("kind", "TEXT");
+		body.put("text", text);
+		body.put("tone", tone);
+		return postStoryBody(accessToken, body);
+	}
+
+	public ResultActions postStoryBody(String accessToken, Object body) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/stories").contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body)).header("Authorization", "Bearer " + accessToken));
+	}
+
+	/** The caller's Stories tray. */
+	public ResultActions stories(String accessToken) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/stories").header("Authorization", "Bearer " + accessToken));
+	}
+
+	public ResultActions deleteStory(String accessToken, Object storyId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/stories/{id}", storyId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
 	/** Blocks the User. */
 	public ResultActions block(String accessToken, Object userId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.put("/api/v1/users/{id}/block", userId).header("Authorization",

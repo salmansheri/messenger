@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push, Storage storage, Uploads uploads, Profile profile, Search search, Blocks blocks, Availability availability) {
+public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie refreshCookie, Cors cors, Lookup lookup, Groups groups, Messages messages, Presence presence, Push push, Storage storage, Uploads uploads, Profile profile, Search search, Blocks blocks, Availability availability, Stories stories) {
 
 	public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String privateKey,
 			String publicKey) {
@@ -65,6 +65,10 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 
 	/** How many times one User may change their Availability per hour (choosing the one held is free). */
 	public record Availability(int maxChangesPerHour) {
+	}
+
+	/** How many Stories one User may post per hour (deleting one does not give the post back). */
+	public record Stories(int maxPostsPerHour) {
 	}
 
 	/** How many Blocks and Unblocks one User may make per hour (repeating the current state is free). */

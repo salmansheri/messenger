@@ -20,6 +20,15 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
 			+ "where mine.userId = :userId and other.conversationId = mine.conversationId and other.userId <> :userId")
 	List<UUID> findCoParticipantIds(UUID userId);
 
+	/** Everyone the User shares a Direct conversation with: the people their Stories are for, before Blocks. */
+	@Query("""
+			select other.userId from Participant mine, Participant other, Conversation c
+			where mine.userId = :userId and c.id = mine.conversationId
+			and c.type = dev.salman.backend.entity.ConversationType.DIRECT
+			and other.conversationId = c.id and other.userId <> :userId
+			""")
+	List<UUID> findDirectPartnerIds(UUID userId);
+
 	boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
 
 	Optional<Participant> findByConversationIdAndUserId(UUID conversationId, UUID userId);

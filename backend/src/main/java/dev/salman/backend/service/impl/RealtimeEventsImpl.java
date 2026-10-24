@@ -22,6 +22,8 @@ import dev.salman.backend.dto.RealtimeEvent;
 import dev.salman.backend.dto.ReplyQuote;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
+import dev.salman.backend.dto.StoryPoster;
+import dev.salman.backend.dto.StoryResponse;
 import dev.salman.backend.entity.Availability;
 import dev.salman.backend.entity.Message;
 import dev.salman.backend.entity.Participant;
@@ -46,6 +48,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
 	private final AttachmentLoader attachmentLoader;
+	private final StoryAudience storyAudience;
 	private final RealtimePublisher publisher;
 
 	@Override
@@ -234,6 +237,31 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	private Set<UUID> presenceAudience(UUID userId) {
 		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
 		recipients.removeAll(userBlocks.findBlockedEitherWayWith(userId));
+		return recipients;
+	}
+
+	@Override
+	public void storyPosted(StoryResponse story, StoryPoster poster) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "story.posted");
+		payload.put("story", story);
+		payload.put("poster", poster);
+		publish(storyRecipients(poster.userId()), payload);
+	}
+
+	@Override
+	public void storyRemoved(UUID storyId, UUID posterId) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "story.removed");
+		payload.put("storyId", storyId);
+		payload.put("posterId", posterId);
+		publish(storyRecipients(posterId), payload);
+	}
+
+	/** The Story's audience and the poster's own sessions. */
+	private Set<UUID> storyRecipients(UUID posterId) {
+		var recipients = storyAudience.of(posterId);
+		recipients.add(posterId);
 		return recipients;
 	}
 

@@ -8,6 +8,8 @@ import java.util.UUID;
 import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.ReceiptPositions;
 import dev.salman.backend.dto.ReceiptResponse;
+import dev.salman.backend.dto.StoryPoster;
+import dev.salman.backend.dto.StoryResponse;
 import dev.salman.backend.entity.Availability;
 import dev.salman.backend.entity.Message;
 
@@ -37,6 +39,8 @@ import dev.salman.backend.entity.Message;
  * so clients should treat a "started" as stale after a few seconds without a repeat;</li>
  * <li>{@code presence.changed} (no {@code conversationId}): a User went online or offline ({@code userId},
  * {@code online}, and {@code lastSeenAt} when offline), to everyone who shares a Conversation with them.</li>
+ * <li>{@code story.posted} and {@code story.removed} (no {@code conversationId}): see {@link #storyPosted} and
+ * {@link #storyRemoved}.</li>
  * </ul>
  *
  * <p>Delivery is best effort and not durable (an instance restarting misses events), and events can arrive in a
@@ -100,6 +104,15 @@ public interface RealtimeEvents {
 	 * and by their own sessions.
 	 */
 	void availabilityChanged(UUID userId, Availability availability);
+
+	/**
+	 * A Story was posted ({@code story}, {@code poster}); heard by the poster's own sessions and by the Story's audience
+	 * (everyone the poster shares a Direct conversation with, less a Block either way).
+	 */
+	void storyPosted(StoryResponse story, StoryPoster poster);
+
+	/** A Story was deleted ({@code storyId}, {@code posterId}); heard by the same people as {@link #storyPosted}. */
+	void storyRemoved(UUID storyId, UUID posterId);
 
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);
