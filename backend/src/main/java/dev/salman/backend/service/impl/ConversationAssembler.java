@@ -60,7 +60,7 @@ class ConversationAssembler {
 		var membersByConversation = members.stream().collect(Collectors.groupingBy(Participant::getConversationId));
 		var latestByConversation = latestVisible(found, members, viewerId);
 		var now = clock.instant();
-		var reacted = reactionLoader.of(latestByConversation.values());
+		var reacted = reactionLoader.of(latestByConversation.values(), viewerId);
 		var pictured = attachmentLoader.of(latestByConversation.values());
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));

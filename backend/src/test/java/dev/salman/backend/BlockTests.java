@@ -517,6 +517,102 @@ class BlockTests extends RealtimeIntegrationTest {
 		assertThat(listOrderOf(ada)).containsExactly(withGrace, adaWithLinus);
 	}
 
+	// ---- the Blocked User's Reactions, edits and typing (#61)
+
+	/** Who reacted to the Message, as {@code who} sees it in their history. */
+	private List<String> reactorsSeenBy(Account who, String messageId) throws Exception {
+		var reactors = new ArrayList<String>();
+		messageSeenBy(who, messageId).get("reactions").forEach(r -> r.get("userIds").forEach(u -> reactors.add(u.asString())));
+		return reactors;
+	}
+
+	@Test
+	void theBlockedUsersReactionsAreHiddenFromTheBlockerWhileTheBlockLastsAndShowAgainAfter() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var group = idOf(client.createGroup(ada.accessToken(), "Book club", grace.id(), linus.id()));
+		var inGroup = client.sendNew(ada.accessToken(), group, "In the Group").get("id").asString();
+		var before = client.sendNew(ada.accessToken(), withGrace, "Before the Block").get("id").asString();
+		client.react(grace.accessToken(), withGrace, before, "❤️").andExpect(status().isOk());
+		client.react(ada.accessToken(), withGrace, before, "👍").andExpect(status().isOk());
+		client.react(grace.accessToken(), group, inGroup, "❤️").andExpect(status().isOk());
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.react(grace.accessToken(), withGrace, before, "😂").andExpect(status().isOk())
+				.andExpect(jsonPath("$.reactions.length()").value(2));
+
+		assertThat(reactorsSeenBy(ada, before)).containsExactly(ada.id());
+		assertThat(reactorsSeenBy(grace, before)).containsExactlyInAnyOrder(ada.id(), grace.id());
+		client.conversation(ada.accessToken(), withGrace)
+				.andExpect(jsonPath("$.lastMessage.reactions.length()").value(1))
+				.andExpect(jsonPath("$.lastMessage.reactions[0].userIds[0]").value(ada.id()));
+		client.unreact(ada.accessToken(), withGrace, before).andExpect(status().isOk())
+				.andExpect(jsonPath("$.reactions.length()").value(0));
+		client.history(ada.accessToken(), group, "")
+				.andExpect(jsonPath("$.messages[0].reactions[0].userIds[0]").value(grace.id()));
+
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		assertThat(reactorsSeenBy(ada, before)).containsExactly(grace.id());
+		client.history(ada.accessToken(), withGrace, "").andExpect(jsonPath("$.messages[0].reactions[0].emoji").value("😂"));
+	}
+
+	@Test
+	void theBlockedUsersReactionsAndEditsSendNothingToTheBlockerButTheirDeletionsDo() throws Exception {
+		var mine = client.sendNew(ada.accessToken(), withGrace, "Mine").get("id").asString();
+		var hers = client.sendNew(grace.accessToken(), withGrace, "Hers").get("id").asString();
+		var other = client.sendNew(grace.accessToken(), withGrace, "To be deleted").get("id").asString();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var forAda = listening(ada);
+		var gracesOtherTab = listening(grace);
+
+		client.react(grace.accessToken(), withGrace, mine, "❤️").andExpect(status().isOk());
+		gracesOtherTab.await(e -> isType(e, "reaction.changed", withGrace));
+		client.editMessage(grace.accessToken(), withGrace, hers, "Hers, changed").andExpect(status().isOk());
+		gracesOtherTab.await(e -> isType(e, "message.updated", withGrace));
+		client.deleteMessage(grace.accessToken(), withGrace, other).andExpect(status().isNoContent());
+
+		var deleted = forAda.await(e -> isType(e, "message.updated", withGrace));
+		assertThat(deleted.at("/message/id").asString()).isEqualTo(other);
+		assertThat(deleted.at("/message/deletedAt").isMissingNode()).isFalse();
+		assertThat(forAda.history()).noneMatch(e -> isType(e, "reaction.changed", withGrace));
+		assertThat(forAda.history()).noneMatch(e -> hers.equals(e.at("/message/id").asString(null)));
+		assertThat(messageSeenBy(ada, other).path("body").asString(null)).isNull();
+		// The known limit (ADR 0004): no earlier text is kept, so the next fetch shows the edit.
+		assertThat(messageSeenBy(ada, hers).get("body").asString()).isEqualTo("Hers, changed");
+	}
+
+	@Test
+	void theBlockedUsersEditsInAGroupStillReachTheBlocker() throws Exception {
+		var group = idOf(client.createGroup(ada.accessToken(), "Book club", grace.id()));
+		var hers = client.sendNew(grace.accessToken(), group, "In the Group").get("id").asString();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var forAda = listening(ada);
+
+		client.editMessage(grace.accessToken(), group, hers, "In the Group, changed").andExpect(status().isOk());
+
+		assertThat(forAda.await(e -> isType(e, "message.updated", group)).at("/message/body").asString())
+				.isEqualTo("In the Group, changed");
+	}
+
+	@Test
+	void theBlockedUsersTypingDoesNotReachTheBlocker() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var group = idOf(client.createGroup(ada.accessToken(), "Book club", grace.id(), linus.id()));
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var forAda = listening(ada);
+		var forGrace = listening(grace);
+
+		forGrace.send("/app/conversations/" + withGrace + "/typing", Map.of("typing", true));
+		forGrace.send("/app/conversations/" + group + "/typing", Map.of("typing", true));
+
+		forAda.await(e -> isType(e, "typing.changed", group));
+		assertThat(forAda.receivesNothingMatching(e -> isType(e, "typing.changed", withGrace), 500)).isTrue();
+		assertThat(forAda.history()).noneMatch(e -> isType(e, "typing.changed", withGrace));
+
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		forGrace.send("/app/conversations/" + withGrace + "/typing", Map.of("typing", false));
+		forAda.await(e -> isType(e, "typing.changed", withGrace));
+	}
+
 	// ---- throttle
 
 	@Test

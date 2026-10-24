@@ -1,5 +1,6 @@
 package dev.salman.backend.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select c from Conversation c where c.id = :id")
 	Optional<Conversation> findByIdForUpdate(UUID id);
+
+	/** Which of these Conversations are Direct ones. */
+	@Query("select c.id from Conversation c where c.id in :ids and c.type = dev.salman.backend.entity.ConversationType.DIRECT")
+	List<UUID> findDirectAmong(Collection<UUID> ids);
 
 	/** The caller's Conversations, most recently active first. */
 	@Query("""

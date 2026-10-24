@@ -23,4 +23,18 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, UUID> {
 	@Query("select b.blockedId from UserBlock b where b.blockerId = :blockerId and b.blockedId in :userIds")
 	List<UUID> findBlockedAmong(UUID blockerId, Collection<UUID> userIds);
 
+	/** The Blocks any of these Users made against any of those. */
+	List<UserBlock> findByBlockerIdInAndBlockedIdIn(Collection<UUID> blockerIds, Collection<UUID> blockedIds);
+
+	/**
+	 * Who in this Conversation blocks the User: the other Participant of a Direct conversation that blocked them, or
+	 * nobody (a Group never hides anyone's actions).
+	 */
+	@Query("""
+			select b.blockerId from UserBlock b, Conversation c, Participant p
+			where c.id = :conversationId and c.type = dev.salman.backend.entity.ConversationType.DIRECT
+			and p.conversationId = c.id and p.userId = b.blockerId and b.blockedId = :userId
+			""")
+	List<UUID> findBlockersInDirect(UUID conversationId, UUID userId);
+
 }

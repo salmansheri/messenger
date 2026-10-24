@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import dev.salman.backend.dto.ConversationSettings;
 import dev.salman.backend.dto.MessageResponse;
+import dev.salman.backend.dto.ReactionView;
 import dev.salman.backend.dto.RealtimeEvent;
 import dev.salman.backend.dto.ReplyQuote;
 import dev.salman.backend.dto.ReceiptPositions;
@@ -29,6 +30,7 @@ import dev.salman.backend.lib.RealtimePublisher;
 import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.ParticipantRepository;
+import dev.salman.backend.repository.UserBlockRepository;
 import dev.salman.backend.service.RealtimeEvents;
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +40,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 
 	private final ParticipantRepository participants;
 	private final MessageRepository messages;
+	private final UserBlockRepository userBlocks;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
@@ -53,30 +56,38 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	@Override
 	public void messageUpdated(Message message) {
 		// Only people who can still read it: not someone who joined after it, who hid it for themselves or from whom it
-		// is withheld.
+		// is withheld. An edit by a Blocked User does not reach their blocker either; taking a Message back does.
+		var silenced = message.isDeleted() ? Set.<UUID>of() : blockersOf(message.getConversationId(), message.getSenderId());
 		var members = participants.findByConversationId(message.getConversationId()).stream()
-				.filter(m -> m.canRead(message.getSeq())).filter(m -> !message.isWithheldFrom(m.getUserId())).toList();
+				.filter(m -> m.canRead(message.getSeq())).filter(m -> !message.isWithheldFrom(m.getUserId()))
+				.filter(m -> !silenced.contains(m.getUserId())).toList();
 		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
 		publishMessage("message.updated", message, members.stream().filter(m -> !hiders.contains(m.getUserId())).toList());
+	}
+
+	/** What one audience of a Message event sees of it besides the Message itself. */
+	private record View(Optional<ReplyQuote> quote, List<ReactionView> reactions) {
 	}
 
 	/**
 	 * Tells these Participants about the Message. No status in the pushed copy: it is the sender's own view and changes
 	 * as receipts arrive. A reply carries a quote of the Message it answers, which differs by who reads it (someone who
-	 * joined after the quoted Message must not get its text), so recipients with the same quote share one event.
+	 * joined after the quoted Message must not get its text), and so do the reactions (a blocker does not see the
+	 * Blocked User's), so recipients who see the same share one event.
 	 */
 	private void publishMessage(String type, Message message, Collection<Participant> recipients) {
 		var answered = quotes.quotedBy(message);
 		var hid = answered.map(quotes::hiddenBy).orElse(Set.of());
-		Map<Optional<ReplyQuote>, Set<UUID>> audiences = new LinkedHashMap<>();
+		var reacted = reactionLoader.ofEach(message, userIds(recipients));
+		Map<View, Set<UUID>> audiences = new LinkedHashMap<>();
 		for (var member : recipients) {
 			var quote = answered.map(original -> QuoteResolver.quoteFor(original, member, hid.contains(member.getUserId())));
-			audiences.computeIfAbsent(quote, q -> new LinkedHashSet<>()).add(member.getUserId());
+			audiences.computeIfAbsent(new View(quote, reacted.get(member.getUserId())), q -> new LinkedHashSet<>())
+					.add(member.getUserId());
 		}
-		var reacted = reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of());
 		var picture = attachmentLoader.of(List.of(message)).get(message.getId());
-		audiences.forEach((quote, audience) -> publish(audience, event(type, message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null, quote.orElse(null), reacted, picture)))));
+		audiences.forEach((view, audience) -> publish(audience, event(type, message.getConversationId(),
+				Map.of("message", MessageResponse.from(message, null, view.quote().orElse(null), view.reactions(), picture)))));
 	}
 
 	@Override
@@ -135,13 +146,15 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 				.filter(m -> m.canRead(message.getSeq())).filter(m -> !message.isWithheldFrom(m.getUserId()))
 				.collect(Collectors.toList());
 		var hiders = Set.copyOf(hidden.findUserIdsWhoHid(message.getId()));
+		var silenced = blockersOf(message.getConversationId(), userId); // a blocker never sees the Blocked User's reactions
 		var details = new LinkedHashMap<String, Object>();
 		details.put("messageId", message.getId());
 		details.put("seq", message.getSeq());
 		details.put("userId", userId);
 		details.put("emoji", emoji);
 		details.put("at", at);
-		publish(userIds(readers.stream().filter(m -> !hiders.contains(m.getUserId())).toList()),
+		publish(userIds(readers.stream().filter(m -> !hiders.contains(m.getUserId()))
+				.filter(m -> !silenced.contains(m.getUserId())).toList()),
 				event("reaction.changed", message.getConversationId(), details));
 	}
 
@@ -169,6 +182,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	public void typingChanged(UUID conversationId, UUID typistId, boolean typing) {
 		var recipients = userIds(participants.findByConversationId(conversationId));
 		recipients.remove(typistId);
+		recipients.removeAll(blockersOf(conversationId, typistId));
 		publish(recipients, event("typing.changed", conversationId, Map.of("userId", typistId, "typing", typing)));
 	}
 
@@ -207,6 +221,11 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	@Override
 	public void credentialsRevoked(UUID userId) {
 		publish(Set.of(userId), Map.of("type", RealtimeListener.AUTH_REVOKED));
+	}
+
+	/** Who in this Conversation blocks the User (only ever the other Participant of a Direct conversation). */
+	private Set<UUID> blockersOf(UUID conversationId, UUID userId) {
+		return Set.copyOf(userBlocks.findBlockersInDirect(conversationId, userId));
 	}
 
 	private static Set<UUID> userIds(Collection<Participant> members) {

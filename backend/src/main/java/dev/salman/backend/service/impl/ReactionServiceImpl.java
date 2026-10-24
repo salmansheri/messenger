@@ -115,7 +115,7 @@ public class ReactionServiceImpl implements ReactionService {
 		var status = message.getSenderId().equals(callerId)
 				? MessageStatuses.of(message, callerId, participants.findByConversationId(message.getConversationId())) : null;
 		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()),
-				reactionLoader.of(List.of(message)).getOrDefault(message.getId(), List.of()),
+				reactionLoader.of(List.of(message), callerId).getOrDefault(message.getId(), List.of()),
 				attachmentLoader.of(List.of(message)).get(message.getId()));
 	}
 
