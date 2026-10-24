@@ -9,6 +9,7 @@ import { messageFor } from "@/lib/api/messages";
 import { useFrontier } from "@/features/receipts/queries";
 import type { Frontier } from "@/features/receipts/status";
 import { BlockedNotice } from "@/features/conversations/blocked-notice";
+import { AvailabilityLine } from "@/features/presence/availability-line";
 import { TypingLine } from "@/features/presence/typing-line";
 import { createTypingSender } from "@/features/presence/typing-sender";
 import { useTypingPublisher } from "@/features/realtime/realtime-provider";
@@ -414,6 +415,7 @@ export function MessageView({ conversation, myId, target, onLeaveTarget }: Props
           <p key={`${line.seq}-${line.change ?? "new"}`}>{line.text}</p>
         ))}
       </div>
+      <AvailabilityLine conversation={conversation} myId={myId} />
       <TypingLine conversationId={conversationId} names={names} />
       {conversation.blocked ? (
         <BlockedNotice conversation={conversation} myId={myId} onUnblocked={() => {

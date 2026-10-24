@@ -123,6 +123,16 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "presence.changed", userId: "u1" }))).toBeUndefined();
   });
 
+  it("reads a change of Availability, and drops one that is not one of the three", () => {
+    expect(parseEvent(JSON.stringify({ type: "availability.changed", userId: "u1", availability: "BUSY" }))).toEqual({
+      type: "availability.changed",
+      userId: "u1",
+      availability: "BUSY",
+    });
+    expect(parseEvent(JSON.stringify({ type: "availability.changed", userId: "u1", availability: "DO_NOT_DISTURB" }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "availability.changed", availability: "AWAY" }))).toBeUndefined();
+  });
+
   it("reads a name change, and drops one that does not say who or what", () => {
     expect(parseEvent(JSON.stringify({ type: "profile.changed", userId: "u1", displayName: "Ada King" }))).toEqual({
       type: "profile.changed",

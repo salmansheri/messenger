@@ -1,4 +1,9 @@
-import type { ConversationSettings, MessageResponse } from "@/lib/api";
+import type { ConversationSettings, MessageResponse, UserProfile } from "@/lib/api";
+
+/** How someone says they can be reached (GLOSSARY "Availability"). */
+export type Availability = NonNullable<UserProfile["availability"]>;
+
+const AVAILABILITIES: readonly string[] = ["AVAILABLE", "BUSY", "AWAY"] satisfies Availability[];
 
 /**
  * What the app acts on. `ignored` is any other well-formed event (a kind that does not exist yet): it is known to be
@@ -23,6 +28,8 @@ export type RealtimeEvent =
   | { type: "typing.changed"; conversationId: string; userId: string; typing: boolean }
   /** Someone who shares a Conversation with this person came online or went offline. */
   | { type: "presence.changed"; userId: string; online: boolean; lastSeenAt: string | undefined }
+  /** Someone whose presence this person sees (or this person, in another session) changed their Availability. */
+  | { type: "availability.changed"; userId: string; availability: Availability }
   /**
    * Someone who shares a Conversation with this person (or this person, in another session) changed their name or
    * Avatar. Only what changed is there: a name change says nothing about the picture, and `avatarUrl: null` is a removal.
@@ -115,6 +122,10 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
         online: payload.online,
         lastSeenAt: typeof payload.lastSeenAt === "string" ? payload.lastSeenAt : undefined,
       };
+    case "availability.changed":
+      return typeof payload.userId === "string" && typeof payload.availability === "string" && AVAILABILITIES.includes(payload.availability)
+        ? { type: "availability.changed", userId: payload.userId, availability: payload.availability as Availability }
+        : undefined;
     case "profile.changed": {
       if (typeof payload.userId !== "string") return undefined;
       const changes: ProfileChanges = {};

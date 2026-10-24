@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { logoutMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { messageFor } from "@/lib/api/messages";
+import { AvailabilityChooser } from "./availability-chooser";
 import { AvatarChooser } from "./avatar-chooser";
 import { BlockedUsersSection } from "./blocked-users-section";
 import { ProfileForm } from "./profile-form";
@@ -67,6 +68,16 @@ export function SettingsView() {
             Your Avatar
           </h2>
           <AvatarChooser userId={me.data.id} name={me.data.displayName} url={me.data.avatarUrl} />
+        </section>
+      )}
+
+      {me.data?.id && (
+        <section aria-labelledby="availability" className="mt-10 border-t border-rule pt-6">
+          <h2 id="availability" className="font-serif text-lg font-semibold">
+            Your Availability
+          </h2>
+          <p className="mt-2 text-ink-muted">Shown to the people who see when you are online. It changes nothing for you.</p>
+          <AvailabilityChooser userId={me.data.id} held={me.data.availability ?? "AVAILABLE"} labelledBy="availability" />
         </section>
       )}
 

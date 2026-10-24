@@ -392,6 +392,81 @@ describe("typing and presence events", () => {
     expect(client.getQueryData<PresenceView[]>(key)).toEqual([{ userId: "grace", online: true, lastSeenAt: undefined }]);
   });
 
+  it("shows someone's new Availability in every Conversation's presence that has loaded", () => {
+    const { client } = withList([conversation(2, 0)]);
+    const one = presenceQueryKey({ path: { conversationId: "c1" } });
+    const two = presenceQueryKey({ path: { conversationId: "c2" } });
+    client.setQueryData<PresenceView[]>(one, [{ userId: "grace", online: true, availability: "AVAILABLE" }]);
+    client.setQueryData<PresenceView[]>(two, [{ userId: "grace", online: true, availability: "AVAILABLE" }]);
+
+    handleEvent(client, JSON.stringify({ type: "availability.changed", userId: "grace", availability: "AWAY" }), createTypingTracker());
+
+    expect(client.getQueryData<PresenceView[]>(one)?.[0].availability).toBe("AWAY");
+    expect(client.getQueryData<PresenceView[]>(two)?.[0].availability).toBe("AWAY");
+    expect(client.getQueryData(meQueryKey()), "someone else's change leaves the profile alone").toEqual({ id: "me" });
+  });
+
+  it("restarts a presence request that is under way instead of patching it (its answer may predate the change)", async () => {
+    const { client } = withList([conversation(2, 0)]);
+    const key = presenceQueryKey({ path: { conversationId: "c1" } });
+    client.setQueryData<PresenceView[]>(key, [{ userId: "grace", online: true, availability: "AVAILABLE" }]);
+    const answers: ReturnType<typeof deferred<PresenceView[]>>[] = [];
+    const observer = new QueryObserver(client, {
+      queryKey: key,
+      staleTime: Infinity,
+      queryFn: () => {
+        const answer = deferred<PresenceView[]>();
+        answers.push(answer);
+        return answer.promise;
+      },
+    });
+    stops.push(observer.subscribe(() => {}));
+    void client.invalidateQueries({ queryKey: key }); // a request starts (as after a reconnect)
+    await Promise.resolve();
+    expect(answers).toHaveLength(1);
+
+    handleEvent(client, JSON.stringify({ type: "availability.changed", userId: "grace", availability: "BUSY" }), createTypingTracker());
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(answers, "the request was restarted").toHaveLength(2);
+    expect(client.getQueryData<PresenceView[]>(key)?.[0].availability, "not patched").toBe("AVAILABLE");
+  });
+
+  it("restarts a first presence request that is under way too, though nothing is loaded yet", async () => {
+    const { client } = withList([conversation(2, 0)]);
+    const key = presenceQueryKey({ path: { conversationId: "c1" } });
+    const answers: ReturnType<typeof deferred<PresenceView[]>>[] = [];
+    const observer = new QueryObserver(client, {
+      queryKey: key,
+      queryFn: () => {
+        const answer = deferred<PresenceView[]>();
+        answers.push(answer);
+        return answer.promise;
+      },
+    });
+    stops.push(observer.subscribe(() => {}));
+    await Promise.resolve();
+    expect(answers).toHaveLength(1);
+
+    handleEvent(client, JSON.stringify({ type: "availability.changed", userId: "grace", availability: "BUSY" }), createTypingTracker());
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(answers, "the request was restarted").toHaveLength(2);
+    answers[0].resolve([{ userId: "grace", online: true, availability: "AVAILABLE" }]); // the old answer, late
+    answers[1].resolve([{ userId: "grace", online: true, availability: "BUSY" }]);
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(client.getQueryData<PresenceView[]>(key)?.[0].availability).toBe("BUSY");
+  });
+
+  it("puts this person's own Availability, changed in another tab, into their profile", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(meQueryKey(), { id: "me", availability: "AVAILABLE" });
+
+    handleEvent(client, JSON.stringify({ type: "availability.changed", userId: "me", availability: "BUSY" }), createTypingTracker());
+
+    expect(client.getQueryData(meQueryKey())).toEqual({ id: "me", availability: "BUSY" });
+  });
+
   it("asks for a Conversation's presence again when the Conversation changed (someone new may have joined)", async () => {
     const { client } = withList([conversation(2, 0)]);
     const key = presenceQueryKey({ path: { conversationId: "c1" } });

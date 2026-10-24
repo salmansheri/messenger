@@ -10,6 +10,11 @@ export type UserProfile = {
     displayName?: string;
     emailVerified?: boolean;
     avatarUrl?: string;
+    availability?: 'AVAILABLE' | 'BUSY' | 'AWAY';
+};
+
+export type UpdateAvailabilityRequest = {
+    availability: 'AVAILABLE' | 'BUSY' | 'AWAY';
 };
 
 export type SetReactionRequest = {
@@ -214,6 +219,7 @@ export type PresenceView = {
     userId?: string;
     online?: boolean;
     lastSeenAt?: string;
+    availability?: 'AVAILABLE' | 'BUSY' | 'AWAY';
 };
 
 export type MessagePage = {
@@ -292,6 +298,22 @@ export type SetAvatarResponses = {
 };
 
 export type SetAvatarResponse = SetAvatarResponses[keyof SetAvatarResponses];
+
+export type SetAvailabilityData = {
+    body: UpdateAvailabilityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/availability';
+};
+
+export type SetAvailabilityResponses = {
+    /**
+     * OK
+     */
+    200: UserProfile;
+};
+
+export type SetAvailabilityResponse = SetAvailabilityResponses[keyof SetAvailabilityResponses];
 
 export type UnreactData = {
     body?: never;

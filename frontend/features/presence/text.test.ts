@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { presenceText, typingText } from "./text";
+import { availabilityNotice, presenceText, typingText } from "./text";
 
 const NOW = new Date("2026-03-10T12:00:00Z");
 
@@ -24,6 +24,31 @@ describe("presenceText", () => {
   it("says offline for someone who has never been seen, and nothing when it is not known yet", () => {
     expect(presenceText({ userId: "u", online: false }, NOW, "UTC")).toBe("Offline");
     expect(presenceText(undefined, NOW, "UTC")).toBe("");
+  });
+});
+
+describe("presenceText with Availability", () => {
+  it("puts Busy or Away before where someone is, online or not", () => {
+    expect(presenceText({ userId: "u", online: true, availability: "BUSY" }, NOW, "UTC")).toBe("Busy · Online");
+    expect(presenceText({ userId: "u", online: false, lastSeenAt: "2026-03-10T09:05:00Z", availability: "AWAY" }, NOW, "UTC")).toBe(
+      "Away · Last seen today at 09:05",
+    );
+  });
+
+  it("adds nothing for someone who is available", () => {
+    expect(presenceText({ userId: "u", online: true, availability: "AVAILABLE" }, NOW, "UTC")).toBe("Online");
+  });
+});
+
+describe("availabilityNotice", () => {
+  it("says the other person is busy or away", () => {
+    expect(availabilityNotice("Grace", "BUSY")).toBe("Grace is busy.");
+    expect(availabilityNotice("Grace", "AWAY")).toBe("Grace is away.");
+  });
+
+  it("says nothing for someone who is available, or whose Availability is not known", () => {
+    expect(availabilityNotice("Grace", "AVAILABLE")).toBe("");
+    expect(availabilityNotice("Grace", undefined)).toBe("");
   });
 });
 

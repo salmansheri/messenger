@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, block, blocks, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvatar, signUp, startDirect, unblock, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, BlockData, BlockResponse, BlocksData, BlocksResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnblockData, UnblockResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, block, blocks, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvailability, setAvatar, signUp, startDirect, unblock, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, BlockData, BlockResponse, BlocksData, BlocksResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvailabilityData, SetAvailabilityResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnblockData, UnblockResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
 
 export const unblockMutation = (options?: Partial<Options<UnblockData>>): UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> => {
     const mutationOptions: UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> = {
@@ -52,6 +52,20 @@ export const setAvatarMutation = (options?: Partial<Options<SetAvatarData>>): Us
     const mutationOptions: UseMutationOptions<SetAvatarResponse, DefaultError, Options<SetAvatarData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await setAvatar({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const setAvailabilityMutation = (options?: Partial<Options<SetAvailabilityData>>): UseMutationOptions<SetAvailabilityResponse, DefaultError, Options<SetAvailabilityData>> => {
+    const mutationOptions: UseMutationOptions<SetAvailabilityResponse, DefaultError, Options<SetAvailabilityData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setAvailability({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

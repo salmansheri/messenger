@@ -29,3 +29,13 @@ export function avatarFailureMessage(problem: ApiProblem): string {
   if (problem.status === 400) return problem.detail || "That picture could not be used. Choose a PNG, JPEG, WebP or GIF image.";
   return messageFor(problem);
 }
+
+/** Why a new Availability was not saved: changes are limited per hour, so a 429 says how long to wait. */
+export function availabilityFailureMessage(problem: ApiProblem): string {
+  if (problem.status === 429) {
+    return problem.retryAfterSeconds === undefined
+      ? "You have changed your Availability too often. Try again later."
+      : `You have changed your Availability too often. Try again in ${describeWait(problem.retryAfterSeconds)}.`;
+  }
+  return messageFor(problem);
+}

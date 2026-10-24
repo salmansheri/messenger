@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiProblem } from "@/lib/api/problem";
-import { avatarFailureMessage, nameChangeFailureMessage } from "./wording";
+import { availabilityFailureMessage, avatarFailureMessage, nameChangeFailureMessage } from "./wording";
 
 const problem = (status: number, retryAfterSeconds?: number) => new ApiProblem(status, "Problem", undefined, {}, retryAfterSeconds);
 
@@ -33,5 +33,16 @@ describe("avatarFailureMessage", () => {
 
   it("keeps the general wording for everything else", () => {
     expect(avatarFailureMessage(problem(503))).toBe("The server is busy. Try again in a moment.");
+  });
+});
+
+describe("availabilityFailureMessage", () => {
+  it("says how long to wait when the Availability was changed too often", () => {
+    expect(availabilityFailureMessage(problem(429, 1200))).toBe("You have changed your Availability too often. Try again in 20 minutes.");
+    expect(availabilityFailureMessage(problem(429))).toBe("You have changed your Availability too often. Try again later.");
+  });
+
+  it("keeps the general wording for everything else", () => {
+    expect(availabilityFailureMessage(problem(503))).toBe("The server is busy. Try again in a moment.");
   });
 });

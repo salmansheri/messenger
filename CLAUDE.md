@@ -67,7 +67,7 @@ Backend design (partly implemented; see issue #1 for the full spec):
 Detailed notes per area live in `docs/backend/` and `docs/frontend/`. **Read the file for the area a ticket touches before changing it, and record new behaviour there, not here** (keep CLAUDE.md to rules that apply to every change).
 
 - Backend: `auth-and-sessions.md` (sign-up, verification, login/refresh/logout, password reset, lookup), `conversations-and-groups.md` (Direct, Groups, mute/archive/pin), `messages.md` (send, `seq`, history paging and `aroundSeq`, receipts, edit/delete/hide, replies, reactions), `images-and-profile.md` (uploads, image Messages, display name, Avatars), `search.md`, `blocking.md` (incl. Withheld Messages), `availability.md`, `realtime-presence-push.md` (STOMP, events, presence sweep, typing, push).
-- Frontend: `auth-and-session.md`, `conversations.md` (list, open pane, Groups panel, settings menu, name change), `messages.md` (Message view, outbox, edit/delete, reactions, replies, images, `?at=` windows), `realtime-receipts-presence.md`, `accessibility-and-landing.md`, `search.md`, `people-and-blocking.md` (Avatars, Block UI, Blocked Users), `e2e.md` (Playwright setup).
+- Frontend: `auth-and-session.md`, `conversations.md` (list, open pane, Groups panel, settings menu, name change), `messages.md` (Message view, outbox, edit/delete, reactions, replies, images, `?at=` windows), `realtime-receipts-presence.md` (incl. Availability), `accessibility-and-landing.md`, `search.md`, `people-and-blocking.md` (Avatars, Block UI, Blocked Users), `e2e.md` (Playwright setup).
 
 
 ## Agent skills

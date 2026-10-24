@@ -10,7 +10,7 @@ import {
   type PresenceView,
   type UserProfile,
 } from "@/lib/api";
-import { parseEvent, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
+import { parseEvent, type Availability, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
 import { directWith } from "@/features/conversations/present";
 import { withoutBlockedUser } from "@/features/session/blocked-users";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
@@ -20,7 +20,7 @@ import { isDetached } from "@/features/messages/window";
 import { acceptReaction } from "@/features/messages/reactions";
 import { readPositionKey, receiptsKey } from "@/features/receipts/queries";
 import { mergeFrontier, type Frontier } from "@/features/receipts/status";
-import { applyPresence } from "@/features/presence/apply-presence";
+import { applyAvailability, applyPresence } from "@/features/presence/apply-presence";
 import type { TypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
 import { applyProfileChanges, applyToHistory, applyToList, applyUnread } from "./apply-event";
@@ -84,6 +84,30 @@ export function recordProfile(queryClient: QueryClient, userId: string, changes:
 }
 
 /**
+ * Changes every loaded presence query, or restarts one whose request is under way (see `fetching`). Invalidating
+ * alone would not do for a first load: TanStack Query only restarts a fetch that already has data, and otherwise
+ * waits for the request under way, whose answer may predate the event. So the request is cancelled first.
+ */
+function patchPresence(queryClient: QueryClient, change: (views: PresenceView[] | undefined) => PresenceView[] | undefined) {
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: allPresenceKey })) {
+    if (query.state.fetchStatus === "fetching") {
+      const queryKey = query.queryKey;
+      void queryClient.cancelQueries({ queryKey }).then(() => queryClient.invalidateQueries({ queryKey }));
+    } else queryClient.setQueryData<PresenceView[]>(query.queryKey, change);
+  }
+}
+
+/**
+ * Someone's new Availability, from the event or from the answer to the person's own change: put into every loaded
+ * presence (where other people's is read from) and, when it is the signed-in person's own, into their profile.
+ */
+export function recordAvailability(queryClient: QueryClient, userId: string, availability: Availability) {
+  const me = queryClient.getQueryData<UserProfile>(meQueryKey());
+  if (me?.id === userId && me.availability !== availability) queryClient.setQueryData<UserProfile>(meQueryKey(), { ...me, availability });
+  patchPresence(queryClient, (views) => applyAvailability(views, { userId, availability }));
+}
+
+/**
  * A Block or Unblock made by this person, from the event or from the answer to their own change: the Direct
  * conversation is marked in the list, and what the server now shows differently is asked for again: that
  * Conversation's Messages (the other person's reactions are hidden while the Block lasts and shown again after it),
@@ -137,10 +161,11 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     return;
   }
   if (event.type === "presence.changed") {
-    for (const query of queryClient.getQueryCache().findAll({ queryKey: allPresenceKey })) {
-      if (query.state.fetchStatus === "fetching") void queryClient.invalidateQueries({ queryKey: query.queryKey });
-      else queryClient.setQueryData<PresenceView[]>(query.queryKey, (views) => applyPresence(views, event));
-    }
+    patchPresence(queryClient, (views) => applyPresence(views, event));
+    return;
+  }
+  if (event.type === "availability.changed") {
+    recordAvailability(queryClient, event.userId, event.availability);
     return;
   }
   if (event.type === "profile.changed") {

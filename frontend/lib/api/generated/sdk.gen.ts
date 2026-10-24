@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddParticipantData, AddParticipantResponses, BlockData, BlockResponses, BlocksData, BlocksResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnblockData, UnblockResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
+import type { AddParticipantData, AddParticipantResponses, BlockData, BlockResponses, BlocksData, BlocksResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvailabilityData, SetAvailabilityResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnblockData, UnblockResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -44,6 +44,16 @@ export const setAvatar = <ThrowOnError extends boolean = true>(options?: Options
     headers: {
         'Content-Type': null,
         ...options?.headers
+    }
+});
+
+export const setAvailability = <ThrowOnError extends boolean = true>(options: Options<SetAvailabilityData, ThrowOnError>): RequestResult<SetAvailabilityResponses, unknown, ThrowOnError> => (options.client ?? client).put<SetAvailabilityResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/users/me/availability',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
     }
 });
 
