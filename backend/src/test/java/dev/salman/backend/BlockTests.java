@@ -613,6 +613,98 @@ class BlockTests extends RealtimeIntegrationTest {
 		forAda.await(e -> isType(e, "typing.changed", withGrace));
 	}
 
+	// ---- presence and Groups (#62)
+
+	private List<String> presenceListedFor(Account who, String conversationId) throws Exception {
+		var ids = new ArrayList<String>();
+		read(client.presence(who.accessToken(), conversationId).andExpect(status().isOk()))
+				.forEach(p -> ids.add(p.get("userId").asString()));
+		return ids;
+	}
+
+	private static boolean presenceOf(JsonNode event, Account who) {
+		return "presence.changed".equals(event.path("type").asString())
+				&& who.id().equals(event.path("userId").asString());
+	}
+
+	@Test
+	void neitherSeesTheOthersPresenceAnywhereWhileTheBlockLasts() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var group = idOf(client.createGroup(linus.accessToken(), "Book club", ada.id(), grace.id()));
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		assertThat(presenceListedFor(ada, withGrace)).isEmpty();
+		assertThat(presenceListedFor(grace, withGrace)).isEmpty();
+		assertThat(presenceListedFor(ada, group)).containsExactly(linus.id());
+		assertThat(presenceListedFor(grace, group)).containsExactly(linus.id());
+		assertThat(presenceListedFor(linus, group)).containsExactlyInAnyOrder(ada.id(), grace.id());
+
+		client.unblock(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		assertThat(presenceListedFor(ada, withGrace)).containsExactly(grace.id());
+		assertThat(presenceListedFor(grace, group)).containsExactlyInAnyOrder(linus.id(), ada.id());
+	}
+
+	@Test
+	void presenceChangedIsNotSentBetweenThemEitherWay() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		client.createGroup(linus.accessToken(), "Book club", ada.id(), grace.id()).andExpect(status().isCreated());
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+		var forLinus = listening(linus);
+		var forAda = listening(ada);
+		forLinus.await(e -> presenceOf(e, ada));
+
+		var forGrace = listening(grace);
+		forLinus.await(e -> presenceOf(e, grace));
+		forAda.close();
+		var adaOffline = forLinus.await(e -> presenceOf(e, ada) && !e.path("online").asBoolean());
+
+		assertThat(adaOffline).isNotNull();
+		assertThat(forAda.history()).noneMatch(e -> presenceOf(e, grace));
+		assertThat(forGrace.history()).noneMatch(e -> presenceOf(e, ada));
+	}
+
+	@Test
+	void theBlockedUserCannotPutTheBlockerInAGroup() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var stranger = UUID.randomUUID();
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		var refused = read(client.createGroup(grace.accessToken(), "Book club", linus.id(), ada.id())
+				.andExpect(status().isNotFound()));
+		var unknown = read(client.createGroup(grace.accessToken(), "Book club", linus.id(), stranger)
+				.andExpect(status().isNotFound()));
+		assertThat(refused.get("detail")).isEqualTo(unknown.get("detail"));
+		assertThat(listOrderOf(linus)).isEmpty();
+
+		var group = idOf(client.createGroup(grace.accessToken(), "Book club", linus.id()));
+		var refusedAdd = read(client.addParticipant(grace.accessToken(), group, ada.id())
+				.andExpect(status().isNotFound()));
+		var unknownAdd = read(client.addParticipant(grace.accessToken(), group, stranger)
+				.andExpect(status().isNotFound()));
+		assertThat(refusedAdd.get("detail")).isEqualTo(unknownAdd.get("detail"));
+	}
+
+	@Test
+	void otherAdminsCanStillAddTheBlockerAndTheGroupWorksAsUsual() throws Exception {
+		var linus = client.account("Linus Torvalds");
+		var group = idOf(client.createGroup(grace.accessToken(), "Book club", linus.id()));
+		client.promote(grace.accessToken(), group, linus.id()).andExpect(status().isNoContent());
+		client.block(ada.accessToken(), grace.id()).andExpect(status().isNoContent());
+
+		client.addParticipant(linus.accessToken(), group, ada.id()).andExpect(status().isOk());
+		// Already in: the Blocked User is told so like anyone else, not 'not found' about someone they can see there.
+		client.addParticipant(grace.accessToken(), group, ada.id()).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.detail").value("That user is already in the group."));
+		var hers = client.sendNew(grace.accessToken(), group, "Welcome, Ada").get("id").asString();
+		client.react(grace.accessToken(), group, hers, "❤️").andExpect(status().isOk());
+
+		client.history(ada.accessToken(), group, "")
+				.andExpect(jsonPath("$.messages[0].body").value("Welcome, Ada"))
+				.andExpect(jsonPath("$.messages[0].reactions[0].userIds[0]").value(grace.id()));
+		assertThat(read(client.createGroup(linus.accessToken(), "Second", ada.id(), grace.id())
+				.andExpect(status().isCreated())).get("participants").size()).isEqualTo(3);
+	}
+
 	// ---- throttle
 
 	@Test

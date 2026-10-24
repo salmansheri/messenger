@@ -23,6 +23,17 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, UUID> {
 	@Query("select b.blockedId from UserBlock b where b.blockerId = :blockerId and b.blockedId in :userIds")
 	List<UUID> findBlockedAmong(UUID blockerId, Collection<UUID> userIds);
 
+	/** Everyone the User blocks or is blocked by: the two never see each other's presence (ADR 0006). */
+	@Query("""
+			select case when b.blockerId = :userId then b.blockedId else b.blockerId end from UserBlock b
+			where b.blockerId = :userId or b.blockedId = :userId
+			""")
+	List<UUID> findBlockedEitherWayWith(UUID userId);
+
+	/** Which of these Users have blocked the User. */
+	@Query("select b.blockerId from UserBlock b where b.blockedId = :userId and b.blockerId in :userIds")
+	List<UUID> findBlockersAmong(UUID userId, Collection<UUID> userIds);
+
 	/** The Blocks any of these Users made against any of those. */
 	List<UserBlock> findByBlockerIdInAndBlockedIdIn(Collection<UUID> blockerIds, Collection<UUID> blockedIds);
 

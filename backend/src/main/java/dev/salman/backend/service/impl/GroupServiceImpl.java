@@ -26,6 +26,7 @@ import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.ParticipantRepository;
 import dev.salman.backend.repository.ReactionRepository;
+import dev.salman.backend.repository.UserBlockRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.GroupService;
 import dev.salman.backend.service.RateLimiter;
@@ -42,6 +43,7 @@ public class GroupServiceImpl implements GroupService {
 	private final ParticipantRepository participants;
 	private final ReactionRepository reactions;
 	private final UserRepository users;
+	private final UserBlockRepository blocks;
 	private final ConversationAssembler assembler;
 	private final RealtimeEvents events;
 	private final RateLimiter rateLimiter;
@@ -75,6 +77,7 @@ public class GroupServiceImpl implements GroupService {
 		if (found.size() != others.size() || !found.stream().allMatch(User::isEmailVerified)) {
 			throw new NotFoundException("No user found.");
 		}
+		requireNotBlockedBy(callerId, others);
 
 		var now = clock.instant();
 		var group = new Conversation();
@@ -108,6 +111,8 @@ public class GroupServiceImpl implements GroupService {
 		if (participants.existsByConversationIdAndUserId(conversationId, userId)) {
 			throw new ConflictException("That user is already in the group.");
 		}
+		// After the check above, so someone already in the Group (another Admin added them) reads the same to everyone.
+		requireNotBlockedBy(callerId, List.of(userId));
 		if (participants.countByConversationId(conversationId) >= MAX_PARTICIPANTS) {
 			throw new ConflictException("The group is full.");
 		}
@@ -190,6 +195,13 @@ public class GroupServiceImpl implements GroupService {
 
 	private void addMember(Conversation group, UUID userId, ParticipantRole role, long joinedAfterSeq) {
 		participants.save(Participant.joining(group.getId(), userId, role, clock.instant(), joinedAfterSeq));
+	}
+
+	/** Someone who blocked the caller cannot be put in a Group by them, and looks like anyone unknown (ADR 0006). */
+	private void requireNotBlockedBy(UUID callerId, Collection<UUID> userIds) {
+		if (!blocks.findBlockersAmong(callerId, userIds).isEmpty()) {
+			throw new NotFoundException("No user found.");
+		}
 	}
 
 	private static NotFoundException notFound() {

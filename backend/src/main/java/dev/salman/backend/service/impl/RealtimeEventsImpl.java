@@ -193,7 +193,9 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		payload.put("userId", userId);
 		payload.put("online", online);
 		payload.put("lastSeenAt", online ? null : lastSeenAt);
-		publish(new LinkedHashSet<>(participants.findCoParticipantIds(userId)), payload);
+		var recipients = new LinkedHashSet<>(participants.findCoParticipantIds(userId));
+		recipients.removeAll(userBlocks.findBlockedEitherWayWith(userId)); // a Block hides presence both ways
+		publish(recipients, payload);
 	}
 
 	@Override

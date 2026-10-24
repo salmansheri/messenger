@@ -25,6 +25,7 @@ import dev.salman.backend.entity.Participant;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.repository.ParticipantRepository;
+import dev.salman.backend.repository.UserBlockRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.PresenceService;
 import dev.salman.backend.service.RealtimeEvents;
@@ -117,6 +118,7 @@ public class PresenceServiceImpl implements PresenceService {
 	private final StringRedisTemplate redis;
 	private final ParticipantRepository participants;
 	private final UserRepository users;
+	private final UserBlockRepository blocks;
 	private final RealtimeEvents events;
 	private final AppProperties props;
 	private final Clock clock;
@@ -206,8 +208,10 @@ public class PresenceServiceImpl implements PresenceService {
 		if (!participants.existsByConversationIdAndUserId(conversationId, callerId)) {
 			throw new NotFoundException("Conversation not found.");
 		}
+		// Someone the caller blocks, or who blocks the caller, has no presence for them anywhere (ADR 0006).
+		var blockedEitherWay = Set.copyOf(blocks.findBlockedEitherWayWith(callerId));
 		var others = participants.findByConversationId(conversationId).stream().map(Participant::getUserId)
-				.filter(id -> !id.equals(callerId)).toList();
+				.filter(id -> !id.equals(callerId)).filter(id -> !blockedEitherWay.contains(id)).toList();
 		var online = liveSocketCounts(others);
 		var lastSeen = users.findAllById(others).stream().filter(u -> u.getLastSeenAt() != null)
 				.collect(Collectors.toMap(User::getId, User::getLastSeenAt));
