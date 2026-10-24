@@ -69,6 +69,7 @@ describe("blockFailureMessage", () => {
       "Unblock this person to send Messages.",
     );
     expect(blockFailureMessage(problem(404))).toBe("You no longer share this Conversation with that person.");
+    expect(blockFailureMessage(problem(404), "settings")).toBe("That person can no longer be unblocked here.");
   });
 
   it("uses the general wording for anything else", () => {

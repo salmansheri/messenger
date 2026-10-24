@@ -1,6 +1,7 @@
 import { QueryClient, QueryObserver, partialMatchKey } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  blocksQueryKey,
   historyInfiniteQueryKey,
   listQueryKey,
   meQueryKey,
@@ -453,5 +454,26 @@ describe("recordBlock", () => {
 
     recordBlock(client, "linus", true);
     expect(answers).toHaveLength(1);
+  });
+
+  it("takes an unblocked person out of the Blocked Users list at once, and asks for it again", () => {
+    const { client } = withList([{ ...direct, blocked: true }]);
+    client.setQueryData(blocksQueryKey(), [{ userId: "grace" }, { userId: "linus" }]);
+
+    recordBlock(client, "grace", false);
+
+    expect(client.getQueryData(blocksQueryKey())).toEqual([{ userId: "linus" }]);
+    expect(client.getQueryState(blocksQueryKey())?.isInvalidated).toBe(true);
+  });
+});
+
+describe("catchUp and the Blocked Users list", () => {
+  it("asks for the Blocked Users list again after a reconnect (a block.changed may have been missed)", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(blocksQueryKey(), []);
+
+    catchUp(client);
+
+    expect(client.getQueryState(blocksQueryKey())?.isInvalidated).toBe(true);
   });
 });

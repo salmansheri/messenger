@@ -37,14 +37,16 @@ export function settingsFailureMessage(problem: ApiProblem): string {
  * Why a Block or Unblock was refused: changing Blocks too often (with how long to wait), the server's own words for a
  * refusal, or a person this Conversation no longer has (the server answers that like any unknown User).
  */
-export function blockFailureMessage(problem: ApiProblem): string {
+export function blockFailureMessage(problem: ApiProblem, where: "conversation" | "settings" = "conversation"): string {
   if (problem.status === 429) {
     return problem.retryAfterSeconds === undefined
       ? "You have blocked or unblocked too often. Try again later."
       : `You have blocked or unblocked too often. Try again in ${describeWait(problem.retryAfterSeconds)}.`;
   }
   if (problem.status === 409) return problem.detail ?? "That can no longer be done.";
-  if (problem.status === 404) return "You no longer share this Conversation with that person.";
+  if (problem.status === 404) {
+    return where === "settings" ? "That person can no longer be unblocked here." : "You no longer share this Conversation with that person.";
+  }
   return messageFor(problem);
 }
 
@@ -52,6 +54,10 @@ export function blockFailureMessage(problem: ApiProblem): string {
 export function blockedNotice(name: string | undefined): string {
   return `You blocked ${name ?? "this person"}. Unblock to send a Message.`;
 }
+
+/** What a Block does, said where the Blocked Users are listed (ADR 0006). */
+export const BLOCKED_SUMMARY =
+  "They are not told. Their Messages do not reach you, even after you unblock them, and you do not see each other's presence.";
 
 /** What blocking does, said before it happens (ADR 0006). */
 export const BLOCK_EXPLANATION = [

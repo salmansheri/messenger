@@ -7,6 +7,7 @@ import { logoutMutation, toProblem } from "@/lib/api";
 import { session } from "@/lib/auth/app-session";
 import { messageFor } from "@/lib/api/messages";
 import { AvatarChooser } from "./avatar-chooser";
+import { BlockedUsersSection } from "./blocked-users-section";
 import { ProfileForm } from "./profile-form";
 import { useMe } from "./use-me";
 
@@ -68,6 +69,8 @@ export function SettingsView() {
           <AvatarChooser userId={me.data.id} name={me.data.displayName} url={me.data.avatarUrl} />
         </section>
       )}
+
+      <BlockedUsersSection />
 
       <section aria-labelledby="session" className="mt-10 border-t border-rule pt-6">
         <h2 id="session" className="font-serif text-lg font-semibold">

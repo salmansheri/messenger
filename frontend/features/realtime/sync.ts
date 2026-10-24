@@ -4,6 +4,7 @@ import {
   listQueryKey,
   meQueryKey,
   presenceQueryKey,
+  type BlockedUser,
   type ConversationResponse,
   type ConversationSettings,
   type PresenceView,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/api";
 import { parseEvent, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
 import { directWith } from "@/features/conversations/present";
+import { withoutBlockedUser } from "@/features/session/blocked-users";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, historyConversationId, messagesKey, reactionTimesKey } from "@/features/messages/queries";
@@ -94,6 +96,10 @@ export function recordBlock(queryClient: QueryClient, userId: string, blocked: b
   if (direct?.id) {
     void queryClient.invalidateQueries({ queryKey: messagesKey(direct.id) });
     void queryClient.invalidateQueries({ queryKey: presenceQueryKey({ path: { conversationId: direct.id } }) });
+  }
+  // An Unblock leaves the Blocked Users list at once; a Block needs the person's name and picture, so the list is asked for.
+  if (!blocked && !fetching(queryClient, blocksQueryKey())) {
+    queryClient.setQueryData<BlockedUser[]>(blocksQueryKey(), (list) => withoutBlockedUser(list, userId));
   }
   void queryClient.invalidateQueries({ queryKey: blocksQueryKey() });
 }
@@ -191,6 +197,7 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
 export function catchUp(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: listQueryKey() });
   void queryClient.invalidateQueries({ queryKey: allPresenceKey });
+  void queryClient.invalidateQueries({ queryKey: blocksQueryKey() }); // a block.changed may have been missed
   queryClient
     .getQueryCache()
     .findAll({ queryKey: allMessagesKey })
