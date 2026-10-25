@@ -33,4 +33,10 @@ public interface StoryService {
 	 */
 	void delete(UUID callerId, UUID storyId);
 
+	/**
+	 * Removes a bounded batch of expired Stories with their Story views, releases their photos as a delete does, and
+	 * announces each one that had not been deleted already. Safe to run on several instances at once.
+	 */
+	void removeExpired();
+
 }

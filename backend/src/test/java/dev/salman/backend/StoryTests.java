@@ -27,7 +27,7 @@ import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
 import tools.jackson.databind.JsonNode;
 
-/** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one, Story views (#71). */
+/** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one, Story views (#71), expiry (#72). */
 class StoryTests extends RealtimeIntegrationTest {
 
 	private final HttpClient http = HttpClient.newHttpClient();
@@ -546,6 +546,53 @@ class StoryTests extends RealtimeIntegrationTest {
 
 		assertThat(forAda.history()).filteredOn(e -> isStory(e, "story.viewed")).hasSize(2);
 		assertThat(forGrace.receivesNothingMatching(e -> isStory(e, "story.viewed"), 800)).isTrue();
+	}
+
+	@Test
+	void theSweepRemovesExpiredStoriesWithTheirPhotosAndTellsEveryoneWhoCouldSeeThem() throws Exception {
+		var photoStory = json.readTree(postPhotoStory(ada, upload(ada), "Fleeting").andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString());
+		var image = fileOf(photoStory.get("attachment").get("url").asString());
+		var thumbnail = fileOf(photoStory.get("attachment").get("thumbnailUrl").asString());
+		var textStory = idOf(client.postTextStory(ada.accessToken(), "Also fleeting", "SEA"));
+		var deletedEarlier = idOf(client.postTextStory(ada.accessToken(), "Regret", "SEA"));
+		client.viewStory(grace.accessToken(), textStory).andExpect(status().isNoContent());
+		client.deleteStory(ada.accessToken(), deletedEarlier).andExpect(status().isNoContent());
+		var otherTabOfAda = listening(ada);
+		var forGrace = listening(grace);
+		var forLinus = listening(linus);
+
+		clock.advance(Duration.ofHours(24).plusMinutes(1));
+
+		await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+			assertThat(image).doesNotExist();
+			assertThat(thumbnail).doesNotExist();
+		});
+		for (var story : new String[] { photoStory.get("id").asString(), textStory }) {
+			var removed = forGrace.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story));
+			assertThat(removed.get("posterId").asString()).isEqualTo(ada.id());
+			otherTabOfAda.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story));
+		}
+		assertThat(forGrace.receivesNothingMatching(
+				e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(deletedEarlier), 800)).isTrue();
+		assertThat(forLinus.history()).noneMatch(e -> isStory(e, "story.removed"));
+	}
+
+	@Test
+	void aSweptPhotoStorysFilesGoOnceStorageRecovers() throws Exception {
+		var posted = json.readTree(postPhotoStory(ada, upload(ada), null).andExpect(status().isCreated()).andReturn()
+				.getResponse().getContentAsString());
+		var story = posted.get("id").asString();
+		var image = fileOf(posted.get("attachment").get("url").asString());
+		var forGrace = listening(grace);
+		storage.failDeletes();
+
+		clock.advance(Duration.ofHours(24).plusMinutes(1));
+
+		forGrace.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story)); // swept
+		assertThat(image).as("storage could not delete it yet").exists();
+		storage.reset();
+		await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(image).doesNotExist());
 	}
 
 	/** Who posted the Story a story event is about, or null for any other event. */

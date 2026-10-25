@@ -53,6 +53,7 @@ app:
     max-changes-per-hour: 20
   stories:
     max-posts-per-hour: 30
+    sweep-interval: 1h
   uploads:
     max-per-minute: 20
     unattached-lifetime: 24h

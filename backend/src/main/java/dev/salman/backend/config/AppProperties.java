@@ -67,8 +67,11 @@ public record AppProperties(String mailFrom, Jwt jwt, Otp otp, RefreshCookie ref
 	public record Availability(int maxChangesPerHour) {
 	}
 
-	/** How many Stories one User may post per hour (deleting one does not give the post back). */
-	public record Stories(int maxPostsPerHour) {
+	/**
+	 * {@code maxPostsPerHour}: Stories one User may post per hour (deleting one does not give the post back).
+	 * {@code sweepInterval}: how often expired Stories are removed.
+	 */
+	public record Stories(int maxPostsPerHour, Duration sweepInterval) {
 	}
 
 	/** How many Blocks and Unblocks one User may make per hour (repeating the current state is free). */

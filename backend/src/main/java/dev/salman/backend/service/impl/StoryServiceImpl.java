@@ -44,6 +44,7 @@ public class StoryServiceImpl implements StoryService {
 	static final int MAX_LIVE = 30;
 	static final Duration LIFETIME = Duration.ofHours(24);
 	private static final Duration POST_WINDOW = Duration.ofHours(1);
+	private static final int SWEEP_BATCH = 100;
 
 	private final StoryRepository stories;
 	private final StoryViewService views;
@@ -149,6 +150,25 @@ public class StoryServiceImpl implements StoryService {
 			stories.save(story);
 		}
 		events.storyRemoved(story.getId(), callerId);
+	}
+
+	@Override
+	@Transactional
+	public void removeExpired() {
+		var expired = stories.findExpiredForSweep(clock.instant(), SWEEP_BATCH);
+		if (expired.isEmpty()) {
+			return;
+		}
+		// The rows first (their views go with them), then the photos: their files go after commit.
+		stories.deleteAllInBatch(expired);
+		for (var story : expired) {
+			if (story.getAttachmentId() != null) {
+				attachmentService.release(story.getAttachmentId());
+			}
+			if (story.getDeletedAt() == null) { // a deleted Story was announced when it was deleted
+				events.storyRemoved(story.getId(), story.getPosterId());
+			}
+		}
 	}
 
 }
