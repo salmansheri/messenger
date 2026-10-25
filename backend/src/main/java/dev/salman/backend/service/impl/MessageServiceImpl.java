@@ -35,6 +35,7 @@ import dev.salman.backend.service.MessageService;
 import dev.salman.backend.service.MessageThrottle;
 import dev.salman.backend.service.PushService;
 import dev.salman.backend.service.RealtimeEvents;
+import dev.salman.backend.service.StoryService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -47,6 +48,8 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
 	private final AttachmentLoader attachmentLoader;
+	private final StoryQuotes storyQuotes;
+	private final StoryService stories;
 	private final AttachmentService attachmentService;
 	private final ReactionLoader reactionLoader;
 	private final RealtimeEvents events;
@@ -64,7 +67,7 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	@Transactional
 	public SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body,
-			UUID replyToMessageId, UUID attachmentId) {
+			UUID replyToMessageId, UUID attachmentId, UUID replyToStoryId) {
 		requireParticipant(callerId, conversationId);
 		// Before the lock, so a User over the limit never queues behind (or in front of) other people's sends. A
 		// retry the server already stored is answered below without counting; two retries racing here at worst
@@ -85,7 +88,8 @@ public class MessageServiceImpl implements MessageService {
 			var stored = existing.get();
 			if ((!stored.isDeleted() && stored.getEditedAt() == null && !Objects.equals(stored.getBody(), body))
 					|| (!stored.isDeleted() && !Objects.equals(stored.getAttachmentId(), attachmentId))
-					|| !Objects.equals(stored.getReplyToId(), replyToMessageId)) {
+					|| !Objects.equals(stored.getReplyToId(), replyToMessageId)
+					|| !answersSameStory(stored, replyToStoryId)) {
 				throw new ConflictException("This client message ID was already used for a different message.");
 			}
 			return new SentMessage(responseFor(stored, statusFor(stored, callerId), viewer(conversationId, callerId)), false);
@@ -109,6 +113,13 @@ public class MessageServiceImpl implements MessageService {
 			}
 		}
 
+		if (replyToStoryId != null) {
+			// Only a Story of the other Participant of this Direct conversation, which the replier can see.
+			// Read from the key, never by loading Participants before advanceReceipts (see Conversation.otherUserOf).
+			var poster = conversation.otherUserOf(callerId).orElseThrow(() -> new NotFoundException("Story not found."));
+			stories.requireRepliable(callerId, poster, replyToStoryId); // locked until this send commits
+		}
+
 		if (attachmentId != null) {
 			attachmentService.claim(callerId, attachmentId); // locked until this send commits
 		}
@@ -123,6 +134,8 @@ public class MessageServiceImpl implements MessageService {
 		message.setClientMessageId(clientMessageId);
 		message.setBody(body);
 		message.setReplyToId(replyToMessageId);
+		message.setReplyToStoryId(replyToStoryId);
+		message.setRepliedToStory(replyToStoryId != null);
 		message.setAttachmentId(attachmentId);
 		message.setWithheldFrom(withheldFrom);
 		message.setCreatedAt(now);
@@ -167,6 +180,18 @@ public class MessageServiceImpl implements MessageService {
 		return responseFor(message, statusFor(message, callerId), viewer(conversationId, callerId));
 	}
 
+	/**
+	 * Whether a retry names the same Story as the stored Message. Once that Story has gone the stored Message no longer
+	 * knows which it was, so any Story matches; answering a Story or not must still agree.
+	 */
+	private static boolean answersSameStory(Message stored, UUID replyToStoryId) {
+		if (!stored.isRepliedToStory()) {
+			return replyToStoryId == null;
+		}
+		return replyToStoryId != null
+				&& (stored.getReplyToStoryId() == null || stored.getReplyToStoryId().equals(replyToStoryId));
+	}
+
 	/** The caller as a Participant, for working out what they may see of a quote. */
 	private Participant viewer(UUID conversationId, UUID callerId) {
 		return participants.findByConversationIdAndUserId(conversationId, callerId).orElseThrow(MessageServiceImpl::notFound);
@@ -176,7 +201,7 @@ public class MessageServiceImpl implements MessageService {
 	private MessageResponse responseFor(Message message, MessageStatus status, Participant viewer) {
 		return MessageResponse.from(message, status, quotes.resolve(List.of(message), conversation -> viewer).get(message.getId()),
 				reactionLoader.of(List.of(message), viewer.getUserId()).getOrDefault(message.getId(), List.of()),
-				attachmentLoader.of(List.of(message)).get(message.getId()));
+				attachmentLoader.of(List.of(message)).get(message.getId()), storyQuotes.of(List.of(message)).get(message.getId()));
 	}
 
 	@Override
@@ -299,9 +324,10 @@ public class MessageServiceImpl implements MessageService {
 		var quoted = quotes.resolve(page, conversation -> reader);
 		var reacted = reactionLoader.of(page, callerId);
 		var pictured = attachmentLoader.of(page);
+		var storyQuoted = storyQuotes.of(page);
 		return page.stream()
 				.map(m -> MessageResponse.from(m, MessageStatuses.of(m, callerId, members), quoted.get(m.getId()),
-						reacted.getOrDefault(m.getId(), List.of()), pictured.get(m.getId())))
+						reacted.getOrDefault(m.getId(), List.of()), pictured.get(m.getId()), storyQuoted.get(m.getId())))
 				.toList();
 	}
 

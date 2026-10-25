@@ -21,6 +21,7 @@ import dev.salman.backend.dto.MessageResponse;
 import dev.salman.backend.dto.ParticipantSummary;
 import dev.salman.backend.dto.ReactionView;
 import dev.salman.backend.dto.ReplyQuote;
+import dev.salman.backend.dto.StoryQuote;
 import dev.salman.backend.entity.Conversation;
 import dev.salman.backend.entity.ConversationType;
 import dev.salman.backend.entity.Message;
@@ -47,6 +48,7 @@ class ConversationAssembler {
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
 	private final AttachmentLoader attachmentLoader;
+	private final StoryQuotes storyQuotes;
 	private final AvatarLinks avatars;
 	private final UserBlockRepository blocks;
 
@@ -62,6 +64,7 @@ class ConversationAssembler {
 		var now = clock.instant();
 		var reacted = reactionLoader.of(latestByConversation.values(), viewerId);
 		var pictured = attachmentLoader.of(latestByConversation.values());
+		var storyQuoted = storyQuotes.of(latestByConversation.values());
 		var quoted = quotes.resolve(latestByConversation.values(), conversationId -> membersByConversation
 				.getOrDefault(conversationId, List.of()).stream().filter(m -> m.getUserId().equals(viewerId)).findFirst().orElse(null));
 		var blocked = blockedConversations(found, membersByConversation, viewerId);
@@ -72,7 +75,7 @@ class ConversationAssembler {
 		var activity = visibleActivity(found, viewerId);
 		return found.stream()
 				.map(c -> toResponse(c, viewerId, membersByConversation.get(c.getId()), usersById,
-						latestByConversation.get(c.getId()), quoted, reacted, pictured, blocked.contains(c.getId()),
+						latestByConversation.get(c.getId()), quoted, reacted, pictured, storyQuoted, blocked.contains(c.getId()),
 						withheld.getOrDefault(c.getId(), 0L), activity.getOrDefault(c.getId(), c.getUpdatedAt()), now))
 				.toList();
 	}
@@ -140,7 +143,7 @@ class ConversationAssembler {
 	private ConversationResponse toResponse(Conversation conversation, UUID viewerId,
 			Collection<Participant> members, Map<UUID, User> usersById, Message latestMessage,
 			Map<UUID, ReplyQuote> quoted, Map<UUID, List<ReactionView>> reacted,
-			Map<UUID, AttachmentResponse> pictured, boolean blocked, long withheldUnread, Instant activityAt,
+			Map<UUID, AttachmentResponse> pictured, Map<UUID, StoryQuote> storyQuoted, boolean blocked, long withheldUnread, Instant activityAt,
 			Instant now) {
 		var viewer = members.stream().filter(m -> m.getUserId().equals(viewerId)).findFirst();
 		var latest = viewer.filter(v -> latestMessage != null && v.canRead(latestMessage.getSeq()))
@@ -156,7 +159,8 @@ class ConversationAssembler {
 				summaries,
 				latest == null ? null
 						: MessageResponse.from(latest, MessageStatuses.of(latest, viewerId, members), quoted.get(latest.getId()),
-								reacted.getOrDefault(latest.getId(), List.of()), pictured.get(latest.getId())),
+								reacted.getOrDefault(latest.getId(), List.of()), pictured.get(latest.getId()),
+								storyQuoted.get(latest.getId())),
 				unread, viewer.map(v -> ConversationSettings.of(v, now)).orElse(new ConversationSettings(false, null, false, false)),
 				blocked, conversation.getCreatedAt(), activityAt);
 	}

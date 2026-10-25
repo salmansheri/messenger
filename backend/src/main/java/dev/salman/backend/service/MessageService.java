@@ -16,15 +16,18 @@ public interface MessageService {
 	 * Stores a Message from the caller and gives it the next Sequence number. Sending again with the same Client
 	 * message ID and text returns the stored Message instead of creating another. {@code replyToMessageId}, when given,
 	 * is the Message of this Conversation that the new one answers; it must be one the caller may read (sent after they
-	 * joined), or the answer is the same not-found as for a Conversation that does not exist.
+	 * joined), or the answer is the same not-found as for a Conversation that does not exist. {@code replyToStoryId},
+	 * when given, is a live Story of the other Participant of this Direct conversation that the caller can see;
+	 * anything else is the same not-found.
 	 *
 	 * @throws dev.salman.backend.exception.NotFoundException when the caller is not a Participant (or the
 	 *         Conversation does not exist: the two look the same)
 	 * @throws dev.salman.backend.exception.ConflictException when the Client message ID was already used for
-	 *         different text or a different Message to answer, or {@code replyToMessageId} was deleted for everyone
+	 *         different text or a different Message or Story to answer, or {@code replyToMessageId} was deleted for
+	 *         everyone
 	 */
 	SentMessage send(UUID callerId, UUID conversationId, UUID clientMessageId, String body, UUID replyToMessageId,
-			UUID attachmentId);
+			UUID attachmentId, UUID replyToStoryId);
 
 	/**
 	 * A page of the Conversation's Messages, always in ascending Sequence order, at most {@code limit} long:

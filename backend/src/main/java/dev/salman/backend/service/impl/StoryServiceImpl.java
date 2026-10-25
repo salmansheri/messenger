@@ -28,6 +28,7 @@ import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.exception.UnauthorizedException;
+import dev.salman.backend.repository.MessageRepository;
 import dev.salman.backend.repository.StoryRepository;
 import dev.salman.backend.repository.UserRepository;
 import dev.salman.backend.service.AttachmentService;
@@ -48,6 +49,7 @@ public class StoryServiceImpl implements StoryService {
 
 	private final StoryRepository stories;
 	private final StoryViewService views;
+	private final MessageRepository messages;
 	private final UserRepository users;
 	private final StoryAudience audience;
 	private final AttachmentLoader attachmentLoader;
@@ -138,6 +140,7 @@ public class StoryServiceImpl implements StoryService {
 			return; // already deleted: nothing more to do or to say
 		}
 		story.setDeletedAt(clock.instant());
+		messages.clearReplyToStory(story.getId()); // replies keep only that they answered a Story
 		if (story.getAttachmentId() != null) {
 			// The Story first (it stops referring to the photo), then the photo: its files go after commit, and a
 			// storage failure leaves them to the sweep without undoing the deletion.
@@ -169,6 +172,16 @@ public class StoryServiceImpl implements StoryService {
 				events.storyRemoved(story.getId(), story.getPosterId());
 			}
 		}
+	}
+
+	@Override
+	@Transactional
+	public void requireRepliable(UUID replierId, UUID posterId, UUID storyId) {
+		var now = clock.instant();
+		stories.findByIdForUpdate(storyId).filter(story -> story.getPosterId().equals(posterId))
+				.filter(story -> story.getDeletedAt() == null && story.getExpiresAt().isAfter(now))
+				.filter(story -> audience.of(posterId).contains(replierId))
+				.orElseThrow(() -> new NotFoundException("Story not found."));
 	}
 
 }

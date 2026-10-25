@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import dev.salman.backend.entity.Message;
@@ -20,6 +21,11 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 	Optional<Message> findByIdAndConversationId(UUID id, UUID conversationId);
 
 	boolean existsByAttachmentId(UUID attachmentId);
+
+	/** Lets go of a Story that is being deleted: the Messages answering it keep only that they answered a Story. */
+	@Modifying
+	@Query("update Message m set m.replyToStoryId = null where m.replyToStoryId = :storyId")
+	void clearReplyToStory(UUID storyId);
 
 	/**
 	 * The newest Messages after {@code minSeq} (the Participant's join point) that the viewer has not hidden and that

@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
+import dev.salman.backend.support.StompTestClient;
 import tools.jackson.databind.JsonNode;
 
 /** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one, Story views (#71), expiry (#72). */
@@ -558,18 +559,19 @@ class StoryTests extends RealtimeIntegrationTest {
 		var deletedEarlier = idOf(client.postTextStory(ada.accessToken(), "Regret", "SEA"));
 		client.viewStory(grace.accessToken(), textStory).andExpect(status().isNoContent());
 		client.deleteStory(ada.accessToken(), deletedEarlier).andExpect(status().isNoContent());
-		var otherTabOfAda = listening(ada);
-		var forGrace = listening(grace);
-		var forLinus = listening(linus);
+		clock.advance(Duration.ofHours(23).plusMinutes(59)); // not expired yet
+		var otherTabOfAda = listening(signedInAgain(ada));
+		var forGrace = listening(signedInAgain(grace));
+		var forLinus = listening(signedInAgain(linus));
 
-		clock.advance(Duration.ofHours(24).plusMinutes(1));
+		clock.advance(Duration.ofMinutes(2));
 
 		await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
 			assertThat(image).doesNotExist();
 			assertThat(thumbnail).doesNotExist();
 		});
 		for (var story : new String[] { photoStory.get("id").asString(), textStory }) {
-			var removed = forGrace.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story));
+			var removed = awaitRemoval(forGrace, story);
 			assertThat(removed.get("posterId").asString()).isEqualTo(ada.id());
 			otherTabOfAda.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story));
 		}
@@ -584,15 +586,35 @@ class StoryTests extends RealtimeIntegrationTest {
 				.getResponse().getContentAsString());
 		var story = posted.get("id").asString();
 		var image = fileOf(posted.get("attachment").get("url").asString());
-		var forGrace = listening(grace);
+		clock.advance(Duration.ofHours(23).plusMinutes(59)); // not expired yet
+		var forGrace = listening(signedInAgain(grace));
 		storage.failDeletes();
 
-		clock.advance(Duration.ofHours(24).plusMinutes(1));
+		clock.advance(Duration.ofMinutes(2));
 
-		forGrace.await(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story)); // swept
+		awaitRemoval(forGrace, story); // swept
 		assertThat(image).as("storage could not delete it yet").exists();
 		storage.reset();
 		await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(image).doesNotExist());
+	}
+
+	/**
+	 * The account with a token issued now. A socket is closed once its token runs out, so a test that moves the clock
+	 * past an expiry opens its sockets with fresh tokens just before, or the events would never reach them.
+	 */
+	private Account signedInAgain(Account account) throws Exception {
+		return new Account(account.email(), account.id(),
+				client.loginForTokens(account.email(), AuthClient.PASSWORD).accessToken());
+	}
+
+	/**
+	 * The {@code story.removed} of a swept Story. Moving the clock expires every Story earlier tests left behind too, and
+	 * the sweep takes them oldest first in batches, so this one can come after the client's usual five seconds.
+	 */
+	private static JsonNode awaitRemoval(StompTestClient listener, String story) {
+		return await().atMost(Duration.ofSeconds(20)).until(() -> listener.history().stream()
+				.filter(e -> isStory(e, "story.removed") && e.get("storyId").asString().equals(story)).findFirst()
+				.orElse(null), java.util.Objects::nonNull);
 	}
 
 	/** Who posted the Story a story event is about, or null for any other event. */

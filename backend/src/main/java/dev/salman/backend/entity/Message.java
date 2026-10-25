@@ -55,6 +55,14 @@ public class Message {
 	@Column(name = "reply_to_id")
 	private UUID replyToId;
 
+	/** The Story this one answers while that Story exists, or null (see {@link #repliedToStory}). */
+	@Column(name = "reply_to_story_id")
+	private UUID replyToStoryId;
+
+	/** Whether this Message answers a Story; stays true after the Story has gone and the reference is cleared. */
+	@Column(name = "replied_to_story", nullable = false)
+	private boolean repliedToStory;
+
 	/** The uploaded image sent with this Message, or null. */
 	@Column(name = "attachment_id")
 	private UUID attachmentId;

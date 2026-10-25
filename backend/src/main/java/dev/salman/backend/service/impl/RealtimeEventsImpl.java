@@ -48,6 +48,7 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 	private final QuoteResolver quotes;
 	private final ReactionLoader reactionLoader;
 	private final AttachmentLoader attachmentLoader;
+	private final StoryQuotes storyQuotes;
 	private final StoryAudience storyAudience;
 	private final RealtimePublisher publisher;
 
@@ -90,8 +91,10 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 					.add(member.getUserId());
 		}
 		var picture = attachmentLoader.of(List.of(message)).get(message.getId());
+		var storyQuote = storyQuotes.of(List.of(message)).get(message.getId());
 		audiences.forEach((view, audience) -> publish(audience, event(type, message.getConversationId(),
-				Map.of("message", MessageResponse.from(message, null, view.quote().orElse(null), view.reactions(), picture)))));
+				Map.of("message", MessageResponse.from(message, null, view.quote().orElse(null), view.reactions(), picture,
+						storyQuote)))));
 	}
 
 	@Override

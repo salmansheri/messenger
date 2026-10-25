@@ -13,17 +13,19 @@ import dev.salman.backend.entity.Message;
  * answers, as the viewer sees it (null for a Message that answers nothing, and for one that was deleted).
  * {@code reactions} lists who reacted with what (empty for none, and for a Message that was deleted).
  * {@code attachment} is the image sent with it, with links signed for this reading (null for none, and for a Message
- * that was deleted); {@code body} is then its caption, and is null for an image sent alone.
+ * that was deleted); {@code body} is then its caption, and is null for an image sent alone. {@code storyQuote} is the
+ * Story it answers (null for a Message that answers none, and for one that was deleted), unavailable once the Story
+ * has gone.
  */
 public record MessageResponse(UUID id, UUID conversationId, long seq, UUID senderId, UUID clientMessageId,
 		String body, Instant createdAt, Instant editedAt, Instant deletedAt, MessageStatus status, ReplyQuote replyTo,
-		List<ReactionView> reactions, AttachmentResponse attachment) {
+		List<ReactionView> reactions, AttachmentResponse attachment, StoryQuote storyQuote) {
 
 	public static MessageResponse from(Message message, MessageStatus status, ReplyQuote replyTo,
-			List<ReactionView> reactions, AttachmentResponse attachment) {
+			List<ReactionView> reactions, AttachmentResponse attachment, StoryQuote storyQuote) {
 		return new MessageResponse(message.getId(), message.getConversationId(), message.getSeq(),
 				message.getSenderId(), message.getClientMessageId(), message.getBody(), message.getCreatedAt(), message.getEditedAt(),
-				message.getDeletedAt(), status, replyTo, reactions, attachment);
+				message.getDeletedAt(), status, replyTo, reactions, attachment, storyQuote);
 	}
 
 }

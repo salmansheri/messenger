@@ -2,7 +2,6 @@ package dev.salman.backend.service.impl;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.dto.BlockedUser;
 import dev.salman.backend.entity.Conversation;
-import dev.salman.backend.entity.ConversationType;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.entity.UserBlock;
 import dev.salman.backend.exception.ConflictException;
@@ -110,18 +108,8 @@ public class BlockServiceImpl implements BlockService {
 				.filter(other -> blocks.existsByBlockerIdAndBlockedId(callerId, other)).isPresent();
 	}
 
-	/**
-	 * The other User of a Direct conversation (none for a Group), read from its key, which holds both ids. Never load
-	 * Participants here: {@code send} calls this before {@code advanceReceipts}, and a managed Participant loaded that
-	 * early makes the receipt events read stale positions (the pitfall in CLAUDE.md's Replies note).
-	 */
 	private static Optional<UUID> otherParticipant(UUID userId, Conversation conversation) {
-		if (conversation.getType() != ConversationType.DIRECT) {
-			return Optional.empty();
-		}
-		var user = userId.toString();
-		return Arrays.stream(conversation.getDirectKey().split(":")).filter(id -> !id.equals(user)).findFirst()
-				.map(UUID::fromString);
+		return conversation.otherUserOf(userId);
 	}
 
 	/**

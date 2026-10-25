@@ -1,6 +1,8 @@
 package dev.salman.backend.entity;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.hibernate.annotations.UuidGenerator;
@@ -52,6 +54,19 @@ public class Conversation {
 		var a = first.toString();
 		var b = second.toString();
 		return a.compareTo(b) < 0 ? a + ":" + b : b + ":" + a;
+	}
+
+	/**
+	 * The other User of a Direct conversation (none for a Group), read from its key, which holds both ids. It never
+	 * loads Participants: {@code send} needs it before {@code advanceReceipts}, and a managed Participant loaded that
+	 * early makes the receipt events read stale positions (the pitfall in docs/backend/messages.md, Replies).
+	 */
+	public Optional<UUID> otherUserOf(UUID userId) {
+		if (type != ConversationType.DIRECT) {
+			return Optional.empty();
+		}
+		var user = userId.toString();
+		return Arrays.stream(directKey.split(":")).filter(id -> !id.equals(user)).findFirst().map(UUID::fromString);
 	}
 
 }

@@ -39,4 +39,13 @@ public interface StoryService {
 	 */
 	void removeExpired();
 
+	/**
+	 * Checks that {@code replierId} may answer the Story with a Message to {@code posterId}: the Story is theirs, live,
+	 * and seen by the replier. The Story stays locked until the caller's transaction ends, so it cannot be deleted
+	 * half-way through the reply.
+	 *
+	 * @throws dev.salman.backend.exception.NotFoundException otherwise ('Story not found.')
+	 */
+	void requireRepliable(UUID replierId, UUID posterId, UUID storyId);
+
 }
