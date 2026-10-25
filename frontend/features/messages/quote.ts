@@ -1,4 +1,4 @@
-import type { MessageResponse, ReplyQuote } from "@/lib/api";
+import type { MessageResponse, ReplyQuote, StoryQuote } from "@/lib/api";
 import { firstCharacters, glimpse } from "./glimpse";
 
 /** A quote shows the start of the text, as the server's quotes and push notifications do. */
@@ -57,4 +57,18 @@ export function replyTarget(
 ): ReplyQuote | undefined {
   if (!draft) return undefined;
   return loaded(draft.messageId)?.deletedAt ? undefined : draft;
+}
+
+/** What the quote of a Story reply shows: the start of the Story ("Photo" for a photo), or that it has gone. */
+export type StoryQuoteView = { kind: "story"; text: string; label: string } | { kind: "unavailable"; label: string };
+
+/**
+ * How a Story reply's quote reads. In a Direct conversation the Story is the other person's: yours when they replied,
+ * theirs when you did. The server words the text like a preview ('Photo', 'Photo: caption', the start of the text) and
+ * says `unavailable` once the Story has expired or been deleted. It is never a jump target: a Story is not in the history.
+ */
+export function storyQuoteView(quote: StoryQuote, mine: boolean): StoryQuoteView {
+  if (quote.unavailable) return { kind: "unavailable", label: "In reply to a Story that is no longer available" };
+  const text = oneLine(quote.text ?? "") || (quote.kind === "PHOTO" ? "Photo" : "Story");
+  return { kind: "story", text, label: `In reply to ${mine ? "their" : "your"} Story: ${text}` };
 }

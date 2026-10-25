@@ -1,4 +1,4 @@
-import type { ConversationResponse, MessagePage, MessageResponse, ReactionView, ReplyQuote } from "@/lib/api";
+import type { ConversationResponse, MessagePage, MessageResponse, ReactionView, ReplyQuote, StoryQuote } from "@/lib/api";
 import { formatDay } from "@/features/conversations/present";
 import type { Pending } from "./outbox";
 
@@ -48,6 +48,8 @@ export type TimelineItem =
       reactions: ReactionView[];
       /** The Message this one answers (none for a deleted reply); for one still being sent, what the person chose. */
       replyTo?: ReplyQuote;
+      /** The Story this one answers (none for a deleted Message), as the server quotes it. */
+      storyQuote?: StoryQuote;
       /** The image sent with it (none for a deleted Message). */
       image?: TimelineImage;
     };
@@ -76,6 +78,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       deleted: Boolean(message.deletedAt),
       reactions: message.deletedAt ? [] : (message.reactions ?? []),
       replyTo: message.deletedAt || !message.replyTo ? undefined : message.replyTo,
+      storyQuote: message.deletedAt || !message.storyQuote ? undefined : message.storyQuote,
       image: message.deletedAt || !message.attachment?.thumbnailUrl ? undefined : {
         src: message.attachment.thumbnailUrl,
         fullSrc: message.attachment.url ?? message.attachment.thumbnailUrl,
@@ -98,6 +101,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
         deleted: false,
         reactions: [] as ReactionView[],
         replyTo: entry.replyTo,
+        storyQuote: undefined,
         image: entry.image && { src: entry.image.previewUrl, fullSrc: entry.image.previewUrl, width: entry.image.width, height: entry.image.height },
         seq: undefined,
         senderId: myId,
@@ -132,6 +136,7 @@ export function buildTimeline({ confirmed, pending, myId, firstUnreadSeq, now, t
       deleted: row.deleted,
       reactions: row.reactions,
       replyTo: row.replyTo,
+      storyQuote: row.storyQuote,
       image: row.image,
       senderId: row.senderId,
       body: row.body,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MessageResponse, ReplyQuote } from "@/lib/api";
-import { firstCharacters, quoteView, replyDraft, replyTarget } from "./quote";
+import { firstCharacters, quoteView, replyDraft, replyTarget, storyQuoteView } from "./quote";
 
 const names: Record<string, string> = { ada: "Ada Lovelace", me: "You" };
 const nameOf = (id: string | undefined) => (id ? (names[id] ?? "Someone who left") : "Someone");
@@ -114,3 +114,28 @@ describe("quoting an image", () => {
   });
 });
 
+describe("storyQuoteView", () => {
+  it("shows the start of a text Story", () => {
+    expect(storyQuoteView({ storyId: "s1", kind: "TEXT", text: "Off to the coast", unavailable: false }, false)).toEqual({
+      kind: "story",
+      text: "Off to the coast",
+      label: "In reply to your Story: Off to the coast",
+    });
+  });
+
+  it("shows a photo Story as Photo, with its caption as the server words it", () => {
+    expect(storyQuoteView({ storyId: "s1", kind: "PHOTO", text: "Photo", unavailable: false }, true)).toEqual({
+      kind: "story",
+      text: "Photo",
+      label: "In reply to their Story: Photo",
+    });
+    expect(storyQuoteView({ storyId: "s1", kind: "PHOTO", text: undefined, unavailable: false }, true)).toMatchObject({ text: "Photo" });
+  });
+
+  it("says the Story is no longer available once it has gone", () => {
+    expect(storyQuoteView({ unavailable: true }, false)).toEqual({
+      kind: "unavailable",
+      label: "In reply to a Story that is no longer available",
+    });
+  });
+});

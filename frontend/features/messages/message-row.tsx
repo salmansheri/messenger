@@ -10,8 +10,8 @@ import { Avatar } from "@/features/people/person-avatar";
 import { nextMenuIndex } from "@/components/ui/menu-keys";
 import { checkMessageBody } from "./schema";
 import type { TimelineItem } from "./timeline";
-import { QuoteBlock } from "./quote-block";
-import { quoteView } from "./quote";
+import { QuoteBlock, StoryQuoteBlock } from "./quote-block";
+import { quoteView, storyQuoteView } from "./quote";
 import { messageActions, type MessageActions } from "./actions";
 import { ReactionChips, ReactMenu } from "./reaction-controls";
 import { useDeleteForEveryone, useEditMessage, useHideMessage } from "./use-message-actions";
@@ -89,6 +89,7 @@ export function MessageRow({ item, conversationId, myId, group, blocked, names, 
             onJump={item.replyTo.messageId && loaded(item.replyTo.messageId) ? () => onJump(item.replyTo?.messageId ?? "") : undefined}
           />
         )}
+        {item.storyQuote && <StoryQuoteBlock view={storyQuoteView(item.storyQuote, mine)} />}
         {item.image && !item.deleted && (
           <MessageImage
             image={item.image}

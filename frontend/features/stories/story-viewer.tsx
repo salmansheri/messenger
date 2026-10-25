@@ -9,6 +9,7 @@ import { Avatar, TONES } from "@/features/people/person-avatar";
 import { useImageRecovery } from "@/features/messages/use-image-recovery";
 import { recordStorySeen } from "@/features/realtime/sync";
 import { OwnStoryControls } from "./own-story-controls";
+import { StoryReplyBox } from "./story-reply-box";
 import { useTrayRefresh } from "./queries";
 import { viewerPeople, type TrayEntry } from "./tray";
 import { STORY_MS, current, openViewer, step } from "./viewer-machine";
@@ -233,6 +234,15 @@ export function StoryViewer({
                 viewCount={found.story.viewCount ?? 0}
                 onCover={cover}
                 onDeleted={() => requestAnimationFrame(() => closeButton.current?.focus())}
+              />
+            )}
+            {!found.entry.own && found.story.id && (
+              <StoryReplyBox
+                key={found.entry.userId}
+                storyId={found.story.id}
+                posterId={found.entry.userId}
+                posterName={found.entry.displayName}
+                onCover={cover}
               />
             )}
           </section>

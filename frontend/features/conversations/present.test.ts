@@ -49,6 +49,13 @@ describe("conversationTitle", () => {
 });
 
 describe("lastLine", () => {
+  it("says a Message answers a Story, from either side", () => {
+    const storyQuote = { storyId: "s1", kind: "TEXT" as const, text: "Off to the coast", unavailable: false };
+    expect(lastLine(direct({ lastMessage: { senderId: "grace-id", body: "Lucky you!", storyQuote } }), ME)).toBe("Replied to your Story: Lucky you!");
+    expect(lastLine(direct({ lastMessage: { senderId: ME, body: "Lucky you!", storyQuote } }), ME)).toBe("You replied to a Story: Lucky you!");
+    expect(lastLine(direct({ lastMessage: { senderId: ME, body: "Gone", storyQuote: { unavailable: true } } }), ME)).toBe("You replied to a Story: Gone");
+  });
+
   it("says so when nothing has been sent yet", () => {
     expect(lastLine(direct(), ME)).toBe("No Messages yet");
   });

@@ -46,6 +46,7 @@ export function lastLine(conversation: ConversationResponse, myId: string | unde
   const text = message.attachment
     ? glimpse(message.body, true, PHOTO_CAPTION_CHARACTERS)
     : (message.body ?? "").replace(/\s+/g, " ").trim();
+  if (message.storyQuote) return message.senderId === myId ? `You replied to a Story: ${text}` : `Replied to your Story: ${text}`;
   if (message.senderId === myId) return `You: ${text}`;
   if (conversation.type === "GROUP") {
     const sender = conversation.participants?.find((participant) => participant.userId === message.senderId);

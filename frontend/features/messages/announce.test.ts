@@ -133,3 +133,10 @@ describe("changes to Messages already there", () => {
     expect(changeAnnouncements(many, () => "Grace", "me").map((line) => line.text)).toEqual(["4 Messages were changed"]);
   });
 });
+
+describe("announcementOf a Story reply", () => {
+  it("says the person replied to your Story, then what they wrote", () => {
+    const storyQuote = { storyId: "s1", kind: "TEXT" as const, text: "Off to the coast", unavailable: false };
+    expect(announcementOf({ ...msg(1, "grace", "Lucky\nyou!"), storyQuote }, "Grace Hopper")).toBe("Grace Hopper replied to your Story: Lucky you!");
+  });
+});

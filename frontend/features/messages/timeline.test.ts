@@ -170,6 +170,18 @@ describe("replies in the timeline", () => {
 
     expect(messages.map((m) => m.replyTo)).toEqual([quote, undefined, undefined, quote]);
   });
+
+  it("carries the quote of a Story reply, and none once the Message was deleted", () => {
+    const storyQuote = { storyId: "s1", kind: "TEXT" as const, text: "Off to the coast", unavailable: false };
+    const reply: MessageResponse = { ...msg(1, "a", "2026-03-10T10:00:00Z"), storyQuote };
+    const deleted: MessageResponse = { ...msg(2, "a", "2026-03-10T10:01:00Z"), body: undefined, deletedAt: "2026-03-10T10:06:00Z", storyQuote };
+
+    const messages = build({ confirmed: [reply, deleted, msg(3, "a", "2026-03-10T10:02:00Z")], myId: "a" }).filter(
+      (item) => item.kind === "message",
+    );
+
+    expect(messages.map((m) => m.storyQuote)).toEqual([storyQuote, undefined, undefined]);
+  });
 });
 
 describe("images in the timeline", () => {

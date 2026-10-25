@@ -31,6 +31,7 @@ export function announcementOf(message: MessageResponse, sender: string): string
     const caption = spokenText(message.body);
     return caption ? `${sender} sent an image: ${caption}` : `${sender} sent an image`;
   }
+  if (message.storyQuote) return `${sender} replied to your Story: ${spokenText(message.body)}`;
   return `${sender}: ${spokenText(message.body)}`;
 }
 
