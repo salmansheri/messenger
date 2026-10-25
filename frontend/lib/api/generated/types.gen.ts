@@ -43,6 +43,7 @@ export type MessageResponse = {
     replyTo?: ReplyQuote;
     reactions?: Array<ReactionView>;
     attachment?: AttachmentResponse;
+    storyQuote?: StoryQuote;
 };
 
 export type ReactionView = {
@@ -58,6 +59,13 @@ export type ReplyQuote = {
     unavailable?: boolean;
 };
 
+export type StoryQuote = {
+    storyId?: string;
+    kind?: 'TEXT' | 'PHOTO';
+    text?: string;
+    unavailable?: boolean;
+};
+
 export type LookupRequest = {
     email: string;
 };
@@ -65,6 +73,26 @@ export type LookupRequest = {
 export type UserSummary = {
     id?: string;
     displayName?: string;
+};
+
+export type PostStoryRequest = {
+    kind: 'TEXT' | 'PHOTO';
+    text?: string;
+    tone?: 'CLAY' | 'OCHRE' | 'MOSS' | 'SEA' | 'SLATE' | 'PLUM';
+    attachmentId?: string;
+};
+
+export type StoryResponse = {
+    id?: string;
+    posterId?: string;
+    kind?: 'TEXT' | 'PHOTO';
+    text?: string;
+    tone?: 'CLAY' | 'OCHRE' | 'MOSS' | 'SEA' | 'SLATE' | 'PLUM';
+    attachment?: AttachmentResponse;
+    createdAt?: string;
+    expiresAt?: string;
+    seen?: boolean;
+    viewCount?: number;
 };
 
 export type RegisterDeviceRequest = {
@@ -125,6 +153,7 @@ export type SendMessageRequest = {
     body?: string;
     replyToMessageId?: string;
     attachmentId?: string;
+    replyToStoryId?: string;
 };
 
 export type CreateGroupRequest = {
@@ -199,6 +228,25 @@ export type BlockedUser = {
     displayName?: string;
     avatarUrl?: string;
     blockedAt?: string;
+};
+
+export type Person = {
+    userId?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    stories?: Array<StoryResponse>;
+};
+
+export type StoryTray = {
+    own?: Array<StoryResponse>;
+    people?: Array<Person>;
+};
+
+export type StoryViewer = {
+    userId?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    viewedAt?: string;
 };
 
 export type SearchPage = {
@@ -368,6 +416,56 @@ export type LookupResponses = {
 };
 
 export type LookupResponse = LookupResponses[keyof LookupResponses];
+
+export type TrayData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/stories';
+};
+
+export type TrayResponses = {
+    /**
+     * OK
+     */
+    200: StoryTray;
+};
+
+export type TrayResponse = TrayResponses[keyof TrayResponses];
+
+export type PostData = {
+    body: PostStoryRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/stories';
+};
+
+export type PostResponses = {
+    /**
+     * Created
+     */
+    201: StoryResponse;
+};
+
+export type PostResponse = PostResponses[keyof PostResponses];
+
+export type ViewData = {
+    body?: never;
+    path: {
+        storyId: string;
+    };
+    query?: never;
+    url: '/api/v1/stories/{storyId}/view';
+};
+
+export type ViewResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ViewResponse = ViewResponses[keyof ViewResponses];
 
 export type RegisterData = {
     body: RegisterDeviceRequest;
@@ -834,6 +932,24 @@ export type BlocksResponses = {
 
 export type BlocksResponse = BlocksResponses[keyof BlocksResponses];
 
+export type ViewersData = {
+    body?: never;
+    path: {
+        storyId: string;
+    };
+    query?: never;
+    url: '/api/v1/stories/{storyId}/views';
+};
+
+export type ViewersResponses = {
+    /**
+     * OK
+     */
+    200: Array<StoryViewer>;
+};
+
+export type ViewersResponse = ViewersResponses[keyof ViewersResponses];
+
 export type SearchAllData = {
     body?: never;
     path?: never;
@@ -928,6 +1044,24 @@ export type SearchConversationResponses = {
 };
 
 export type SearchConversationResponse = SearchConversationResponses[keyof SearchConversationResponses];
+
+export type DeleteData = {
+    body?: never;
+    path: {
+        storyId: string;
+    };
+    query?: never;
+    url: '/api/v1/stories/{storyId}';
+};
+
+export type DeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteResponse = DeleteResponses[keyof DeleteResponses];
 
 export type UnregisterData = {
     body?: never;

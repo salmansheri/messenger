@@ -4,13 +4,16 @@ import {
   listQueryKey,
   meQueryKey,
   presenceQueryKey,
+  trayQueryKey,
   type BlockedUser,
   type ConversationResponse,
   type ConversationSettings,
   type PresenceView,
+  type StoryTray,
   type UserProfile,
 } from "@/lib/api";
-import { parseEvent, type Availability, type ProfileChanges, type RealtimeEvent } from "@/lib/realtime/events";
+import { parseEvent, type Availability, type ProfileChanges, type RealtimeEvent, type StoryEvent } from "@/lib/realtime/events";
+import { applyStoryEvent, markSeen } from "@/features/stories/tray";
 import { directWith } from "@/features/conversations/present";
 import { withoutBlockedUser } from "@/features/session/blocked-users";
 import { catchUpHistory, refreshHistory } from "@/features/messages/catch-up";
@@ -128,6 +131,29 @@ export function recordBlock(queryClient: QueryClient, userId: string, blocked: b
   void queryClient.invalidateQueries({ queryKey: blocksQueryKey() });
 }
 
+/** Changes the loaded Stories tray, or asks for it again while a request for it is under way (see `fetching`). */
+function patchTray(queryClient: QueryClient, change: (tray: StoryTray) => StoryTray) {
+  if (fetching(queryClient, trayQueryKey())) {
+    void queryClient.invalidateQueries({ queryKey: trayQueryKey() });
+    return;
+  }
+  const tray = queryClient.getQueryData<StoryTray>(trayQueryKey());
+  if (!tray) return;
+  const next = change(tray);
+  if (next !== tray) queryClient.setQueryData(trayQueryKey(), next);
+}
+
+/** A Story posted, removed or viewed: put into the tray. */
+export function recordStoryEvent(queryClient: QueryClient, event: StoryEvent) {
+  const myId = queryClient.getQueryData<UserProfile>(meQueryKey())?.id;
+  patchTray(queryClient, (tray) => applyStoryEvent(tray, event, myId));
+}
+
+/** One of someone else's Stories, once its view has been reported: no longer unseen in the tray. */
+export function recordStorySeen(queryClient: QueryClient, storyId: string) {
+  patchTray(queryClient, (tray) => markSeen(tray, storyId));
+}
+
 /**
  * A reaction put on a Message, or everyone's reactions of one person taken away. Reactions are only in the loaded
  * history, never the list. A word older than one already heard for the same person and Message is ignored, and, as
@@ -180,6 +206,10 @@ export function handleEvent(queryClient: QueryClient, body: string, typing: Typi
     handleReaction(queryClient, event);
     return;
   }
+  if (event.type === "story.posted" || event.type === "story.removed" || event.type === "story.viewed") {
+    recordStoryEvent(queryClient, event);
+    return;
+  }
   if (event.type === "message.created" && event.message.senderId) typing.stopped(event.conversationId, event.message.senderId); // sending ends typing
   // Someone may have joined or left, and the new Participant's presence is not in what is loaded.
   if (event.type === "conversation.changed") {
@@ -223,6 +253,7 @@ export function catchUp(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: listQueryKey() });
   void queryClient.invalidateQueries({ queryKey: allPresenceKey });
   void queryClient.invalidateQueries({ queryKey: blocksQueryKey() }); // a block.changed may have been missed
+  void queryClient.invalidateQueries({ queryKey: trayQueryKey() }); // so may a Story posted, removed or viewed
   queryClient
     .getQueryCache()
     .findAll({ queryKey: allMessagesKey })

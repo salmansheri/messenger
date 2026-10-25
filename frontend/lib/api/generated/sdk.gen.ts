@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddParticipantData, AddParticipantResponses, BlockData, BlockResponses, BlocksData, BlocksResponses, CreateData, CreateResponses, DeleteForEveryoneData, DeleteForEveryoneResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvailabilityData, SetAvailabilityResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, UnblockData, UnblockResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses } from './types.gen';
+import type { AddParticipantData, AddParticipantResponses, BlockData, BlockResponses, BlocksData, BlocksResponses, CreateData, CreateResponses, DeleteData, DeleteForEveryoneData, DeleteForEveryoneResponses, DeleteResponses, EditData, EditResponses, FileData, FileResponses, ForgotPasswordData, ForgotPasswordResponses, GetData, GetResponses, HideData, HideResponses, HistoryData, HistoryResponses, LeaveData, LeaveResponses, ListData, ListResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, LookupData, LookupResponses, MeData, MeResponses, PostData, PostResponses, PresenceData, PresenceResponses, PromoteData, PromoteResponses, ReactData, ReactResponses, RefreshData, RefreshResponses, RegisterData, RegisterResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveParticipantData, RemoveParticipantResponses, RenameData, RenameResponses, ReportData, ReportResponses, ResendVerificationData, ResendVerificationResponses, ResetPasswordData, ResetPasswordResponses, SearchAllData, SearchAllResponses, SearchConversationData, SearchConversationResponses, SendData, SendResponses, SetAvailabilityData, SetAvailabilityResponses, SetAvatarData, SetAvatarResponses, SignUpData, SignUpResponses, StartDirectData, StartDirectResponses, TrayData, TrayResponses, UnblockData, UnblockResponses, UnreactData, UnreactResponses, UnregisterData, UnregisterResponses, UpdateMeData, UpdateMeResponses, UpdateSettingsData, UpdateSettingsResponses, UploadData, UploadResponses, VerifyEmailData, VerifyEmailResponses, ViewData, ViewersData, ViewersResponses, ViewResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -81,6 +81,28 @@ export const lookup = <ThrowOnError extends boolean = true>(options: Options<Loo
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const tray = <ThrowOnError extends boolean = true>(options?: Options<TrayData, ThrowOnError>): RequestResult<TrayResponses, unknown, ThrowOnError> => (options?.client ?? client).get<TrayResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/stories',
+    ...options
+});
+
+export const post = <ThrowOnError extends boolean = true>(options: Options<PostData, ThrowOnError>): RequestResult<PostResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/stories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const view = <ThrowOnError extends boolean = true>(options: Options<ViewData, ThrowOnError>): RequestResult<ViewResponses, unknown, ThrowOnError> => (options.client ?? client).post<ViewResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/stories/{storyId}/view',
+    ...options
 });
 
 export const register = <ThrowOnError extends boolean = true>(options: Options<RegisterData, ThrowOnError>): RequestResult<RegisterResponses, unknown, ThrowOnError> => (options.client ?? client).post<RegisterResponses, unknown, ThrowOnError>({
@@ -318,6 +340,12 @@ export const blocks = <ThrowOnError extends boolean = true>(options?: Options<Bl
     ...options
 });
 
+export const viewers = <ThrowOnError extends boolean = true>(options: Options<ViewersData, ThrowOnError>): RequestResult<ViewersResponses, unknown, ThrowOnError> => (options.client ?? client).get<ViewersResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/stories/{storyId}/views',
+    ...options
+});
+
 export const searchAll = <ThrowOnError extends boolean = true>(options: Options<SearchAllData, ThrowOnError>): RequestResult<SearchAllResponses, unknown, ThrowOnError> => (options.client ?? client).get<SearchAllResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/messages/search',
@@ -345,6 +373,12 @@ export const presence = <ThrowOnError extends boolean = true>(options: Options<P
 export const searchConversation = <ThrowOnError extends boolean = true>(options: Options<SearchConversationData, ThrowOnError>): RequestResult<SearchConversationResponses, unknown, ThrowOnError> => (options.client ?? client).get<SearchConversationResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/v1/conversations/{conversationId}/messages/search',
+    ...options
+});
+
+export const delete_ = <ThrowOnError extends boolean = true>(options: Options<DeleteData, ThrowOnError>): RequestResult<DeleteResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/stories/{storyId}',
     ...options
 });
 

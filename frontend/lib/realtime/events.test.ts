@@ -193,4 +193,28 @@ describe("parseEvent", () => {
     expect(parseEvent(JSON.stringify({ type: "block.changed", blocked: true }))).toBeUndefined();
     expect(parseEvent(JSON.stringify({ type: "block.changed", userId: "grace", blocked: "yes" }))).toBeUndefined();
   });
+
+  it("reads a Story posted, with who posted it (no picture is a null)", () => {
+    const story = { id: "s1", posterId: "ada", kind: "TEXT", text: "Hi", tone: "SEA", seen: false };
+    expect(parseEvent(JSON.stringify({ type: "story.posted", story, poster: { userId: "ada", displayName: "Ada", avatarUrl: null } }))).toEqual({
+      type: "story.posted",
+      story,
+      poster: { userId: "ada", displayName: "Ada", avatarUrl: undefined },
+    });
+    expect(parseEvent(JSON.stringify({ type: "story.posted", story: { kind: "TEXT" }, poster: { userId: "ada" } }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "story.posted", story }))).toBeUndefined();
+  });
+
+  it("reads a Story removed and a Story viewed, dropping either without what it needs", () => {
+    expect(parseEvent(JSON.stringify({ type: "story.removed", storyId: "s1", posterId: "ada" }))).toEqual({ type: "story.removed", storyId: "s1", posterId: "ada" });
+    expect(parseEvent(JSON.stringify({ type: "story.removed", storyId: "s1" }))).toBeUndefined();
+    expect(parseEvent(JSON.stringify({ type: "story.viewed", storyId: "s1", viewerId: "grace", viewedAt: "2026-03-10T08:00:00Z", viewCount: 2 }))).toEqual({
+      type: "story.viewed",
+      storyId: "s1",
+      viewerId: "grace",
+      viewedAt: "2026-03-10T08:00:00Z",
+      viewCount: 2,
+    });
+    expect(parseEvent(JSON.stringify({ type: "story.viewed", storyId: "s1", viewerId: "grace", viewedAt: "t", viewCount: "2" }))).toBeUndefined();
+  });
 });

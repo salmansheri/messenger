@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addParticipant, block, blocks, create, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvailability, setAvatar, signUp, startDirect, unblock, unreact, unregister, updateMe, updateSettings, upload, verifyEmail } from '../sdk.gen';
-import type { AddParticipantData, AddParticipantResponse, BlockData, BlockResponse, BlocksData, BlocksResponse, CreateData, CreateResponse, DeleteForEveryoneData, DeleteForEveryoneResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvailabilityData, SetAvailabilityResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, UnblockData, UnblockResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse } from '../types.gen';
+import { addParticipant, block, blocks, create, delete_, deleteForEveryone, edit, file, forgotPassword, get, hide, history_, leave, list, login, logout, lookup, me, type Options, post, presence, promote, react, refresh, register, removeAvatar, removeParticipant, rename, report, resendVerification, resetPassword, searchAll, searchConversation, send, setAvailability, setAvatar, signUp, startDirect, tray, unblock, unreact, unregister, updateMe, updateSettings, upload, verifyEmail, view, viewers } from '../sdk.gen';
+import type { AddParticipantData, AddParticipantResponse, BlockData, BlockResponse, BlocksData, BlocksResponse, CreateData, CreateResponse, DeleteData, DeleteForEveryoneData, DeleteForEveryoneResponse, DeleteResponse, EditData, EditResponse, FileData, FileResponse, ForgotPasswordData, ForgotPasswordResponse, GetData, GetResponse, HideData, HideResponse, HistoryData, HistoryResponse, LeaveData, LeaveResponse, ListData, ListResponse, LoginData, LoginResponse, LogoutData, LookupData, LookupResponse, MeData, MeResponse, PostData, PostResponse, PresenceData, PresenceResponse, PromoteData, PromoteResponse, ReactData, ReactResponse, RefreshData, RefreshResponse, RegisterData, RegisterResponse, RemoveAvatarData, RemoveAvatarResponse, RemoveParticipantData, RemoveParticipantResponse, RenameData, RenameResponse, ReportData, ReportResponse, ResendVerificationData, ResendVerificationResponse, ResetPasswordData, ResetPasswordResponse, SearchAllData, SearchAllResponse, SearchConversationData, SearchConversationResponse, SendData, SendResponse, SetAvailabilityData, SetAvailabilityResponse, SetAvatarData, SetAvatarResponse, SignUpData, SignUpResponse2, StartDirectData, StartDirectResponse, TrayData, TrayResponse, UnblockData, UnblockResponse, UnreactData, UnreactResponse, UnregisterData, UnregisterResponse, UpdateMeData, UpdateMeResponse, UpdateSettingsData, UpdateSettingsResponse, UploadData, UploadResponse, VerifyEmailData, VerifyEmailResponse, ViewData, ViewersData, ViewersResponse, ViewResponse } from '../types.gen';
 
 export const unblockMutation = (options?: Partial<Options<UnblockData>>): UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> => {
     const mutationOptions: UseMutationOptions<UnblockResponse, DefaultError, Options<UnblockData>> = {
@@ -118,6 +118,82 @@ export const lookupMutation = (options?: Partial<Options<LookupData>>): UseMutat
     return mutationOptions;
 };
 
+export type QueryKey<TOptions extends Options> = [
+    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
+        _id: string;
+        _infinite?: boolean;
+        tags?: ReadonlyArray<string>;
+    }
+];
+
+const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
+    QueryKey<TOptions>[0]
+] => {
+    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
+    if (infinite) {
+        params._infinite = infinite;
+    }
+    if (tags) {
+        params.tags = tags;
+    }
+    if (options?.body) {
+        params.body = options.body;
+    }
+    if (options?.headers) {
+        params.headers = options.headers;
+    }
+    if (options?.path) {
+        params.path = options.path;
+    }
+    if (options?.query) {
+        params.query = options.query;
+    }
+    return [params];
+};
+
+export const trayQueryKey = (options?: Options<TrayData>) => createQueryKey('tray', options);
+
+export const trayOptions = (options?: Options<TrayData>) => queryOptions<TrayResponse, DefaultError, TrayResponse, ReturnType<typeof trayQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await tray({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: trayQueryKey(options)
+});
+
+export const postMutation = (options?: Partial<Options<PostData>>): UseMutationOptions<PostResponse, DefaultError, Options<PostData>> => {
+    const mutationOptions: UseMutationOptions<PostResponse, DefaultError, Options<PostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await post({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const viewMutation = (options?: Partial<Options<ViewData>>): UseMutationOptions<ViewResponse, DefaultError, Options<ViewData>> => {
+    const mutationOptions: UseMutationOptions<ViewResponse, DefaultError, Options<ViewData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await view({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const registerMutation = (options?: Partial<Options<RegisterData>>): UseMutationOptions<RegisterResponse, DefaultError, Options<RegisterData>> => {
     const mutationOptions: UseMutationOptions<RegisterResponse, DefaultError, Options<RegisterData>> = {
         mutationFn: async (fnOptions) => {
@@ -172,39 +248,6 @@ export const promoteMutation = (options?: Partial<Options<PromoteData>>): UseMut
         }
     };
     return mutationOptions;
-};
-
-export type QueryKey<TOptions extends Options> = [
-    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
-        _id: string;
-        _infinite?: boolean;
-        tags?: ReadonlyArray<string>;
-    }
-];
-
-const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
-    QueryKey<TOptions>[0]
-] => {
-    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
-    if (infinite) {
-        params._infinite = infinite;
-    }
-    if (tags) {
-        params.tags = tags;
-    }
-    if (options?.body) {
-        params.body = options.body;
-    }
-    if (options?.headers) {
-        params.headers = options.headers;
-    }
-    if (options?.path) {
-        params.path = options.path;
-    }
-    if (options?.query) {
-        params.query = options.query;
-    }
-    return [params];
 };
 
 export const historyQueryKey = (options: Options<HistoryData>) => createQueryKey('history', options);
@@ -589,6 +632,21 @@ export const blocksOptions = (options?: Options<BlocksData>) => queryOptions<Blo
     queryKey: blocksQueryKey(options)
 });
 
+export const viewersQueryKey = (options: Options<ViewersData>) => createQueryKey('viewers', options);
+
+export const viewersOptions = (options: Options<ViewersData>) => queryOptions<ViewersResponse, DefaultError, ViewersResponse, ReturnType<typeof viewersQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await viewers({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: viewersQueryKey(options)
+});
+
 export const searchAllQueryKey = (options: Options<SearchAllData>) => createQueryKey('searchAll', options);
 
 export const searchAllOptions = (options: Options<SearchAllData>) => queryOptions<SearchAllResponse, DefaultError, SearchAllResponse, ReturnType<typeof searchAllQueryKey>>({
@@ -716,6 +774,20 @@ export const searchConversationInfiniteOptions = (options: Options<SearchConvers
         queryKey: searchConversationInfiniteQueryKey(options)
     });
     return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const deleteMutation = (options?: Partial<Options<DeleteData>>): UseMutationOptions<DeleteResponse, DefaultError, Options<DeleteData>> => {
+    const mutationOptions: UseMutationOptions<DeleteResponse, DefaultError, Options<DeleteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await delete_({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
 };
 
 export const unregisterMutation = (options?: Partial<Options<UnregisterData>>): UseMutationOptions<UnregisterResponse, DefaultError, Options<UnregisterData>> => {

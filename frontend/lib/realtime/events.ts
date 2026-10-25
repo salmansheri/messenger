@@ -1,4 +1,4 @@
-import type { ConversationSettings, MessageResponse, UserProfile } from "@/lib/api";
+import type { ConversationSettings, MessageResponse, StoryResponse, UserProfile } from "@/lib/api";
 
 /** How someone says they can be reached (GLOSSARY "Availability"). */
 export type Availability = NonNullable<UserProfile["availability"]>;
@@ -37,7 +37,17 @@ export type RealtimeEvent =
   | { type: "profile.changed"; userId: string; changes: ProfileChanges }
   /** This person blocked (`blocked: true`) or unblocked someone, in any of their tabs or devices. Never sent to the other. */
   | { type: "block.changed"; userId: string; blocked: boolean }
+  | StoryEvent
   | { type: "ignored" };
+
+/**
+ * A Story was posted (to the poster's audience and their own sessions), removed (deleted or expired, to the same
+ * people), or viewed for the first time (to the poster's own sessions, with the count they see).
+ */
+export type StoryEvent =
+  | { type: "story.posted"; story: StoryResponse; poster: { userId: string; displayName?: string; avatarUrl?: string } }
+  | { type: "story.removed"; storyId: string; posterId: string }
+  | { type: "story.viewed"; storyId: string; viewerId: string; viewedAt: string; viewCount: number };
 
 /** What a `profile.changed` event changes; a key that is absent was not changed. */
 export type ProfileChanges = { displayName?: string; avatarUrl?: string | null };
@@ -142,6 +152,28 @@ export function parseEvent(body: string): RealtimeEvent | undefined {
     case "block.changed":
       return typeof payload.userId === "string" && typeof payload.blocked === "boolean"
         ? { type: "block.changed", userId: payload.userId, blocked: payload.blocked }
+        : undefined;
+    case "story.posted": {
+      const story = payload.story;
+      const poster = payload.poster;
+      if (!isObject(story) || typeof story.id !== "string" || !isObject(poster) || typeof poster.userId !== "string") return undefined;
+      return {
+        type: "story.posted",
+        story: story as StoryResponse,
+        poster: {
+          userId: poster.userId,
+          displayName: typeof poster.displayName === "string" ? poster.displayName : undefined,
+          avatarUrl: typeof poster.avatarUrl === "string" ? poster.avatarUrl : undefined,
+        },
+      };
+    }
+    case "story.removed":
+      return typeof payload.storyId === "string" && typeof payload.posterId === "string"
+        ? { type: "story.removed", storyId: payload.storyId, posterId: payload.posterId }
+        : undefined;
+    case "story.viewed":
+      return typeof payload.storyId === "string" && typeof payload.viewerId === "string" && typeof payload.viewedAt === "string" && typeof payload.viewCount === "number"
+        ? { type: "story.viewed", storyId: payload.storyId, viewerId: payload.viewerId, viewedAt: payload.viewedAt, viewCount: payload.viewCount }
         : undefined;
     default:
       return { type: "ignored" };

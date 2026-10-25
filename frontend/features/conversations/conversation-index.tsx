@@ -10,6 +10,7 @@ import { messageFor } from "@/lib/api/messages";
 import { Avatar } from "@/features/people/person-avatar";
 import { SearchPanel } from "@/features/search/search-panel";
 import { SearchToggle } from "@/features/search/search-toggle";
+import { StoryTray } from "@/features/stories/story-tray";
 import { focusMessageRow } from "@/features/messages/focus-row";
 import { targetFrom } from "@/features/messages/window";
 import { conversationAvatar, conversationTitle, formatWhen, lastLine, unreadLabel, unreadSpeech } from "./present";
@@ -66,6 +67,8 @@ export function ConversationIndex() {
           </Link>
         </span>
       </div>
+
+      <StoryTray />
 
       {/* Only once the list is there: results are named from it (who said it, which Conversation, "You"). */}
       {search.open && list.status === "ready" && (

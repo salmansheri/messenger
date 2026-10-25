@@ -6,14 +6,16 @@ import {
   listQueryKey,
   meQueryKey,
   presenceQueryKey,
+  trayQueryKey,
   type ConversationResponse,
   type PresenceView,
+  type StoryTray,
 } from "@/lib/api";
 import type { History } from "@/features/messages/history";
 import { allMessagesKey, messagesKey } from "@/features/messages/queries";
 import { createTypingTracker } from "@/features/presence/typing-tracker";
 import { allPresenceKey } from "@/features/presence/use-presence";
-import { catchUp, handleEvent, recordBlock, recordProfile, recordSettings } from "./sync";
+import { catchUp, handleEvent, recordBlock, recordProfile, recordSettings, recordStorySeen } from "./sync";
 
 const conversation = (lastSeq: number, unread: number): ConversationResponse => ({
   id: "c1",
@@ -550,5 +552,70 @@ describe("catchUp and the Blocked Users list", () => {
     catchUp(client);
 
     expect(client.getQueryState(blocksQueryKey())?.isInvalidated).toBe(true);
+  });
+});
+
+describe("Stories in the tray", () => {
+  const tray: StoryTray = { own: [], people: [{ userId: "ada", displayName: "Ada", stories: [{ id: "a1", posterId: "ada", createdAt: "t1", seen: false }] }] };
+  const posted = JSON.stringify({
+    type: "story.posted",
+    story: { id: "a2", posterId: "ada", createdAt: "t2", seen: false },
+    poster: { userId: "ada", displayName: "Ada" },
+  });
+
+  /** A client with the tray on screen, each fetch answered by the test. */
+  function withTray(initial: StoryTray) {
+    const client = new QueryClient();
+    client.setQueryData(meQueryKey(), { id: "me" });
+    client.setQueryData(trayQueryKey(), initial);
+    const answers: ReturnType<typeof deferred<StoryTray>>[] = [];
+    const observer = new QueryObserver(client, {
+      queryKey: trayQueryKey(),
+      staleTime: Infinity,
+      queryFn: () => {
+        const answer = deferred<StoryTray>();
+        answers.push(answer);
+        return answer.promise;
+      },
+    });
+    stops.push(observer.subscribe(() => {}));
+    return { client, answers };
+  }
+
+  it("puts a posted, removed or viewed Story into the loaded tray", () => {
+    const { client } = withTray(tray);
+
+    handleEvent(client, posted, createTypingTracker());
+    expect(client.getQueryData<StoryTray>(trayQueryKey())?.people?.[0].stories?.map((s) => s.id)).toEqual(["a1", "a2"]);
+
+    handleEvent(client, JSON.stringify({ type: "story.removed", storyId: "a1", posterId: "ada" }), createTypingTracker());
+    expect(client.getQueryData<StoryTray>(trayQueryKey())?.people?.[0].stories?.map((s) => s.id)).toEqual(["a2"]);
+  });
+
+  it("asks for the tray again instead of patching it while a request for it is under way", async () => {
+    const { client, answers } = withTray(tray);
+    void client.refetchQueries({ queryKey: trayQueryKey() });
+    expect(answers).toHaveLength(1);
+
+    handleEvent(client, posted, createTypingTracker());
+
+    expect(answers).toHaveLength(2); // restarted
+    answers[1].resolve(tray);
+    await Promise.resolve();
+  });
+
+  it("marks a Story seen once its view is reported", () => {
+    const { client } = withTray(tray);
+    recordStorySeen(client, "a1");
+    expect(client.getQueryData<StoryTray>(trayQueryKey())?.people?.[0].stories?.[0].seen).toBe(true);
+  });
+
+  it("asks for the tray again after a reconnect", () => {
+    const { client } = withList([conversation(2, 0)]);
+    client.setQueryData(trayQueryKey(), tray);
+
+    catchUp(client);
+
+    expect(client.getQueryState(trayQueryKey())?.isInvalidated).toBe(true);
   });
 });

@@ -13,7 +13,8 @@ const SIZES = {
 } as const;
 
 // Whole class names, so Tailwind finds them.
-const TONES: Record<AvatarTone, string> = {
+/** The background class of each tone (the `--tone-*` tokens); also what a text Story is drawn on. */
+export const TONES: Record<AvatarTone, string> = {
   clay: "bg-tone-clay",
   ochre: "bg-tone-ochre",
   moss: "bg-tone-moss",
