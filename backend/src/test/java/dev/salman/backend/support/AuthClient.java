@@ -436,6 +436,18 @@ public class AuthClient {
 		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/stories").header("Authorization", "Bearer " + accessToken));
 	}
 
+	/** Records that the caller viewed a Story. */
+	public ResultActions viewStory(String accessToken, Object storyId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.post("/api/v1/stories/{id}/view", storyId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
+	/** Who viewed one of the caller's Stories. */
+	public ResultActions storyViews(String accessToken, Object storyId) throws Exception {
+		return mvc.perform(MockMvcRequestBuilders.get("/api/v1/stories/{id}/views", storyId).header("Authorization",
+				"Bearer " + accessToken));
+	}
+
 	public ResultActions deleteStory(String accessToken, Object storyId) throws Exception {
 		return mvc.perform(MockMvcRequestBuilders.delete("/api/v1/stories/{id}", storyId).header("Authorization",
 				"Bearer " + accessToken));

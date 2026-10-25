@@ -41,6 +41,7 @@ import dev.salman.backend.entity.Message;
  * {@code online}, and {@code lastSeenAt} when offline), to everyone who shares a Conversation with them.</li>
  * <li>{@code story.posted} and {@code story.removed} (no {@code conversationId}): see {@link #storyPosted} and
  * {@link #storyRemoved}.</li>
+ * <li>{@code story.viewed} (no {@code conversationId}): see {@link #storyViewed}.</li>
  * </ul>
  *
  * <p>Delivery is best effort and not durable (an instance restarting misses events), and events can arrive in a
@@ -106,13 +107,20 @@ public interface RealtimeEvents {
 	void availabilityChanged(UUID userId, Availability availability);
 
 	/**
-	 * A Story was posted ({@code story}, {@code poster}); heard by the poster's own sessions and by the Story's audience
-	 * (everyone the poster shares a Direct conversation with, less a Block either way).
+	 * A Story was posted ({@code story}, as the audience sees it, and {@code poster}); heard by the Story's audience
+	 * (everyone the poster shares a Direct conversation with, less a Block either way) and by the poster's own
+	 * sessions, who get it as the poster sees it (seen, with a view count of 0).
 	 */
 	void storyPosted(StoryResponse story, StoryPoster poster);
 
 	/** A Story was deleted ({@code storyId}, {@code posterId}); heard by the same people as {@link #storyPosted}. */
 	void storyRemoved(UUID storyId, UUID posterId);
+
+	/**
+	 * Someone viewed a Story for the first time ({@code storyId}, {@code viewerId}, {@code viewedAt}, and
+	 * {@code viewCount}, the count the poster sees); heard by the poster's own sessions only.
+	 */
+	void storyViewed(UUID posterId, UUID storyId, UUID viewerId, Instant viewedAt, long viewCount);
 
 	/** The User's credentials were revoked: every socket they have open, on any instance, is closed. */
 	void credentialsRevoked(UUID userId);

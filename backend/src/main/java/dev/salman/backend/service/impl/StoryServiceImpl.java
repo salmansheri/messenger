@@ -34,6 +34,7 @@ import dev.salman.backend.service.AttachmentService;
 import dev.salman.backend.service.RateLimiter;
 import dev.salman.backend.service.RealtimeEvents;
 import dev.salman.backend.service.StoryService;
+import dev.salman.backend.service.StoryViewService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -45,6 +46,7 @@ public class StoryServiceImpl implements StoryService {
 	private static final Duration POST_WINDOW = Duration.ofHours(1);
 
 	private final StoryRepository stories;
+	private final StoryViewService views;
 	private final UserRepository users;
 	private final StoryAudience audience;
 	private final AttachmentLoader attachmentLoader;
@@ -76,9 +78,9 @@ public class StoryServiceImpl implements StoryService {
 		story.setCreatedAt(now);
 		story.setExpiresAt(now.plus(LIFETIME));
 		stories.save(story);
-		var response = StoryResponse.from(story, photo);
+		var response = StoryResponse.from(story, photo, false, null); // as the audience sees it
 		events.storyPosted(response, posterOf(poster));
-		return response;
+		return response.forPoster(0);
 	}
 
 	@Override
@@ -89,9 +91,15 @@ public class StoryServiceImpl implements StoryService {
 		posters.add(callerId);
 		var live = stories.findLiveByPosters(posters, clock.instant());
 		var photos = attachmentLoader.byId(live.stream().map(Story::getAttachmentId).filter(Objects::nonNull).toList());
-		var byPoster = live.stream()
-				.collect(Collectors.groupingBy(Story::getPosterId, LinkedHashMap::new, Collectors.mapping(
-						story -> StoryResponse.from(story, photoOf(story, photos)), Collectors.toList())));
+		var seen = views.seenAmong(callerId, live.stream().map(Story::getId).toList());
+		var counts = views
+				.countsOf(live.stream().filter(story -> story.getPosterId().equals(callerId)).map(Story::getId).toList());
+		var byPoster = live.stream().collect(Collectors.groupingBy(Story::getPosterId, LinkedHashMap::new,
+				Collectors.mapping(story -> {
+					var shown = StoryResponse.from(story, photoOf(story, photos), seen.contains(story.getId()), null);
+					return story.getPosterId().equals(callerId) ? shown.forPoster(counts.getOrDefault(story.getId(), 0L))
+							: shown;
+				}, Collectors.toList())));
 		var own = byPoster.getOrDefault(callerId, List.of());
 		byPoster.remove(callerId);
 		var usersById = users.findAllById(byPoster.keySet()).stream()

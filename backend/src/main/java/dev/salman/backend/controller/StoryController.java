@@ -1,5 +1,6 @@
 package dev.salman.backend.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -17,8 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 import dev.salman.backend.dto.PostStoryRequest;
 import dev.salman.backend.dto.StoryResponse;
 import dev.salman.backend.dto.StoryTray;
+import dev.salman.backend.dto.StoryViewer;
 import dev.salman.backend.lib.Principals;
 import dev.salman.backend.service.StoryService;
+import dev.salman.backend.service.StoryViewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class StoryController {
 
 	private final StoryService stories;
+	private final StoryViewService views;
 
 	/** Posts a text or photo Story; see {@link StoryService#post}. */
 	@PostMapping
@@ -40,6 +44,19 @@ public class StoryController {
 	@GetMapping
 	StoryTray tray(@AuthenticationPrincipal Jwt jwt) {
 		return stories.tray(Principals.userId(jwt));
+	}
+
+	/** Records that the caller viewed a Story; see {@link StoryViewService#view}. */
+	@PostMapping("/{storyId}/view")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void view(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID storyId) {
+		views.view(Principals.userId(jwt), storyId);
+	}
+
+	/** Who viewed one of the caller's own Stories; see {@link StoryViewService#viewers}. */
+	@GetMapping("/{storyId}/views")
+	List<StoryViewer> viewers(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID storyId) {
+		return views.viewers(Principals.userId(jwt), storyId);
 	}
 
 	/** Deletes one of the caller's own Stories; 204 also when it was already deleted. */

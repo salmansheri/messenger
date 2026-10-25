@@ -27,7 +27,7 @@ import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
 import tools.jackson.databind.JsonNode;
 
-/** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one. */
+/** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one, Story views (#71). */
 class StoryTests extends RealtimeIntegrationTest {
 
 	private final HttpClient http = HttpClient.newHttpClient();
@@ -209,7 +209,11 @@ class StoryTests extends RealtimeIntegrationTest {
 		assertThat(posted.get("story").get("text").asString()).isEqualTo("Live");
 		assertThat(posted.get("poster").get("userId").asString()).isEqualTo(ada.id());
 		assertThat(posted.get("poster").get("displayName").asString()).isEqualTo("Ada Lovelace");
-		otherTabOfAda.await(e -> isStory(e, "story.posted"));
+		assertThat(posted.get("story").get("seen").asBoolean()).isFalse();
+		assertThat(posted.get("story").has("viewCount")).isFalse();
+		var ownPosted = otherTabOfAda.await(e -> isStory(e, "story.posted"));
+		assertThat(ownPosted.get("story").get("seen").asBoolean()).isTrue(); // her own, with its count
+		assertThat(ownPosted.get("story").get("viewCount").asLong()).isZero();
 
 		client.deleteStory(ada.accessToken(), story).andExpect(status().isNoContent());
 		client.deleteStory(ada.accessToken(), story).andExpect(status().isNoContent());
@@ -417,6 +421,131 @@ class StoryTests extends RealtimeIntegrationTest {
 	void aTextStoryHasNoAttachment() throws Exception {
 		client.postTextStory(ada.accessToken(), "Words only", "SEA").andExpect(status().isCreated())
 				.andExpect(jsonPath("$.attachment").doesNotExist());
+	}
+
+	@Test
+	void aViewIsRecordedOnceAndTheTrayShowsWhoHasSeenWhatAndThePosterTheCount() throws Exception {
+		client.startDirect(linus.accessToken(), ada.id()).andExpect(status().isCreated());
+		var first = idOf(client.postTextStory(ada.accessToken(), "First", "SEA"));
+		idOf(client.postTextStory(ada.accessToken(), "Second", "SEA"));
+		client.stories(grace.accessToken()).andExpect(jsonPath("$.people[0].stories[0].seen").value(false))
+				.andExpect(jsonPath("$.people[0].stories[0].viewCount").doesNotExist());
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own[0].viewCount").value(0));
+
+		client.viewStory(grace.accessToken(), first).andExpect(status().isNoContent());
+		client.viewStory(grace.accessToken(), first).andExpect(status().isNoContent());
+		client.viewStory(linus.accessToken(), first).andExpect(status().isNoContent());
+		client.viewStory(ada.accessToken(), first).andExpect(status().isNoContent()); // her own: records nothing
+
+		client.stories(grace.accessToken()).andExpect(jsonPath("$.people[0].stories[0].seen").value(true))
+				.andExpect(jsonPath("$.people[0].stories[1].seen").value(false))
+				.andExpect(jsonPath("$.people[0].stories[0].viewCount").doesNotExist());
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own[0].viewCount").value(2))
+				.andExpect(jsonPath("$.own[1].viewCount").value(0));
+	}
+
+	@Test
+	void viewingAStoryOneCannotSeeOrThatIsGoneIsNotFound() throws Exception {
+		var story = idOf(client.postTextStory(ada.accessToken(), "Mine", "SEA"));
+		var deleted = idOf(client.postTextStory(ada.accessToken(), "Deleted", "SEA"));
+		client.deleteStory(ada.accessToken(), deleted).andExpect(status().isNoContent());
+
+		for (var attempt : new String[][] { { linus.accessToken(), story }, { grace.accessToken(), deleted },
+				{ grace.accessToken(), UUID.randomUUID().toString() } }) {
+			client.viewStory(attempt[0], attempt[1]).andExpect(status().isNotFound())
+					.andExpect(jsonPath("$.detail").value("Story not found."));
+		}
+		client.block(grace.accessToken(), ada.id()).andExpect(status().isNoContent());
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNotFound());
+		client.unblock(grace.accessToken(), ada.id()).andExpect(status().isNoContent());
+
+		clock.advance(Duration.ofHours(24).plusMinutes(1));
+		var graceToken = client.loginForTokens(grace.email(), AuthClient.PASSWORD).accessToken();
+		var adaToken = client.loginForTokens(ada.email(), AuthClient.PASSWORD).accessToken();
+		client.viewStory(graceToken, story).andExpect(status().isNotFound());
+		client.viewStory(adaToken, story).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void thePosterSeesWhoViewedNewestFirstAndNobodyElseCan() throws Exception {
+		client.startDirect(linus.accessToken(), ada.id()).andExpect(status().isCreated());
+		var story = idOf(client.postTextStory(ada.accessToken(), "Who saw?", "SEA"));
+		client.storyViews(ada.accessToken(), story).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNoContent());
+		var graceViewedAt = clock.instant();
+		clock.advance(Duration.ofMinutes(1));
+		client.viewStory(linus.accessToken(), story).andExpect(status().isNoContent());
+		clock.advance(Duration.ofMinutes(1));
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNoContent()); // keeps her first view
+
+		var viewers = json.readTree(client.storyViews(ada.accessToken(), story).andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasSize(2))).andExpect(jsonPath("$[0].userId").value(linus.id()))
+				.andExpect(jsonPath("$[0].displayName").value("Linus Torvalds"))
+				.andExpect(jsonPath("$[0].avatarUrl").doesNotExist()).andExpect(jsonPath("$[1].userId").value(grace.id()))
+				.andReturn().getResponse().getContentAsString());
+		assertThat(Instant.parse(viewers.get(1).get("viewedAt").asString())).isBetween(graceViewedAt.minusSeconds(10),
+				graceViewedAt);
+
+		for (var attempt : new String[][] { { grace.accessToken(), story }, { linus.accessToken(), story },
+				{ ada.accessToken(), UUID.randomUUID().toString() } }) {
+			client.storyViews(attempt[0], attempt[1]).andExpect(status().isNotFound())
+					.andExpect(jsonPath("$.detail").value("Story not found."));
+		}
+		clock.advance(Duration.ofHours(24));
+		var adaToken = client.loginForTokens(ada.email(), AuthClient.PASSWORD).accessToken();
+		client.storyViews(adaToken, story).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aBlockEitherWayHidesTheViewFromTheListAndTheCountUntilItIsLifted() throws Exception {
+		client.startDirect(linus.accessToken(), ada.id()).andExpect(status().isCreated());
+		var story = idOf(client.postTextStory(ada.accessToken(), "Seen", "SEA"));
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNoContent());
+		client.viewStory(linus.accessToken(), story).andExpect(status().isNoContent());
+
+		client.block(grace.accessToken(), ada.id()).andExpect(status().isNoContent()); // Grace blocks the poster
+		client.block(ada.accessToken(), linus.id()).andExpect(status().isNoContent()); // the poster blocks Linus
+		client.storyViews(ada.accessToken(), story).andExpect(jsonPath("$").isEmpty());
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own[0].viewCount").value(0));
+
+		var margaret = client.account("Margaret Hamilton");
+		client.startDirect(margaret.accessToken(), ada.id()).andExpect(status().isCreated());
+		var forAda = listening(ada);
+		clock.advance(Duration.ofMinutes(1)); // her view is the newest
+		client.viewStory(margaret.accessToken(), story).andExpect(status().isNoContent());
+		var viewed = forAda.await(e -> isStory(e, "story.viewed"));
+		assertThat(viewed.get("viewCount").asLong()).as("the hidden views are not counted").isEqualTo(1);
+
+		client.unblock(grace.accessToken(), ada.id()).andExpect(status().isNoContent());
+		client.storyViews(ada.accessToken(), story).andExpect(jsonPath("$", hasSize(2)))
+				.andExpect(jsonPath("$[0].userId").value(margaret.id())).andExpect(jsonPath("$[1].userId").value(grace.id()));
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own[0].viewCount").value(2));
+	}
+
+	@Test
+	void aFirstViewTellsOnlyThePostersSessionsWithTheNewCount() throws Exception {
+		client.startDirect(linus.accessToken(), ada.id()).andExpect(status().isCreated());
+		var story = idOf(client.postTextStory(ada.accessToken(), "Count me", "SEA"));
+		var forAda = listening(ada);
+		var forGrace = listening(grace);
+
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNoContent());
+		var first = forAda.await(e -> isStory(e, "story.viewed"));
+		assertThat(first.get("storyId").asString()).isEqualTo(story);
+		assertThat(first.get("viewerId").asString()).isEqualTo(grace.id());
+		assertThat(first.get("viewCount").asLong()).isEqualTo(1);
+		assertThat(Instant.parse(first.get("viewedAt").asString())).isBetween(clock.instant().minusSeconds(10),
+				clock.instant());
+
+		client.viewStory(grace.accessToken(), story).andExpect(status().isNoContent()); // a repeat says nothing
+		client.viewStory(ada.accessToken(), story).andExpect(status().isNoContent()); // nor does her own look
+		client.viewStory(linus.accessToken(), story).andExpect(status().isNoContent());
+		var second = forAda.await(e -> isStory(e, "story.viewed") && e.get("viewerId").asString().equals(linus.id()));
+		assertThat(second.get("viewCount").asLong()).isEqualTo(2);
+
+		assertThat(forAda.history()).filteredOn(e -> isStory(e, "story.viewed")).hasSize(2);
+		assertThat(forGrace.receivesNothingMatching(e -> isStory(e, "story.viewed"), 800)).isTrue();
 	}
 
 	/** Who posted the Story a story event is about, or null for any other event. */

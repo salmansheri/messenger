@@ -246,7 +246,10 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		payload.put("type", "story.posted");
 		payload.put("story", story);
 		payload.put("poster", poster);
-		publish(storyRecipients(poster.userId()), payload);
+		publish(storyAudience.of(poster.userId()), payload);
+		var own = new LinkedHashMap<>(payload);
+		own.put("story", story.forPoster(0)); // their own: seen, and nobody has viewed it yet
+		publish(Set.of(poster.userId()), own);
 	}
 
 	@Override
@@ -256,6 +259,17 @@ public class RealtimeEventsImpl implements RealtimeEvents {
 		payload.put("storyId", storyId);
 		payload.put("posterId", posterId);
 		publish(storyRecipients(posterId), payload);
+	}
+
+	@Override
+	public void storyViewed(UUID posterId, UUID storyId, UUID viewerId, Instant viewedAt, long viewCount) {
+		var payload = new LinkedHashMap<String, Object>();
+		payload.put("type", "story.viewed");
+		payload.put("storyId", storyId);
+		payload.put("viewerId", viewerId);
+		payload.put("viewedAt", viewedAt);
+		payload.put("viewCount", viewCount);
+		publish(Set.of(posterId), payload);
 	}
 
 	/** The Story's audience and the poster's own sessions. */
