@@ -45,6 +45,10 @@ public class Story {
 	@Enumerated(EnumType.STRING)
 	private StoryTone tone;
 
+	/** The upload a photo Story shows; null for a text Story and once a photo Story is deleted. */
+	@Column(name = "attachment_id")
+	private UUID attachmentId;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 

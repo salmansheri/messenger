@@ -26,6 +26,9 @@ public interface StoryRepository extends JpaRepository<Story, UUID> {
 	@Query("select s from Story s where s.id = :id")
 	Optional<Story> findByIdForUpdate(UUID id);
 
+	/** Whether a Story shows this upload (a deleted one no longer does). */
+	boolean existsByAttachmentId(UUID attachmentId);
+
 	@Query("select count(s) from Story s where s.posterId = :posterId and s.deletedAt is null and s.expiresAt > :now")
 	long countLive(UUID posterId, Instant now);
 

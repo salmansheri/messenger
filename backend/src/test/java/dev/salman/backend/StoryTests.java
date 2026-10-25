@@ -1,31 +1,42 @@
 package dev.salman.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.ResultActions;
 
 import dev.salman.backend.support.AuthClient;
 import dev.salman.backend.support.AuthClient.Account;
 import dev.salman.backend.support.RealtimeIntegrationTest;
 import tools.jackson.databind.JsonNode;
 
-/** Text Stories: posting one, seeing them in the tray, deleting one (#69). */
+/** Stories: posting one (text #69, photo #70), seeing them in the tray, deleting one. */
 class StoryTests extends RealtimeIntegrationTest {
+
+	private final HttpClient http = HttpClient.newHttpClient();
 
 	private AuthClient client;
 	private Account ada;
 	private Account grace;
 	private Account linus;
+	private String direct;
 
 	@BeforeEach
 	void accounts() throws Exception {
@@ -33,7 +44,7 @@ class StoryTests extends RealtimeIntegrationTest {
 		ada = client.account("Ada Lovelace");
 		grace = client.account("Grace Hopper");
 		linus = client.account("Linus Torvalds");
-		client.startDirect(ada.accessToken(), grace.id()).andExpect(status().isCreated());
+		direct = idOf(client.startDirect(ada.accessToken(), grace.id()).andExpect(status().isCreated()));
 	}
 
 	@Test
@@ -229,6 +240,183 @@ class StoryTests extends RealtimeIntegrationTest {
 		forGrace.await(e -> isStory(e, "story.removed") && e.get("posterId").asString().equals(grace.id()));
 		assertThat(forAda.history()).noneMatch(e -> grace.id().equals(posterOf(e)));
 		assertThat(forGrace.history()).noneMatch(e -> ada.id().equals(posterOf(e)));
+	}
+
+	/** What fetching a signed link answers now. */
+	private int statusOf(String url) throws Exception {
+		var link = URI.create(url);
+		var local = URI.create("http://localhost:" + port + link.getRawPath() + "?" + link.getRawQuery());
+		return http.send(HttpRequest.newBuilder(local).build(),
+				HttpResponse.BodyHandlers.discarding()).statusCode();
+	}
+
+	/** The stored file behind a signed link: links lapse with the clock, so removal is seen on the disk. */
+	private static Path fileOf(String url) {
+		return Path.of("target/test-uploads")
+				.resolve(URI.create(url).getPath().substring("/api/v1/files/".length()));
+	}
+
+	/** Uploads an image as {@code account} and answers its id. */
+	private String upload(Account account) throws Exception {
+		return idOf(client.uploadImage(account.accessToken(), "a.png", "image/png", UploadImageTests.image("png", 40, 30))
+				.andExpect(status().isCreated()));
+	}
+
+	private ResultActions postPhotoStory(Account account, String attachmentId,
+			String caption) throws Exception {
+		var body = new LinkedHashMap<String, Object>();
+		body.put("kind", "PHOTO");
+		body.put("attachmentId", attachmentId);
+		if (caption != null) {
+			body.put("text", caption);
+		}
+		return client.postStoryBody(account.accessToken(), body);
+	}
+
+	@Test
+	void aPhotoStoryCarriesItsUploadWithFreshlySignedLinksAndAnOptionalCaption() throws Exception {
+		var photo = upload(ada);
+		var posted = postPhotoStory(ada, photo, "At Bletchley").andExpect(status().isCreated())
+				.andExpect(jsonPath("$.kind").value("PHOTO")).andExpect(jsonPath("$.text").value("At Bletchley"))
+				.andExpect(jsonPath("$.tone").doesNotExist()).andExpect(jsonPath("$.attachment.id").value(photo))
+				.andExpect(jsonPath("$.attachment.width").value(40)).andExpect(jsonPath("$.attachment.height").value(30))
+				.andExpect(jsonPath("$.attachment.url").isNotEmpty())
+				.andExpect(jsonPath("$.attachment.thumbnailUrl").isNotEmpty());
+		var story = idOf(posted);
+		postPhotoStory(ada, upload(ada), null).andExpect(status().isCreated())
+				.andExpect(jsonPath("$.text").doesNotExist());
+
+		var tray = json.readTree(client.stories(grace.accessToken()).andExpect(status().isOk()).andReturn()
+				.getResponse().getContentAsString());
+		var shown = tray.get("people").get(0).get("stories").get(0);
+		assertThat(shown.get("id").asString()).isEqualTo(story);
+		assertThat(shown.get("attachment").get("id").asString()).isEqualTo(photo);
+		assertThat(statusOf(shown.get("attachment").get("url").asString())).isEqualTo(200);
+		assertThat(statusOf(shown.get("attachment").get("thumbnailUrl").asString())).isEqualTo(200);
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own[0].attachment.id").value(photo));
+	}
+
+	@Test
+	void anUploadThatIsNotThePostersOwnOrIsAlreadyUsedIsNotFound() throws Exception {
+		var gracesUpload = upload(grace);
+		var sentWithAMessage = upload(ada);
+		client.sendBody(ada.accessToken(), direct,
+				Map.of("clientMessageId", UUID.randomUUID(), "attachmentId", sentWithAMessage))
+				.andExpect(status().isCreated());
+		var deletedWithItsMessage = upload(ada);
+		var deleted = idOf(client.sendBody(ada.accessToken(), direct,
+				Map.of("clientMessageId", UUID.randomUUID(), "attachmentId", deletedWithItsMessage)));
+		client.deleteMessage(ada.accessToken(), direct, deleted).andExpect(status().isNoContent());
+		var inAnotherStory = upload(ada);
+		postPhotoStory(ada, inAnotherStory, null).andExpect(status().isCreated());
+
+		for (var attachment : new String[] { gracesUpload, sentWithAMessage, deletedWithItsMessage, inAnotherStory,
+				UUID.randomUUID().toString() }) {
+			postPhotoStory(ada, attachment, "Mine?").andExpect(status().isNotFound())
+					.andExpect(jsonPath("$.detail").value("Attachment not found."));
+		}
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own", hasSize(1)));
+	}
+
+	@Test
+	void aStorysPhotoCannotAlsoBeSentWithAMessage() throws Exception {
+		var photo = upload(ada);
+		postPhotoStory(ada, photo, null).andExpect(status().isCreated());
+
+		client.sendBody(ada.accessToken(), direct, Map.of("clientMessageId", UUID.randomUUID(), "attachmentId", photo))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.detail").value("Attachment not found."));
+	}
+
+	@Test
+	void aPhotoStoryNeedsAnUploadAndNoToneAndItsCaptionFollowsTheTextRules() throws Exception {
+		var photo = upload(ada);
+		client.postStoryBody(ada.accessToken(), Map.of("kind", "PHOTO", "text", "No photo"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.attachmentId").value("must not be null"));
+		client.postStoryBody(ada.accessToken(), Map.of("kind", "PHOTO", "attachmentId", photo, "tone", "SEA"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.tone").value("must be left out for a photo Story"));
+		postPhotoStory(ada, photo, "  ").andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.text").value("must not be blank"));
+		postPhotoStory(ada, photo, "a\u0000b").andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.text").value("must not contain NUL characters"));
+		postPhotoStory(ada, photo, "😀".repeat(701)).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.text").value("must be at most 700 characters"));
+		client.postStoryBody(ada.accessToken(), Map.of("kind", "TEXT", "text", "Hi", "tone", "SEA", "attachmentId", photo))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.attachmentId").value("must be left out for a text Story"));
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own").isEmpty());
+
+		postPhotoStory(ada, photo, "😀".repeat(700)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void aLiveStorysPhotoOutlivesTheLifetimeOfAnUnsentUpload() throws Exception {
+		var upload = json.readTree(client.uploadImage(ada.accessToken(), "a.png", "image/png",
+				UploadImageTests.image("png", 40, 30)).andExpect(status().isCreated()).andReturn().getResponse()
+				.getContentAsString());
+		var image = fileOf(upload.get("url").asString());
+		var thumbnail = fileOf(upload.get("thumbnailUrl").asString());
+		var unsent = fileOf(json.readTree(client.uploadImage(ada.accessToken(), "b.png", "image/png",
+				UploadImageTests.image("png", 10, 10)).andExpect(status().isCreated()).andReturn().getResponse()
+				.getContentAsString()).get("url").asString());
+		clock.advance(Duration.ofHours(23));
+		var adaToken = client.loginForTokens(ada.email(), AuthClient.PASSWORD).accessToken();
+		client.postStoryBody(adaToken, Map.of("kind", "PHOTO", "attachmentId", upload.get("id").asString()))
+				.andExpect(status().isCreated());
+
+		clock.advance(Duration.ofHours(2)); // both uploads are a day old; the Story has 22 hours to go
+		await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(unsent).doesNotExist()); // a sweep ran
+
+		assertThat(image).exists();
+		assertThat(thumbnail).exists();
+		var graceToken = client.loginForTokens(grace.email(), AuthClient.PASSWORD).accessToken();
+		var shown = json.readTree(client.stories(graceToken).andReturn().getResponse().getContentAsString())
+				.get("people").get(0).get("stories").get(0).get("attachment");
+		assertThat(statusOf(shown.get("url").asString())).isEqualTo(200);
+	}
+
+	@Test
+	void deletingAPhotoStoryRemovesItsFilesAndTheUploadCannotBeUsedAgain() throws Exception {
+		var posted = json.readTree(postPhotoStory(ada, upload(ada), "Gone soon").andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString());
+		var image = fileOf(posted.get("attachment").get("url").asString());
+		var thumbnail = fileOf(posted.get("attachment").get("thumbnailUrl").asString());
+		assertThat(image).exists();
+
+		client.deleteStory(ada.accessToken(), posted.get("id").asString()).andExpect(status().isNoContent());
+
+		await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+			assertThat(image).doesNotExist();
+			assertThat(thumbnail).doesNotExist();
+		});
+		postPhotoStory(ada, posted.get("attachment").get("id").asString(), null).andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Attachment not found."));
+	}
+
+	@Test
+	void aStorageFailureStillDeletesThePhotoStoryAndTheFilesGoOnceStorageRecovers() throws Exception {
+		var posted = json.readTree(postPhotoStory(ada, upload(ada), null).andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString());
+		var story = posted.get("id").asString();
+		var image = fileOf(posted.get("attachment").get("url").asString());
+		storage.failDeletes();
+
+		client.deleteStory(ada.accessToken(), story).andExpect(status().isNoContent());
+		client.deleteStory(ada.accessToken(), story).andExpect(status().isNoContent()); // still a 204 with storage down
+
+		client.stories(ada.accessToken()).andExpect(jsonPath("$.own").isEmpty());
+		client.stories(grace.accessToken()).andExpect(jsonPath("$.people").isEmpty());
+		assertThat(image).as("storage could not delete it yet").exists();
+
+		storage.reset();
+		await().atMost(Duration.ofSeconds(15))
+				.untilAsserted(() -> assertThat(image).doesNotExist());
+	}
+
+	@Test
+	void aTextStoryHasNoAttachment() throws Exception {
+		client.postTextStory(ada.accessToken(), "Words only", "SEA").andExpect(status().isCreated())
+				.andExpect(jsonPath("$.attachment").doesNotExist());
 	}
 
 	/** Who posted the Story a story event is about, or null for any other event. */

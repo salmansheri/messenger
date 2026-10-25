@@ -25,7 +25,6 @@ import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.ForbiddenException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.config.AppProperties;
-import dev.salman.backend.repository.AttachmentRepository;
 import dev.salman.backend.repository.ConversationRepository;
 import dev.salman.backend.repository.MessageHiddenRepository;
 import dev.salman.backend.repository.MessageRepository;
@@ -47,7 +46,6 @@ public class MessageServiceImpl implements MessageService {
 	private final MessageRepository messages;
 	private final MessageHiddenRepository hidden;
 	private final QuoteResolver quotes;
-	private final AttachmentRepository attachments;
 	private final AttachmentLoader attachmentLoader;
 	private final AttachmentService attachmentService;
 	private final ReactionLoader reactionLoader;
@@ -112,12 +110,7 @@ public class MessageServiceImpl implements MessageService {
 		}
 
 		if (attachmentId != null) {
-			// Locked, so two sends cannot both claim it. Someone else's, an unknown one and one already sent with a
-			// Message look the same.
-			attachments.findByIdForUpdate(attachmentId).filter(upload -> upload.getOwnerId().equals(callerId))
-					.filter(upload -> upload.getRemovedAt() == null)
-					.filter(upload -> !messages.existsByAttachmentId(upload.getId()))
-					.orElseThrow(() -> new NotFoundException("Attachment not found."));
+			attachmentService.claim(callerId, attachmentId); // locked until this send commits
 		}
 
 		var now = clock.instant();

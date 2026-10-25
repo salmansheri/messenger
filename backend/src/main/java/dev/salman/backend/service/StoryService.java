@@ -13,10 +13,12 @@ import dev.salman.backend.dto.StoryTray;
 public interface StoryService {
 
 	/**
-	 * Posts a text Story, live for 24 hours from now, and announces it to the poster's sessions and their audience.
+	 * Posts a text or photo Story, live for 24 hours from now, and announces it to the poster's sessions and their
+	 * audience. A photo Story takes an upload of the poster's that no Message or other Story uses.
 	 *
 	 * @throws dev.salman.backend.exception.ConflictException when the poster already has the most live Stories allowed
 	 * @throws dev.salman.backend.exception.RateLimitedException when they posted too often this hour
+	 * @throws dev.salman.backend.exception.NotFoundException when the upload is someone else's, unknown or already used
 	 */
 	StoryResponse post(UUID posterId, PostStoryRequest request);
 
@@ -24,7 +26,8 @@ public interface StoryService {
 	StoryTray tray(UUID callerId);
 
 	/**
-	 * Deletes one of the caller's own Stories, at once for everyone; deleting it again changes nothing.
+	 * Deletes one of the caller's own Stories, at once for everyone; deleting it again changes nothing. A photo Story's
+	 * upload is released: its files go once this commits, or later through the sweep if storage fails.
 	 *
 	 * @throws dev.salman.backend.exception.NotFoundException for anyone else's Story, an expired one or an unknown id
 	 */

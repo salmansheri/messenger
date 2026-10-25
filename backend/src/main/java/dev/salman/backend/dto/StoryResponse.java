@@ -7,13 +7,14 @@ import dev.salman.backend.entity.Story;
 import dev.salman.backend.entity.StoryKind;
 import dev.salman.backend.entity.StoryTone;
 
-/** One Story as its poster and its audience see it. */
-public record StoryResponse(UUID id, UUID posterId, StoryKind kind, String text, StoryTone tone, Instant createdAt,
-		Instant expiresAt) {
+/** One Story as its poster and its audience see it: a text on {@code tone}, or a photo with {@code text} as its caption. */
+public record StoryResponse(UUID id, UUID posterId, StoryKind kind, String text, StoryTone tone,
+		AttachmentResponse attachment, Instant createdAt, Instant expiresAt) {
 
-	public static StoryResponse from(Story story) {
+	/** {@code attachment} is the photo with freshly signed links, null for a text Story. */
+	public static StoryResponse from(Story story, AttachmentResponse attachment) {
 		return new StoryResponse(story.getId(), story.getPosterId(), story.getKind(), story.getText(), story.getTone(),
-				story.getCreatedAt(), story.getExpiresAt());
+				attachment, story.getCreatedAt(), story.getExpiresAt());
 	}
 
 }

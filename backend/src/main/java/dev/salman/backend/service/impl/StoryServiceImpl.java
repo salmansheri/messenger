@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -16,17 +17,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.salman.backend.config.AppProperties;
+import dev.salman.backend.dto.AttachmentResponse;
 import dev.salman.backend.dto.PostStoryRequest;
 import dev.salman.backend.dto.StoryPoster;
 import dev.salman.backend.dto.StoryResponse;
 import dev.salman.backend.dto.StoryTray;
 import dev.salman.backend.entity.Story;
+import dev.salman.backend.entity.StoryKind;
 import dev.salman.backend.entity.User;
 import dev.salman.backend.exception.ConflictException;
 import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.exception.UnauthorizedException;
 import dev.salman.backend.repository.StoryRepository;
 import dev.salman.backend.repository.UserRepository;
+import dev.salman.backend.service.AttachmentService;
 import dev.salman.backend.service.RateLimiter;
 import dev.salman.backend.service.RealtimeEvents;
 import dev.salman.backend.service.StoryService;
@@ -43,6 +47,8 @@ public class StoryServiceImpl implements StoryService {
 	private final StoryRepository stories;
 	private final UserRepository users;
 	private final StoryAudience audience;
+	private final AttachmentLoader attachmentLoader;
+	private final AttachmentService attachmentService;
 	private final AvatarLinks avatars;
 	private final RateLimiter rateLimiter;
 	private final RealtimeEvents events;
@@ -59,15 +65,18 @@ public class StoryServiceImpl implements StoryService {
 			throw new ConflictException("You can have at most " + MAX_LIVE + " live Stories.");
 		}
 		rateLimiter.hit("rl:stories:" + posterId, props.stories().maxPostsPerHour(), POST_WINDOW);
+		// Locked until this post commits, so a Story and a Message (or two Stories) cannot both claim it.
+		var photo = request.kind() == StoryKind.PHOTO ? attachmentService.claim(posterId, request.attachmentId()) : null;
 		var story = new Story();
 		story.setPosterId(posterId);
 		story.setKind(request.kind());
 		story.setText(request.text());
 		story.setTone(request.tone());
+		story.setAttachmentId(request.attachmentId());
 		story.setCreatedAt(now);
 		story.setExpiresAt(now.plus(LIFETIME));
 		stories.save(story);
-		var response = StoryResponse.from(story);
+		var response = StoryResponse.from(story, photo);
 		events.storyPosted(response, posterOf(poster));
 		return response;
 	}
@@ -78,9 +87,11 @@ public class StoryServiceImpl implements StoryService {
 		var others = audience.of(callerId);
 		var posters = new ArrayList<UUID>(others);
 		posters.add(callerId);
-		var byPoster = stories.findLiveByPosters(posters, clock.instant()).stream()
-				.collect(Collectors.groupingBy(Story::getPosterId, LinkedHashMap::new,
-						Collectors.mapping(StoryResponse::from, Collectors.toList())));
+		var live = stories.findLiveByPosters(posters, clock.instant());
+		var photos = attachmentLoader.byId(live.stream().map(Story::getAttachmentId).filter(Objects::nonNull).toList());
+		var byPoster = live.stream()
+				.collect(Collectors.groupingBy(Story::getPosterId, LinkedHashMap::new, Collectors.mapping(
+						story -> StoryResponse.from(story, photoOf(story, photos)), Collectors.toList())));
 		var own = byPoster.getOrDefault(callerId, List.of());
 		byPoster.remove(callerId);
 		var usersById = users.findAllById(byPoster.keySet()).stream()
@@ -92,6 +103,10 @@ public class StoryServiceImpl implements StoryService {
 					return new StoryTray.Person(poster.userId(), poster.displayName(), poster.avatarUrl(), e.getValue());
 				}).toList();
 		return new StoryTray(own, people);
+	}
+
+	private static AttachmentResponse photoOf(Story story, Map<UUID, AttachmentResponse> photos) {
+		return story.getAttachmentId() == null ? null : photos.get(story.getAttachmentId());
 	}
 
 	/** When a person's latest live Story was posted (their Stories are oldest first). */
@@ -114,7 +129,17 @@ public class StoryServiceImpl implements StoryService {
 			return; // already deleted: nothing more to do or to say
 		}
 		story.setDeletedAt(clock.instant());
-		stories.save(story);
+		if (story.getAttachmentId() != null) {
+			// The Story first (it stops referring to the photo), then the photo: its files go after commit, and a
+			// storage failure leaves them to the sweep without undoing the deletion.
+			var photo = story.getAttachmentId();
+			story.setAttachmentId(null);
+			stories.saveAndFlush(story);
+			attachmentService.release(photo);
+		}
+		else {
+			stories.save(story);
+		}
 		events.storyRemoved(story.getId(), callerId);
 	}
 

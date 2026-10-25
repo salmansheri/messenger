@@ -16,7 +16,7 @@ import dev.salman.backend.lib.ObjectStorage;
 import dev.salman.backend.repository.AttachmentRepository;
 import lombok.RequiredArgsConstructor;
 
-/** Finds the images of a page or list of Messages in one query and gives each a freshly signed link. */
+/** Finds the images of a page or list of Messages (or of Stories) in one query and gives each a freshly signed link. */
 @Component
 @RequiredArgsConstructor
 class AttachmentLoader {
@@ -45,6 +45,18 @@ class AttachmentLoader {
 			}
 		}
 		return views;
+	}
+
+	/**
+	 * The uploads with these ids by id, each with a freshly signed link; an unknown id is left out. As for Messages, the
+	 * caller has already decided the viewer may see them.
+	 */
+	Map<UUID, AttachmentResponse> byId(Collection<UUID> ids) {
+		if (ids.isEmpty()) {
+			return Map.of();
+		}
+		return attachments.findAllById(ids.stream().distinct().toList()).stream()
+				.collect(Collectors.toMap(Attachment::getId, this::view));
 	}
 
 	AttachmentResponse view(Attachment attachment) {

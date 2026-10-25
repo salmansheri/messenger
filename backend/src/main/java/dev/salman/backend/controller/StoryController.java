@@ -29,7 +29,7 @@ public class StoryController {
 
 	private final StoryService stories;
 
-	/** Posts a text Story; see {@link StoryService#post}. */
+	/** Posts a text or photo Story; see {@link StoryService#post}. */
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	StoryResponse post(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PostStoryRequest request) {

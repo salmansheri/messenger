@@ -11,7 +11,10 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
 
-/** The text of a Story (up to 700 characters). See {@link TextRules}. */
+/**
+ * The text of a Story or the caption of a photo Story (up to 700 characters). Absent is fine here; a text Story needs
+ * it, which the request checks. See {@link TextRules}.
+ */
 @Documented
 @Constraint(validatedBy = ValidStoryText.Validator.class)
 @Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
@@ -30,7 +33,7 @@ public @interface ValidStoryText {
 
 		@Override
 		public boolean isValid(String value, ConstraintValidatorContext context) {
-			return TextRules.check(value, MAX_CHARACTERS, context);
+			return value == null || TextRules.check(value, MAX_CHARACTERS, context);
 		}
 
 	}

@@ -18,13 +18,22 @@ public interface AttachmentService {
 	AttachmentResponse upload(UUID ownerId, byte[] bytes);
 
 	/**
-	 * Gives up the image of a Message that is being deleted for everyone: from this transaction on it cannot be sent
-	 * again, and once the transaction commits its files are removed. If that fails the Message stays deleted and the
-	 * periodic sweep removes the files later.
+	 * Claims an upload for the Message or Story being created in the caller's transaction: locks it until that commits,
+	 * so two cannot both claim it, and answers it with freshly signed links.
+	 *
+	 * @throws dev.salman.backend.exception.NotFoundException when it is someone else's, unknown, released or already
+	 *         used by a Message or a Story (all alike)
+	 */
+	AttachmentResponse claim(UUID ownerId, UUID attachmentId);
+
+	/**
+	 * Gives up the image of a Message that is being deleted for everyone, or of a photo Story being deleted: from this
+	 * transaction on it cannot be used again, and once the transaction commits its files are removed. If that fails the
+	 * Message or Story stays deleted and the periodic sweep removes the files later.
 	 */
 	void release(UUID attachmentId);
 
-	/** Removes uploads nobody sent with a Message within the configured lifetime, and their stored files. */
+	/** Removes uploads no Message or Story used within the configured lifetime, and their stored files. */
 	void removeAbandoned();
 
 }

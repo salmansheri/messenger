@@ -11,10 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 import dev.salman.backend.config.AppProperties;
 import dev.salman.backend.dto.AttachmentResponse;
 import dev.salman.backend.entity.Attachment;
+import dev.salman.backend.exception.NotFoundException;
 import dev.salman.backend.lib.AfterCommit;
 import dev.salman.backend.lib.Images;
 import dev.salman.backend.lib.ObjectStorage;
 import dev.salman.backend.repository.AttachmentRepository;
+import dev.salman.backend.repository.MessageRepository;
+import dev.salman.backend.repository.StoryRepository;
 import dev.salman.backend.service.AttachmentService;
 import dev.salman.backend.service.RateLimiter;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,8 @@ public class AttachmentServiceImpl implements AttachmentService {
 	private static final int SWEEP_BATCH = 100;
 
 	private final AttachmentRepository attachments;
+	private final MessageRepository messages;
+	private final StoryRepository stories;
 	private final ObjectStorage storage;
 	private final RateLimiter rateLimiter;
 	private final AppProperties props;
@@ -64,6 +69,17 @@ public class AttachmentServiceImpl implements AttachmentService {
 			throw e;
 		}
 		return loader.view(attachment);
+	}
+
+	@Override
+	@Transactional
+	public AttachmentResponse claim(UUID ownerId, UUID attachmentId) {
+		var upload = attachments.findByIdForUpdate(attachmentId).filter(candidate -> candidate.getOwnerId().equals(ownerId))
+				.filter(candidate -> candidate.getRemovedAt() == null)
+				.filter(candidate -> !messages.existsByAttachmentId(candidate.getId()))
+				.filter(candidate -> !stories.existsByAttachmentId(candidate.getId()))
+				.orElseThrow(() -> new NotFoundException("Attachment not found."));
+		return loader.view(upload);
 	}
 
 	@Override
