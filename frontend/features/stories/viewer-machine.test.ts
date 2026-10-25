@@ -120,6 +120,17 @@ describe("pausing", () => {
     expect(current(state)?.storyId).toBe("a3");
   });
 
+  it("waits while something is open over the Story (a menu, the list of viewers), keeping a toggled pause", () => {
+    let state = step(openViewer([ada], "ada"), { type: "cover", covered: true });
+    state = step(state, { type: "tick", ms: STORY_MS * 2 });
+    expect(current(state)?.storyId).toBe("a2");
+    state = step(state, { type: "cover", covered: false });
+    state = step(state, { type: "tick", ms: 300 });
+    expect(state.elapsed).toBe(300);
+    const toggled = step(step(step(openViewer([ada], "ada"), { type: "togglePause" }), { type: "cover", covered: true }), { type: "cover", covered: false });
+    expect(toggled.paused).toBe(true);
+  });
+
   it("keeps a toggled pause when moving to another Story by hand", () => {
     const state = step(step(openViewer([ada], "ada"), { type: "togglePause" }), { type: "next" });
     expect(state.paused).toBe(true);

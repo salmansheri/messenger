@@ -17,14 +17,14 @@ export type TrayEntry = {
 const latest = (entry: TrayEntry) => entry.stories[entry.stories.length - 1]?.createdAt ?? "";
 
 /**
- * The tray in the order it is shown: your own first, then people with Stories you have not seen, the one who posted
- * most recently first, then people whose Stories you have all seen, also newest first. Nobody without a live Story is
- * in it, so with no Stories at all it is empty.
+ * The tray in the order it is shown: your own first (always, with no Stories in it when you have none: it is where you
+ * post one), then people with Stories you have not seen, the one who posted most recently first, then people whose
+ * Stories you have all seen, also newest first. Nobody else without a live Story is in it.
  */
 export function orderTray(tray: StoryTray | undefined, me: { id?: string; displayName?: string; avatarUrl?: string } | undefined): TrayEntry[] {
   const entries: TrayEntry[] = [];
   const own = tray?.own ?? [];
-  if (own.length > 0 && me?.id) {
+  if (me?.id) {
     entries.push({ userId: me.id, displayName: me.displayName, avatarUrl: me.avatarUrl, stories: own, own: true, unseen: false });
   }
   const people = (tray?.people ?? [])
@@ -46,9 +46,9 @@ export function orderTray(tray: StoryTray | undefined, me: { id?: string; displa
   return entries;
 }
 
-/** The accessible name of a tray entry: who, and whether there is something new. */
-export function trayEntryLabel(entry: Pick<TrayEntry, "own" | "displayName" | "unseen">): string {
-  if (entry.own) return "Your Story";
+/** The accessible name of a tray entry: who, and whether there is something new; your own when empty posts one. */
+export function trayEntryLabel(entry: Pick<TrayEntry, "own" | "displayName" | "unseen" | "stories">): string {
+  if (entry.own) return entry.stories.length > 0 ? "Your Story" : "Post a Story";
   return `${entry.displayName ?? "Someone"}, ${entry.unseen ? "unseen Stories" : "Stories seen"}`;
 }
 

@@ -40,22 +40,29 @@ describe("orderTray", () => {
     expect(entries[3]).toMatchObject({ unseen: false });
   });
 
-  it("has no own entry without own Stories, and nothing at all when nobody has a Story", () => {
-    expect(orderTray({ own: [], people: [person("ada", [story("a1", "ada", "2026-03-10T08:00:00Z")])] }, ME).map((e) => e.userId)).toEqual(["ada"]);
-    expect(orderTray({ own: [], people: [] }, ME)).toEqual([]);
-    expect(orderTray(undefined, ME)).toEqual([]);
+  it("always has your own entry first, empty when you have no live Story, and nothing else when nobody has one", () => {
+    expect(orderTray({ own: [], people: [person("ada", [story("a1", "ada", "2026-03-10T08:00:00Z")])] }, ME).map((e) => e.userId)).toEqual(["me", "ada"]);
+    expect(orderTray({ own: [], people: [] }, ME)).toEqual([
+      { userId: "me", displayName: "Me", avatarUrl: undefined, stories: [], own: true, unseen: false },
+    ]);
+    expect(orderTray(undefined, ME).map((e) => e.userId)).toEqual(["me"]);
+  });
+
+  it("has nothing at all before it is known who you are", () => {
+    expect(orderTray({ own: [], people: [] }, undefined)).toEqual([]);
   });
 
   it("leaves out a person whose Stories have all gone", () => {
-    expect(orderTray({ people: [person("ada", [])] }, ME)).toEqual([]);
+    expect(orderTray({ people: [person("ada", [])] }, ME).map((e) => e.userId)).toEqual(["me"]);
   });
 });
 
 describe("trayEntryLabel", () => {
   it("names the person and whether they have unseen Stories", () => {
-    expect(trayEntryLabel({ own: false, displayName: "Grace Hopper", unseen: true })).toBe("Grace Hopper, unseen Stories");
-    expect(trayEntryLabel({ own: false, displayName: "Grace Hopper", unseen: false })).toBe("Grace Hopper, Stories seen");
-    expect(trayEntryLabel({ own: true, displayName: "Me", unseen: false })).toBe("Your Story");
+    expect(trayEntryLabel({ own: false, displayName: "Grace Hopper", unseen: true, stories: [{}] })).toBe("Grace Hopper, unseen Stories");
+    expect(trayEntryLabel({ own: false, displayName: "Grace Hopper", unseen: false, stories: [{}] })).toBe("Grace Hopper, Stories seen");
+    expect(trayEntryLabel({ own: true, displayName: "Me", unseen: false, stories: [{}] })).toBe("Your Story");
+    expect(trayEntryLabel({ own: true, displayName: "Me", unseen: false, stories: [] })).toBe("Post a Story");
   });
 });
 

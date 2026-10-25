@@ -65,13 +65,15 @@ type Props = {
    * buttons are ordinary buttons, not menu items. It moves focus itself.
    */
   replacement?: ReactNode;
+  /** The trigger's colours, when the page's own would not read (over the dark glass of a viewer, say). */
+  triggerClassName?: string;
 };
 
 /**
  * A button that opens a menu. The first choice takes focus when it opens; the arrow keys (wrapping), Home and End move
  * through the choices, Escape closes it and gives focus back to the button, and so does a click anywhere else.
  */
-export function DropdownMenu({ label, icon, children, below, onClose, replacement }: Props) {
+export function DropdownMenu({ label, icon, children, below, onClose, replacement, triggerClassName = "text-ink-muted hover:text-ink" }: Props) {
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -135,7 +137,7 @@ export function DropdownMenu({ label, icon, children, below, onClose, replacemen
         aria-controls={open ? menuId : undefined}
         aria-label={label}
         onClick={() => (open ? close(true) : setOpen(true))}
-        className="flex size-9 items-center justify-center rounded-sm text-ink-muted hover:text-ink"
+        className={`flex size-9 items-center justify-center rounded-sm ${triggerClassName}`}
       >
         {icon}
       </button>

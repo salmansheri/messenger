@@ -1,13 +1,14 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { sdk } from "@/lib/api";
 import { formatWhen } from "@/features/conversations/present";
 import type { AvatarTone } from "@/features/people/avatar";
 import { Avatar, TONES } from "@/features/people/person-avatar";
 import { useImageRecovery } from "@/features/messages/use-image-recovery";
 import { recordStorySeen } from "@/features/realtime/sync";
+import { OwnStoryControls } from "./own-story-controls";
 import { useTrayRefresh } from "./queries";
 import { viewerPeople, type TrayEntry } from "./tray";
 import { STORY_MS, current, openViewer, step } from "./viewer-machine";
@@ -122,6 +123,9 @@ export function StoryViewer({
     dispatch({ type: direction });
   };
 
+  // Something open over the Story (the list of viewers, the menu on your own) holds it, and keys are left to it.
+  const cover = useCallback((covered: boolean) => dispatch({ type: "cover", covered }), []);
+
   const name = found ? (found.entry.own ? "You" : (found.entry.displayName ?? "Someone")) : "";
   const when = found?.story.createdAt ? formatWhen(found.story.createdAt, new Date()) : "";
   const summary = found && shown ? storySummary({ own: found.entry.own, name, index: shown.index, count: shown.count, when }) : "";
@@ -133,6 +137,7 @@ export function StoryViewer({
       aria-label={found?.entry.own ? "Your Stories" : `${name}'s Stories`}
       onClose={close}
       onKeyDown={(event) => {
+        if (state.covered) return;
         if (event.key === "ArrowRight") dispatch({ type: "next" });
         else if (event.key === "ArrowLeft") dispatch({ type: "previous" });
         else if (event.key === " ") {
@@ -221,6 +226,15 @@ export function StoryViewer({
               <button type="button" aria-label="Previous Story" onClick={() => tap("previous")} className="absolute inset-y-0 left-0 z-10 w-1/3 focus-visible:outline-offset-[-4px]" />
               <button type="button" aria-label="Next Story" onClick={() => tap("next")} className="absolute inset-y-0 right-0 z-10 w-2/3 focus-visible:outline-offset-[-4px]" />
             </div>
+            {found.entry.own && found.story.id && (
+              <OwnStoryControls
+                storyId={found.story.id}
+                posterId={found.entry.userId}
+                viewCount={found.story.viewCount ?? 0}
+                onCover={cover}
+                onDeleted={() => requestAnimationFrame(() => closeButton.current?.focus())}
+              />
+            )}
           </section>
         )}
       </div>

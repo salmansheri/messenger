@@ -24,6 +24,8 @@ export type ViewerState = {
   held: boolean;
   /** Paused with Space or the Pause button, until it is pressed again. */
   paused: boolean;
+  /** Something is open over the Story (a menu, the list of viewers). */
+  covered: boolean;
   closed: boolean;
 };
 
@@ -34,10 +36,21 @@ export type ViewerAction =
   | { type: "previous" }
   | { type: "hold"; held: boolean }
   | { type: "togglePause" }
+  | { type: "cover"; covered: boolean }
   /** The tray changed: Stories may have come or gone while the viewer is open. */
   | { type: "sync"; people: ViewerPerson[] };
 
-const CLOSED: ViewerState = { people: [], person: 0, story: 0, elapsed: 0, ready: false, held: false, paused: false, closed: true };
+const CLOSED: ViewerState = {
+  people: [],
+  person: 0,
+  story: 0,
+  elapsed: 0,
+  ready: false,
+  held: false,
+  paused: false,
+  covered: false,
+  closed: true,
+};
 
 /** The first Story a person is played from: the first they have not seen, or the first of all. */
 function firstUnseen(person: ViewerPerson): number {
@@ -123,7 +136,7 @@ export function step(state: ViewerState, action: ViewerAction): ViewerState {
   if (state.closed) return state;
   switch (action.type) {
     case "tick": {
-      if (!state.ready || state.held || state.paused) return state;
+      if (!state.ready || state.held || state.paused || state.covered) return state;
       const elapsed = state.elapsed + action.ms;
       return elapsed >= STORY_MS ? forward(state) : { ...state, elapsed };
     }
@@ -137,6 +150,8 @@ export function step(state: ViewerState, action: ViewerAction): ViewerState {
       return state.held === action.held ? state : { ...state, held: action.held };
     case "togglePause":
       return { ...state, paused: !state.paused };
+    case "cover":
+      return state.covered === action.covered ? state : { ...state, covered: action.covered };
     case "sync":
       return sync(state, action.people);
   }
